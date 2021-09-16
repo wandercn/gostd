@@ -1,8 +1,20 @@
 [package]
 name = "gostd"
-version = "0.1.0"
+license = "MIT"
+version = "0.0.1"
 edition = "2018"
+authors = ["wandercn<wander@ffactory.org>"]
+description = "gostd is the go standard library implementation in rust. gostd 是Go标准库的rust实现"
+homepage = "https://github.com/wandercn/gostd"
+repository = "https://github.com/wandercn/gostd"
+keywords = ["gobind","go-api","gostd","go-to-rust","to_be_rust_or_to_be_failed"]
+categories= ["api-bindings","accessibility","development-tools","compilers"]
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3
+[dependencies]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
