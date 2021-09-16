@@ -1,9 +1,9 @@
 # gostd
-rust 语法比go复杂，但是go代码简单好理解，想通过这个项目把go的标准库通过rust实现。以后有什么go的项目可以通过，机械化的把:: 改成.就可以实现转换。
+rust 语法比go复杂，但是go代码简单好理解，想通过这个项目把go的标准库通过rust实现。以后有什么go的项目可以通过，比如 import "bytes" 改成 use gostd::bytes 可以实现转换。
 
-本项目纯粹个人兴趣，大概率会失败,但是梦想还是要有的万一它实现了。
+本项目纯粹个人兴趣，大概率会失败，但是梦想还是要有的万一它实现了。
 
-go to rust，to be rust or to be failed.
+go to rust,to be rust or to be failed.
 
 # 已知难点
 - go底层特性可能无法用rust实现，比如跟运行时相关的反射reflect，如果有依赖此库需要通过rust中的方式处理。
@@ -117,4 +117,4 @@ use gostd::vendor
 # 大致方向
 
 - 分析go标准库的依赖情况，从最底层的库还是实现。
-- go代码中的单元测试也会一并用rust，这样可以保证代码的健壮性。
+- go源码中的单元测试也会一并用rust实现，这样可以保证代码的健壮性。
