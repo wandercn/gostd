@@ -12,6 +12,11 @@ pub type int16 = i16;
 pub type int32 = i32;
 pub type int64 = i64;
 
+// float32 is the set of all IEEE-754 32-bit floating-point numbers.
+pub type float32 = f32;
+
+// float64 is the set of all IEEE-754 64-bit floating-point numbers.
+pub type float64 = f64;
 // type complex64
 // type complex128
 
@@ -32,3 +37,6 @@ pub const iota: int32 = 0;
 } */
 
 // type error = std::error::Error;
+
+
+   
