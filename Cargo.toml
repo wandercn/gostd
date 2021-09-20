@@ -16,5 +16,7 @@ opt-level = 0
 [profile.release]
 opt-level = 3
 [dependencies]
-
+libc = "0.2"
+cvt = "0.1.1"
+lazy_static = "1.4.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

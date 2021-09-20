@@ -38,5 +38,29 @@ pub const iota: int32 = 0;
 
 // type error = std::error::Error;
 
+// 强制类型转换宏 int64() 等价于 as int64
+#[macro_export]
+macro_rules! int64 {
+    ($x:ident) => {
+        $x as int64
+    };
+}
+#[macro_export]
+macro_rules! int32 {
+    ($x:ident) => {
+        $x as int32
+    };
+}
+#[macro_export]
+macro_rules! uint64 {
+    ($x:ident) => {
+        $x as uint64
+    };
+}
 
-   
+#[macro_export]
+macro_rules! int {
+    ($x:ident) => {
+        $x as int
+    };
+}

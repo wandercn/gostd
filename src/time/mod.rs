@@ -4,6 +4,7 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
+#[macro_use]
 use crate::builtin::*;
 use std::boxed::Box;
 
@@ -32,7 +33,7 @@ const Second: int64 = 1000 * Millisecond;
 const Minute: int64 = 60 * Second;
 const Hour: int64 = 60 * Minute;
 
-#[derive(Default,PartialEq,PartialOrd)]
+#[derive(Default, PartialEq, PartialOrd)]
 pub struct Duration(int64); // 由于类型别名不能绑定方法通过元组类型结构体实现,访问元组内容用d.0数字下标访问，go源码是 type Duration int64
 
 const minDuration: int64 = -1 << 63;
@@ -236,11 +237,13 @@ const minWall: int64 = wallToInternal; // year 1885
 const nsecMask: int64 = 1 << 30 - 1;
 const nsecShift: int64 = 30;
 
-#[derive(Default,PartialEq,PartialOrd)]
+use std::cell::RefCell;
+use std::rc::Rc;
+#[derive(Default, PartialEq, PartialOrd)]
 pub struct Time {
     wall: uint64,
     ext: int64,
-    loc: Box<Location>,
+    loc: Rc<RefCell<Location>>,
 }
 
 impl Time {
@@ -281,12 +284,12 @@ impl Time {
         self.ext += d
     }
 
-    fn setLoc(&mut self, loc: Location) {
-        /* if loc == &utcLoc {
-            loc = nil
-        } */
+    fn setLoc(&mut self, mut loc: Location) {
+        if loc.name == "UTC" {
+            loc = Location::default();
+        }
         self.stripMono();
-        self.loc = Box::new(loc);
+        self.loc = Rc::new(RefCell::new(loc));
     }
 
     fn stripMono(&mut self) {
@@ -295,9 +298,96 @@ impl Time {
             self.wall &= nsecMask as uint64;
         }
     }
+
+    fn setMono(&mut self, m: int64) {
+        if self.wall as int64 & hasMonotonic == 0 {
+            let sec = self.ext;
+            if sec < minWall || maxWall < sec {
+                return;
+            }
+            self.wall |=
+                uint64!(hasMonotonic) | (((sec - minWall) as int64) << int64!(nsecShift)) as uint64;
+        }
+        self.ext = m
+    }
+
+    fn mono(&self) -> int64 {
+        if self.wall as int64 & hasMonotonic == 0 {
+            return 0;
+        }
+        self.ext
+    }
+
+    pub fn After(&self, u: Time) -> bool {
+        if self.wall as int64 & u.wall as int64 & hasMonotonic != 0 {
+            return self.ext > u.ext;
+        }
+        let ts = self.sec();
+        let us = u.sec();
+        ts > us || ts == us && self.nsec() > u.nsec()
+    }
+
+    pub fn Before(&self, u: Time) -> bool {
+        if self.wall as int64 & u.wall as int64 & hasMonotonic != 0 {
+            return self.ext < u.ext;
+        }
+        let ts = self.sec();
+        let us = u.sec();
+        ts < us || ts == us && self.nsec() < u.nsec()
+    }
+
+    pub fn Equal(&self, u: Time) -> bool {
+        if self.wall as int64 & u.wall as int64 & hasMonotonic != 0 {
+            return self.ext == u.ext;
+        }
+        self.sec() == u.sec() && self.nsec() == u.nsec()
+    }
+
+    pub fn IsZero(&self) -> bool {
+        self.sec() == 0 && self.nsec() == 0
+    }
+
+    /// 待完善
+    fn abs(&self) -> uint64 {
+        // let mut l = self.loc;
+        // if l.take().name == Local.name {
+        // l = l.get();
+        // }
+        let mut sec = self.unixSec();
+        if self.loc.borrow().name != utcLoc.name {}
+        (sec + (unixToInternal + internalToAbsolute)) as uint64
+    }
+
+    fn date(&self, full:bool )->(int ,Month,int,int){
+        absDate(self.abs(),full)
+    }
+
+    fn Add(&self,d :Duration)->Time{
+        let t=self;
+        let dsec =d.0/1e9 as int64;
+        let nsec =t.nsec() + d%1e9;
+        if nsec >=1e9{
+            dsec+=1;
+            nsec -=1e9;
+        }else if nsec<0{
+            dsec-=1;
+            nsec +=1e9;
+        }
+        t.wall = t.wall&^nsecMask |nsec;
+        t.addSec(dsec);
+        if t.wall & hasMonotonic !=0{
+            let te = t.ext +d;
+            if d<0 && te>t.ext || d>0 && te<t.ext{
+                t.stripMono();
+            }else{
+                t.ext=te;
+            }
+        }
+        t
+    }
 }
 
-#[derive(Default,PartialEq,PartialOrd)]
+#[derive(Default, PartialEq, PartialOrd, Clone)]
 struct Location {
     name: string,
     zone: Vec<zone>,
@@ -321,11 +411,13 @@ struct Location {
     // to lookup.
     cacheStart: int64,
     cacheEnd: int64,
-    cacheZone: Box<zone>,
+    cacheZone: zone,
 }
 
+impl Location {}
+
 // A zone represents a single time zone such as CET.
- #[derive(Default,PartialEq,PartialOrd)]
+#[derive(Default, PartialEq, PartialOrd, Clone)]
 struct zone {
     name: string, // abbreviated name, "CET"
     offset: int,  // seconds east of UTC
@@ -333,7 +425,7 @@ struct zone {
 }
 
 // A zoneTrans represents a single time zone transition.
-#[derive(Default,PartialEq,PartialOrd)]
+#[derive(Default, PartialEq, PartialOrd, Clone, Copy)]
 struct zoneTrans {
     when: int64,  // transition time, in seconds since 1970 GMT
     index: uint8, // the index of the zone that goes into effect at that time
@@ -341,22 +433,222 @@ struct zoneTrans {
     isutc: bool, // ignored - no idea what these mean
 }
 
-
-use std::time::Instant;
-
-fn runtimeNano()->int64{
-    let now = Instant::now;
-    now.into()
+mod unix;
+use lazy_static;
+lazy_static::lazy_static! {
+    static ref startNano:int64 =runtimeNano() - 1;
+    static ref Local:Location = Location::default();
+    static ref utcLoc:Location = {
+    let mut l = Location::default();
+    l.name="UTC".to_string();
+     l
+    };
 }
-fn now()->(int64,int32,int64){
-   (secs,nanos,0)
+fn runtimeNano() -> int64 {
+    unix::monotonic_now() as int64
 }
-pub fn Now()-> Time {
-	let (sec, nsec, mono) = now() ;
-	mono -= startNano
-	sec += unixToInternal - minWall
-	if uint64(sec)>>33 != 0 {
-		return Time{uint64(nsec), sec + minWall, Local}
-	}
-	return Time{hasMonotonic | uint64(sec)<<nsecShift | uint64(nsec), mono, Local}
+fn now() -> (int64, int32, int64) {
+    let (sec, nsec) = unix::real_time_now();
+    let mono = unix::monotonic_now();
+    (int64!(sec), int32!(nsec), int64!(mono))
+}
+
+pub fn Now() -> Time {
+    let (mut sec, mut nsec, mut mono) = now();
+    mono -= *startNano;
+    sec += unixToInternal - minWall;
+    if sec >> 33 != 0 {
+        return Time {
+            wall: uint64!(nsec),
+            ext: sec + minWall,
+            loc: Rc::new(RefCell::new(Local.clone())),
+        };
+    }
+    Time {
+        wall: (hasMonotonic as int64
+            | (uint64!(sec) << uint64!(nsecShift)) as int64
+            | nsec as int64) as uint64,
+        ext: mono,
+        loc: Rc::new(RefCell::new(Local.clone())),
+    }
+}
+
+fn absDate(abs: uint64, full: bool) -> (int, Month, int, int) {
+    let mut year: int = 0;
+    let mut month = Month::January;
+    let mut day: int = 0;
+    let mut yday: int = 0;
+    // Split into time and day.
+    let mut d = abs as int64 / secondsPerDay;
+
+    // Account for 400 year cycles.
+    let mut n = d / daysPer400Years;
+    let mut y = 400 * n;
+    d -= daysPer400Years * n;
+
+    // Cut off 100-year cycles.
+    // The last cycle has one extra leap year, so on the last day
+    // of that year, day / daysPer100Years will be 4 instead of 3.
+    // Cut it back down to 3 by subtracting n>>2.
+    n = d / daysPer100Years;
+    n -= n >> 2;
+    y += 100 * n;
+    d -= daysPer100Years * n;
+
+    // Cut off 4-year cycles.
+    // The last cycle has a missing leap year, which does not
+    // affect the computation.
+    n = d / daysPer4Years;
+    y += 4 * n;
+    d -= daysPer4Years * n;
+
+    // Cut off years within a 4-year cycle.
+    // The last year is a leap year, so on the last day of that year,
+    // day / 365 will be 4 instead of 3. Cut it back down to 3
+    // by subtracting n>>2.
+    n = d / 365;
+    n -= n >> 2;
+    y += n;
+    d -= 365 * n;
+
+    year = (y + absoluteZeroYear) as int;
+    yday = int!(d);
+
+    if !full {
+        return (year, month, day, yday);
+    }
+
+    day = yday;
+    if isLeap(year) {
+        if  day > 31+29-1{
+            day=day -1;
+        }else if day == 31+29-1 {
+            month = Month::February;
+            day = 29;
+
+        }
+    }
+
+    let mut  m = day/31;
+    let end = daysBefore[m as isize+1] as int;
+    let  begin: int;
+    if day >= end {
+         m+=1;
+        begin = end;
+    } else {
+        begin = daysBefore[m] as int;
+    }
+
+    day = day - begin + 1;
+         (year, m, day, yday)
+}
+
+const daysBefore:[int32;13] = [
+	0,
+	31,
+	31 + 28,
+	31 + 28 + 31,
+	31 + 28 + 31 + 30,
+	31 + 28 + 31 + 30 + 31,
+	31 + 28 + 31 + 30 + 31 + 30,
+	31 + 28 + 31 + 30 + 31 + 30 + 31,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30 + 31,
+];
+
+fn isLeap(year: int) -> bool {
+     year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+}
+
+const longDayNames: [&str; 7] = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+];
+
+const shortDayNames: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const shortMonthNames: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+const longMonthNames: [&str; 12] = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+];
+
+#[derive(PartialEq, PartialOrd, Clone, Copy)]
+enum Month {
+    January = 1,
+    February = 2,
+    March = 3,
+    April = 4,
+    May = 5,
+    June = 6,
+    July = 7,
+    August = 8,
+    September = 9,
+    October = 10,
+    November = 11,
+    December = 12,
+}
+
+impl Month {
+    pub fn String(&self) -> string {
+        let m = *self;
+        if Month::January <= m && m <= Month::December {
+            return longMonthNames[m as usize - 1].to_string();
+        }
+        let mut buf: [byte; 20] = [0; 20];
+        let n = fmtInt(&mut buf[..], m as uint64);
+        let mut mon = String::from("%!Month(");
+        let s = string::from_utf8(buf[n..].to_vec()).unwrap();
+        mon.push_str(s.as_str());
+        mon.push(')');
+        mon
+    }
+}
+
+#[derive(PartialEq, PartialOrd, Clone, Copy)]
+enum Weekday {
+    Sunday = 1,
+    Monday = 2,
+    Tuesday = 3,
+    Wednesday = 4,
+    Thursday = 5,
+    Friday = 6,
+    Saturday,
+}
+
+impl Weekday {
+    fn String(&self) -> string {
+        let d = *self;
+        if Weekday::Sunday <= d && d <= Weekday::Saturday {
+            return longDayNames[d as usize].to_string();
+        }
+        let mut buf: [byte; 20] = [0; 20];
+        let n = fmtInt(&mut buf[..], d as uint64);
+        let mut mon = String::from("%!Weekday(");
+        let s = string::from_utf8(buf[n..].to_vec()).unwrap();
+        mon.push_str(s.as_str());
+        mon.push(')');
+        mon
+    }
 }
