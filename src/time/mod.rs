@@ -509,7 +509,7 @@ fn absWeekday(abs: uint64) -> Weekday {
 }
 
 #[derive(Default, PartialEq, PartialOrd, Clone)]
-struct Location {
+pub struct Location {
     name: string,
     zone: Vec<zone>,
     tx: Vec<zoneTrans>,
@@ -539,6 +539,122 @@ impl Location {
     fn new() -> Location {
         Location::default()
     }
+    fn get(&mut self) -> Location {
+        if self.name == "".to_string() {
+            return *utcLoc;
+        }
+
+        if self.name == "Local".to_string() {
+            return *Local;
+        }
+        *self
+    }
+
+    pub fn String(&self) -> string {
+        self.get().name
+    }
+
+    fn lookup(&mut self, sec: int64) -> (string, int, int64, int64, bool) {
+        let l = self.get();
+
+        let mut name: string;
+        let mut offset: int;
+        let mut start: int64;
+        let mut end: int64;
+        let mut isDST: bool;
+
+        if l.zone.len() == 0 {
+            name = "UTC".to_string();
+            offset = 0;
+            start = alpha;
+            end = omega;
+            isDST = false;
+            return (name, offset, start, end, isDST);
+        }
+        let zone = l.cacheZone;
+        if l.cacheStart <= sec && sec < l.cacheEnd {
+            name = zone.name;
+            offset = zone.offset;
+            start = l.cacheStart;
+            end = l.cacheEnd;
+            isDST = zone.isDST;
+            return (name, offset, start, end, isDST);
+        }
+        if l.tx.len() == 0 || sec < l.tx[0].when {
+            let zone = l.zone[l.lookupFirstZone()];
+            name = zone.name;
+            offset = zone.offset;
+            start = alpha;
+            if l.tx.len() > 0 {
+                end = l.tx[0].when;
+            } else {
+                end = omega;
+            }
+            isDST = zone.isDST;
+            return (name, offset, start, end, isDST);
+        }
+
+        let tx = l.tx;
+        end = omega;
+        let mut lo = 0;
+        let mut hi = tx.len();
+        while (hi - lo > 1) {
+            let m = lo + (hi - lo) / 2;
+            let lim = tx[m].when;
+            if sec < lim {
+                end = lim;
+                hi = m;
+            } else {
+                lo = m;
+            }
+        }
+        let zone = l.zone[tx[lo].index as uint];
+        name = zone.name;
+        offset = zone.offset;
+        start = tx[lo].when;
+        isDST = zone.isDST;
+
+        //        if lo == tx.len() - 1 && l.extend != "" {
+        // let (ename, eoffset, estart, eend, eisDST, ok) = tzset(l.extend, end, sec);
+        // if ok {
+        //     return (ename, eoffset, estart, eend, eisDST);
+        // }
+        // }
+
+        (name, offset, start, end, isDST)
+    }
+
+    fn lookupFirstZone(&self) -> uint {
+        if !self.firstZoneUsed() {
+            return 0;
+        }
+        let index = uint!(self.tx[0].index);
+        if self.tx.len() > 0 && self.zone[index].isDST {
+            let mut zi = index - 1;
+            while (zi >= 0) {
+                zi -= 1;
+                if self.zone[zi].isDST {
+                    return zi;
+                }
+            }
+        }
+
+        for (zi, v) in self.zone.iter().enumerate() {
+            if !v.isDST {
+                return zi;
+            }
+        }
+        0
+    }
+
+    fn firstZoneUsed(&self) -> bool {
+        for v in self.tx.iter() {
+            if v.index == 0 {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 // A zone represents a single time zone such as CET.
@@ -558,6 +674,31 @@ struct zoneTrans {
     isutc: bool, // ignored - no idea what these mean
 }
 
+const alpha: int64 = (-1) << 63; // math.MinInt64
+const omega: int64 = (1 << 63) - 1; // math.MaxInt64
+
+pub fn FixedZone(name: string, offset: int) -> Location {
+    let zo = vec![zone {
+        name: name,
+        offset: offset,
+        isDST: false,
+    }];
+    let loc = Location {
+        name,
+        zone: zo,
+        tx: vec![zoneTrans {
+            when: alpha,
+            index: 0,
+            isstd: false,
+            isutc: false,
+        }],
+        cacheStart: alpha,
+        cacheEnd: omega,
+        cacheZone: zo[0],
+        extend: "".to_string(),
+    };
+    loc
+}
 mod unix;
 use lazy_static;
 lazy_static::lazy_static! {
