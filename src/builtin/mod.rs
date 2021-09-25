@@ -189,5 +189,6 @@ macro_rules! rune {
 }
 
 pub fn string(b: &[byte]) -> string {
+    // String::from_utf8_lossy(b).to_string()
     string::from_utf8(b[..].to_vec()).unwrap()
 }
