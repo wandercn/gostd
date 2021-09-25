@@ -32,7 +32,7 @@ const Second: int64 = 1000 * Millisecond;
 const Minute: int64 = 60 * Second;
 const Hour: int64 = 60 * Minute;
 
-#[derive(Default, PartialEq, PartialOrd)]
+#[derive(Default, PartialEq, PartialOrd, Debug)]
 pub struct Duration(int64); // 由于类型别名不能绑定方法通过元组类型结构体实现,访问元组内容用d.0数字下标访问，go源码是 type Duration int64
 
 const minDuration: int64 = int64!(-1) << 63;
@@ -1015,7 +1015,7 @@ const longMonthNames: [&str; 12] = [
     "December",
 ];
 
-#[derive(PartialEq, PartialOrd, Clone, Copy)]
+#[derive(PartialEq, PartialOrd, Clone, Copy, Debug)]
 pub enum Month {
     January = 1,
     February = 2,
@@ -1065,7 +1065,7 @@ impl Month {
     }
 }
 
-#[derive(PartialEq, PartialOrd, Clone, Copy)]
+#[derive(PartialEq, PartialOrd, Clone, Copy, Debug)]
 pub enum Weekday {
     Monday = 1,
     Tuesday = 2,
