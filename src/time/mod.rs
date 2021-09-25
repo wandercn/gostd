@@ -6,7 +6,6 @@
 #![allow(non_camel_case_types)]
 #[macro_use]
 use crate::builtin::*;
-use std::boxed::Box;
 
 const Layout: &str = "01/02 03:04:05PM '06 -0700"; // The reference time, in numerical order.
 const ANSIC: &str = "Mon Jan _2 15:04:05 2006";
@@ -206,7 +205,7 @@ const nsecShift: int32 = 30;
 
 use std::cell::RefCell;
 use std::rc::Rc;
-#[derive(Default, PartialEq, PartialOrd)]
+#[derive(Default, PartialEq, PartialOrd, Debug)]
 pub struct Time {
     wall: uint64,
     ext: int64,
@@ -503,9 +502,43 @@ impl Time {
             self.loc.clone(),
         );
     }
+
+    pub fn IsDST(&self) -> bool {
+        let (_, _, _, _, isDST) = self.loc.borrow().lookup(self.Unix());
+        isDST
+    }
 }
 
-fn Date(
+pub fn Unix(sec: int64, nsec: int64) -> Time {
+    let mut sec = sec;
+    let mut nsec = nsec;
+    if nsec < 0 || nsec >= 100_000_000 {
+        let n = nsec / 1000_000_000;
+        sec += n;
+        nsec -= n * 1000_000_000;
+        if nsec < 0 {
+            nsec += 1000_000_000;
+            sec -= 1;
+        }
+    }
+    unixTime(sec, int32!(nsec))
+}
+
+pub fn UnixMilli(msec: int64) -> Time {
+    Unix(msec / 1000, (msec % 1000) / 1000_000)
+}
+
+pub fn UnixMicro(usec: int64) -> Time {
+    Unix(usec / 1000_000, (usec % 1000_000) * 1000)
+}
+
+/// # Example
+/// ```
+/// use gostd::time;
+/// let start = time::Now();
+/// println!("{:?}",start);
+/// ```
+pub fn Date(
     year: int,
     month: Month,
     day: int,
@@ -578,7 +611,7 @@ fn absWeekday(abs: uint64) -> Weekday {
     Weekday::indexOf(uint!(sec / secondsPerDay))
 }
 
-#[derive(Default, PartialEq, PartialOrd, Clone)]
+#[derive(Default, PartialEq, PartialOrd, Clone, Debug)]
 pub struct Location {
     name: string,
     zone: Vec<zone>,
@@ -728,7 +761,7 @@ impl Location {
 }
 
 // A zone represents a single time zone such as CET.
-#[derive(Default, PartialEq, PartialOrd, Clone)]
+#[derive(Default, PartialEq, PartialOrd, Clone, Debug)]
 struct zone {
     name: string, // abbreviated name, "CET"
     offset: int,  // seconds east of UTC
@@ -736,7 +769,7 @@ struct zone {
 }
 
 // A zoneTrans represents a single time zone transition.
-#[derive(Default, PartialEq, PartialOrd, Clone, Copy)]
+#[derive(Default, PartialEq, PartialOrd, Clone, Copy, Debug)]
 struct zoneTrans {
     when: int64,  // transition time, in seconds since 1970 GMT
     index: uint8, // the index of the zone that goes into effect at that time
