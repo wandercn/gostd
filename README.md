@@ -122,5 +122,5 @@ use gostd::vendor
 # todo
 
 - [x] Go基础类型在rust实现 gostd::builtin, int64 = i64, int32 = i32
-- [x] 强制转换宏,例如 2 as i64 等价 int64!(2) 跟供中的int64(2)就多个！
+- [x] 强制转换宏,例如 2 as i64 等价 int64!(2) 跟Go的int64(2)就多个！
 - [x] time库在rust实现 gostd::time
