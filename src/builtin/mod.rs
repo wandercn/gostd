@@ -36,7 +36,158 @@ pub const iota: int32 = 0;
    t::defaunt().as_ref()
 } */
 
-// type error = std::error::Error;
+// type error = std!!!::error::Error;
+#[macro_export]
+macro_rules! uint8 {
+    ($x:ident) => {
+        ($x as uint8)
+    };
+    ($x:expr) => {
+        ($x as uint8)
+    };
+}
 
+#[macro_export]
+macro_rules! uint16 {
+    ($x:ident) => {
+        ($x as uint16)
+    };
+    ($x:expr) => {
+        ($x as uint16)
+    };
+}
 
-   
+#[macro_export]
+macro_rules! uint32 {
+    ($x:ident) => {
+        ($x as uint32)
+    };
+    ($x:expr) => {
+        ($x as uint32)
+    };
+}
+
+#[macro_export]
+macro_rules! uint64 {
+    ($x:ident) => {
+        $x as uint64;
+    };
+    ($x:expr) => {
+        ($x as uint64)
+    };
+}
+
+#[macro_export]
+macro_rules! int8 {
+    ($x:ident) => {
+        ($x as int8)
+    };
+    ($x:expr) => {
+        ($x as int8)
+    };
+}
+
+#[macro_export]
+macro_rules! int16 {
+    ($x:ident) => {
+        ($x as int16)
+    };
+    ($x:expr) => {
+        ($x as int16)
+    };
+}
+
+#[macro_export]
+macro_rules! int32 {
+    ($x:ident) => {
+        ($x as int32)
+    };
+    ($x:expr) => {
+        ($x as int32)
+    };
+}
+
+// 强制类型转换宏 int64!() 等价于 as int64
+#[macro_export]
+macro_rules! int64 {
+    ($x:ident) => {
+        ($x as int64)
+    };
+    ($x:expr) => {
+        ($x as int64)
+    };
+}
+
+#[macro_export]
+macro_rules! float32 {
+    ($x:ident) => {
+        ($x as float32)
+    };
+    ($x:expr) => {
+        ($x as float32)
+    };
+}
+
+#[macro_export]
+macro_rules! float64 {
+    ($x:ident) => {
+        ($x as float64)
+    };
+    ($x:expr) => {
+        ($x as float64)
+    };
+}
+
+#[macro_export]
+macro_rules! int {
+    ($x:ident) => {
+        ($x as int)
+    };
+    ($x:expr) => {
+        ($x as int)
+    };
+}
+
+#[macro_export]
+macro_rules! uint {
+    ($x:ident) => {
+        ($x as uint)
+    };
+    ($x:expr) => {
+        ($x as uint)
+    };
+}
+
+#[macro_export]
+macro_rules! uintptr {
+    ($x:ident) => {
+        ($x as uintptr)
+    };
+    ($x:expr) => {
+        ($x as uintptr)
+    };
+}
+
+#[macro_export]
+macro_rules! byte {
+    ($x:ident) => {
+        ($x as byte)
+    };
+    ($x:expr) => {
+        ($x as byte)
+    };
+}
+
+#[macro_export]
+macro_rules! rune {
+    ($x:ident) => {
+        ($x as rune)
+    };
+    ($x:expr) => {
+        ($x as rune)
+    };
+}
+
+pub fn string(b: &[byte]) -> string {
+    string::from_utf8(b[..].to_vec()).unwrap()
+}

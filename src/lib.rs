@@ -1,7 +1,9 @@
 pub mod archive;
 pub mod bufio;
 /// 简单实现go的builtin
+#[macro_use]
 pub mod builtin;
+extern crate lazy_static;
 pub mod bytes;
 pub mod cmd;
 pub mod compress;
