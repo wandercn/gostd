@@ -256,9 +256,9 @@ impl Time {
         if (sum > self.ext) == (d > 0) {
             self.ext = sum;
         } else if d > 0 {
-            self.ext = (1 << 63) - 1;
+            self.ext = int64::MAX; //int64!((uint64!(1) << 63) - 1);
         } else {
-            self.ext = -((1 << 63) - 1);
+            self.ext = int64::MIN;
         }
     }
 
@@ -424,7 +424,7 @@ impl Time {
 
     pub fn ISOWeek(&self) -> (int, int) {
         let mut abs = self.abs();
-        let d = int!(Weekday::Thursday) - int!(absWeekday(abs));
+        let mut d = int!(Weekday::Thursday) - int!(absWeekday(abs));
         if d == 4 {
             d = -3;
         }
@@ -434,27 +434,38 @@ impl Time {
     }
 
     pub fn UTC(&mut self) -> Time {
-        self.setLoc(*utcLoc);
-        *self
+        self.setLoc(utcLoc.clone());
+        let mut t = Time::new();
+        t.wall = self.wall;
+        t.ext = self.ext;
+        t.loc = self.loc.clone();
+        t
     }
 
     pub fn Local(&mut self) -> Time {
-        self.setLoc(*Local);
-        *self
+        self.setLoc(Local.clone());
+        let mut t = Time::new();
+        t.wall = self.wall;
+        t.ext = self.ext;
+        t.loc = self.loc.clone();
+        t
     }
 
     pub fn In(&mut self, loc: Location) -> Time {
         self.setLoc(loc);
-        *self
+        let mut t = Time::new();
+        t.wall = self.wall;
+        t.ext = self.ext;
+        t.loc = self.loc.clone();
+        t
     }
 
     pub fn Location(&self) -> Location {
-        let l = self.loc.borrow_mut();
+        let mut l = self.loc.borrow().clone();
         if l.name.len() == 0 {
-            self.setLoc(*utcLoc);
+            l = utcLoc.clone();
         }
-        l = self.loc.borrow_mut();
-        return *l;
+        l
     }
 
     pub fn Zone(&self) -> (string, int) {
@@ -483,15 +494,74 @@ impl Time {
         let (hour, min, sec) = self.Clock();
         return Date(
             year + years,
-            Month(months + month),
+            Month::indexOf(uint!(months) + uint!(month)),
             day + days,
             hour,
             min,
             sec,
             int!(self.nsec()),
-            self.loc,
+            self.loc.clone(),
         );
     }
+}
+
+fn Date(
+    year: int,
+    month: Month,
+    day: int,
+    hour: int,
+    min: int,
+    sec: int,
+    nsec: int,
+    location: Rc<RefCell<Location>>,
+) -> Time {
+    let loc = Some(location);
+    if loc.is_none() {
+        panic!("time: missing Location in call to Date")
+    }
+
+    let mut m = int!(month) - 1;
+    let (year, m) = norm(year, m, 12);
+    let month = Month::indexOf(uint!(m + 1));
+
+    let (sec, nsec) = norm(sec, nsec, 1000_000_000);
+    let (min, sec) = norm(min, sec, 60);
+    let (hour, min) = norm(hour, min, 60);
+    let (day, hour) = norm(day, hour, 24);
+
+    let mut d = daySinceEpoch(year);
+
+    d += uint64!(daysBefore[uint!(month) - 1]);
+
+    if isLeap(year) && month > Month::March {
+        d += 1;
+    }
+
+    d += uint64!(day - 1);
+
+    let mut abs = d * uint64!(secondsPerDay);
+    abs += uint64!(hour) * uint64!(secondsPerHour)
+        + uint64!(min) * uint64!(secondsPerMinute)
+        + uint64!(sec);
+
+    let mut unix = int64!(abs) + (absoluteToInternal + internalToUnix);
+    let l = loc.unwrap();
+    let (_, offset, start, end, _) = l.borrow_mut().lookup(unix);
+    if offset != 0 {
+        let utc = unix - int64!(offset);
+
+        if utc < start {
+            let (_, offset, _, _, _) = l.borrow_mut().lookup(start - 1);
+        }
+
+        if utc >= end {
+            let (_, offset, _, _, _) = l.borrow_mut().lookup(end);
+        }
+        unix -= int64!(offset);
+    }
+    let t = unixTime(unix, int32!(nsec));
+    t.loc.replace(l.borrow().clone());
+    t
 }
 
 fn absClock(abs: uint64) -> (int, int, int) {
@@ -539,22 +609,22 @@ impl Location {
     fn new() -> Location {
         Location::default()
     }
-    fn get(&mut self) -> Location {
+    fn get(&self) -> Location {
         if self.name == "".to_string() {
-            return *utcLoc;
+            return utcLoc.clone();
         }
 
         if self.name == "Local".to_string() {
-            return *Local;
+            return Local.clone();
         }
-        *self
+        self.clone()
     }
 
     pub fn String(&self) -> string {
         self.get().name
     }
 
-    fn lookup(&mut self, sec: int64) -> (string, int, int64, int64, bool) {
+    fn lookup(&self, sec: int64) -> (string, int, int64, int64, bool) {
         let l = self.get();
 
         let mut name: string;
@@ -571,7 +641,7 @@ impl Location {
             isDST = false;
             return (name, offset, start, end, isDST);
         }
-        let zone = l.cacheZone;
+        let zone = l.cacheZone.clone();
         if l.cacheStart <= sec && sec < l.cacheEnd {
             name = zone.name;
             offset = zone.offset;
@@ -581,7 +651,7 @@ impl Location {
             return (name, offset, start, end, isDST);
         }
         if l.tx.len() == 0 || sec < l.tx[0].when {
-            let zone = l.zone[l.lookupFirstZone()];
+            let mut zone = l.zone[(l.lookupFirstZone())].clone();
             name = zone.name;
             offset = zone.offset;
             start = alpha;
@@ -608,7 +678,7 @@ impl Location {
                 lo = m;
             }
         }
-        let zone = l.zone[tx[lo].index as uint];
+        let zone = l.zone[tx[lo].index as uint].clone();
         name = zone.name;
         offset = zone.offset;
         start = tx[lo].when;
@@ -631,7 +701,7 @@ impl Location {
         let index = uint!(self.tx[0].index);
         if self.tx.len() > 0 && self.zone[index].isDST {
             let mut zi = index - 1;
-            while (zi >= 0) {
+            while int32!(zi) >= 0 {
                 zi -= 1;
                 if self.zone[zi].isDST {
                     return zi;
@@ -675,17 +745,17 @@ struct zoneTrans {
 }
 
 const alpha: int64 = (-1) << 63; // math.MinInt64
-const omega: int64 = (1 << 63) - 1; // math.MaxInt64
+const omega: int64 = int64!((uint64!(1) << 63) - 1); // math.MaxInt64
 
 pub fn FixedZone(name: string, offset: int) -> Location {
     let zo = vec![zone {
-        name: name,
+        name: name.to_string(),
         offset: offset,
         isDST: false,
     }];
     let loc = Location {
-        name,
-        zone: zo,
+        name: name.to_string(),
+        zone: zo.clone(),
         tx: vec![zoneTrans {
             when: alpha,
             index: 0,
@@ -694,7 +764,7 @@ pub fn FixedZone(name: string, offset: int) -> Location {
         }],
         cacheStart: alpha,
         cacheEnd: omega,
-        cacheZone: zo[0],
+        cacheZone: zo.get(0).unwrap().clone(),
         extend: "".to_string(),
     };
     loc
@@ -742,7 +812,7 @@ pub fn Now() -> Time {
 }
 
 fn unixTime(sec: int64, nsec: int32) -> Time {
-    let t = Time::new();
+    let mut t = Time::new();
     t.wall = uint64!(nsec);
     t.ext = sec + unixToInternal;
     t
@@ -838,7 +908,7 @@ fn isLeap(year: int) -> bool {
     year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
 }
 
-fn norm(hi: int, lo: int, base: int) -> (int, int) {
+fn norm(mut hi: int, mut lo: int, mut base: int) -> (int, int) {
     if lo < 0 {
         let n = (-lo - 1) / base + 1;
         hi -= n;
@@ -862,11 +932,11 @@ fn daysIn(m: Month, year: int) -> int {
 }
 
 fn daySinceEpoch(year: int) -> uint64 {
-    let y = int64!(year) - absoluteZeroYear;
+    let mut y = int64!(year) - absoluteZeroYear;
 
-    let n = y / 400;
+    let mut n = y / 400;
     y -= 400 * n;
-    let d = daysPer400Years * n;
+    let mut d = daysPer400Years * n;
 
     n = y / 100;
     y -= 100 * n;
@@ -913,7 +983,7 @@ const longMonthNames: [&str; 12] = [
 ];
 
 #[derive(PartialEq, PartialOrd, Clone, Copy)]
-enum Month {
+pub enum Month {
     January = 1,
     February = 2,
     March = 3,
@@ -963,7 +1033,7 @@ impl Month {
 }
 
 #[derive(PartialEq, PartialOrd, Clone, Copy)]
-enum Weekday {
+pub enum Weekday {
     Monday = 1,
     Tuesday = 2,
     Wednesday = 3,
@@ -1076,7 +1146,7 @@ fn div(t: Time, d: Duration) -> (int, Duration) {
         sec = -sec;
         nsec = -nsec;
         if nsec < 0 {
-            nsec += 1000_0000_000;
+            nsec += 1_000_000_000;
             sec -= 1;
         }
     }
@@ -1093,7 +1163,7 @@ fn div(t: Time, d: Duration) -> (int, Duration) {
     } else {
         let sec = uint64!(sec);
         let mut tmp = (sec >> 32) * 1000_0000_000;
-        let u1 = tmp >> 32;
+        let mut u1 = tmp >> 32;
         let u0 = tmp << 32;
         tmp = (sec & 0xFFFFFFFF) * 1000_0000_000;
 
@@ -1110,11 +1180,11 @@ fn div(t: Time, d: Duration) -> (int, Duration) {
             u1 += 1;
         }
 
-        let d1 = uint64!(d.0);
+        let mut d1 = uint64!(d.0);
         while ((d1 >> 63) != 1) {
             d1 <<= 1
         }
-        let d0 = uint64!(0);
+        let mut d0 = uint64!(0);
 
         loop {
             if u1 > d1 || u1 == d1 && u0 >= d0 {
