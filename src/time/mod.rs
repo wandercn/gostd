@@ -1,3 +1,10 @@
+//! Package time provides functionality for measuring and displaying time.
+//! The calendrical calculations always assume a Gregorian calendar, with no leap seconds.
+//!
+//! <details>
+//! <summary>zh-cn</summary>
+//! time包提供了时间的显示和测量用的函数。日历的计算采用的是公历。
+//! </details>
 // #![allow(unused_assignments)]
 #![allow(unused)]
 // #![allow(dead_code)]
@@ -34,6 +41,14 @@ pub const Hour: int64 = 60 * Minute;
 
 #[derive(Default, PartialEq, PartialOrd, Debug)]
 pub struct Duration(int64); // 由于类型别名不能绑定方法通过元组类型结构体实现,访问元组内容用d.0数字下标访问，go源码是 type Duration int64
+
+use std::fmt;
+
+impl fmt::Display for Duration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.String())
+    }
+}
 const minDuration: int64 = int64!(-1) << 63;
 const maxDuration: int64 = int64!((uint64!(1) << 63) - 1);
 
@@ -41,7 +56,7 @@ impl Duration {
     pub fn new(i: int64) -> Duration {
         Duration(i)
     }
-    pub fn String(&self) -> string {
+    pub fn String(&self) -> String {
         let d = self.0;
         let mut buf: [byte; 32] = [0; 32];
         let mut w = buf.len();
@@ -54,7 +69,6 @@ impl Duration {
             u = uint64!(d);
         }
 
-        uint64!(Second);
         if u < uint64!(Second) {
             let prec: int;
             w -= 1;
@@ -68,31 +82,33 @@ impl Duration {
             } else if u < uint64!(Millisecond) {
                 prec = 3;
                 w -= 1;
-                buf[w..].copy_from_slice(&[byte!('µ')])
+                let s = "µ";
+                buf[w..].copy_from_slice(s.as_bytes());
             } else {
                 prec = 6;
                 buf[w] = byte!('m');
             }
-            let (w2, u2) = fmtFrac(&mut buf[w..], uint64!(u), prec);
-            w = fmtInt(&mut buf[w2..], u2 % 60);
+            let (w2, u2) = fmtFrac(&mut buf[..w], uint64!(u), prec);
             u = uint64!(u2);
+            w = fmtInt(&mut buf[..w2], u);
         } else {
             w -= 1;
             buf[w] = byte!('s');
 
-            let (w3, u3) = fmtFrac(&mut buf[w..], u, 9);
-            w = fmtInt(&mut buf[w3..], u3 % 60);
-            u = u3 / 60;
+            let (w3, u3) = fmtFrac(&mut buf[..w], u, 9);
+            u = u3;
+            w = fmtInt(&mut buf[..w3], u3 % 60);
+            u /= 60;
             if u > 0 {
                 w -= 1;
                 buf[w] = byte!('m');
-                w = fmtInt(&mut buf[w..], u % 60);
+                w = fmtInt(&mut buf[..w], u % 60);
                 u /= 60;
 
                 if u > 0 {
                     w -= 1;
                     buf[w] = byte!('h');
-                    w = fmtInt(&mut buf[w..], u);
+                    w = fmtInt(&mut buf[..w], u);
                 }
             }
         }
@@ -422,7 +438,7 @@ impl Time {
     /// let end = time::Date(2000, 1, 1, 12, 0, 0, 0, loc.clone());
     ///
     /// let difference = end.Sub(&mut start);
-    /// println!("difference: {:?}",difference);
+    /// println!("difference: {}",difference);
     /// assert_eq!(12_f64,difference.Hours());
     /// ```
     pub fn Sub(&self, u: &mut Time) -> Duration {
@@ -590,8 +606,11 @@ pub fn UnixMicro(usec: int64) -> Time {
 /// # Example
 /// ```
 /// use gostd::time;
-/// let start = time::Now();
-/// println!("{:?}",start);
+/// let d = time::Date(2000, 2, 1, 12, 30, 0, 0, time::UTC.clone());
+/// let (year, month, day) = d.Date();
+/// println!("year = {}",year);
+/// println!("month = {}",month.String());
+/// println!("day = {}",day);
 /// ```
 pub fn Date(
     year: int,
@@ -1207,11 +1226,11 @@ fn fmtInt(buf: &mut [byte], v: uint64) -> uint {
     let mut v = v;
     let mut w = buf.len();
     if v == 0 {
-        w -= w;
+        w -= 1;
         buf[w] = byte!('0');
     } else {
         while v > 0 {
-            w = w - 1;
+            w -= 1;
             buf[w] = byte!(v % 10) + byte!('0');
             v /= 10;
         }
