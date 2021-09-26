@@ -1,3 +1,10 @@
+//! Package time provides functionality for measuring and displaying time.
+//! The calendrical calculations always assume a Gregorian calendar, with no leap seconds.
+//!
+//! <details>
+//! <summary>zh-cn</summary>
+//! time包提供了时间的显示和测量用的函数。日历的计算采用的是公历。
+//! </details>
 // #![allow(unused_assignments)]
 #![allow(unused)]
 // #![allow(dead_code)]
@@ -25,24 +32,31 @@ const StampMilli: &str = "Jan _2 15:04:05.000";
 const StampMicro: &str = "Jan _2 15:04:05.000000";
 const StampNano: &str = "Jan _2 15:04:05.000000000";
 
-const Nanosecond: int64 = 1;
-const Microsecond: int64 = 1000 * Nanosecond;
-const Millisecond: int64 = 1000 * Microsecond;
-const Second: int64 = 1000 * Millisecond;
-const Minute: int64 = 60 * Second;
-const Hour: int64 = 60 * Minute;
+pub const Nanosecond: int64 = 1;
+pub const Microsecond: int64 = 1000 * Nanosecond;
+pub const Millisecond: int64 = 1000 * Microsecond;
+pub const Second: int64 = 1000 * Millisecond;
+pub const Minute: int64 = 60 * Second;
+pub const Hour: int64 = 60 * Minute;
 
 #[derive(Default, PartialEq, PartialOrd, Debug)]
 pub struct Duration(int64); // 由于类型别名不能绑定方法通过元组类型结构体实现,访问元组内容用d.0数字下标访问，go源码是 type Duration int64
 
+use std::fmt;
+
+impl fmt::Display for Duration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.String())
+    }
+}
 const minDuration: int64 = int64!(-1) << 63;
 const maxDuration: int64 = int64!((uint64!(1) << 63) - 1);
 
 impl Duration {
-    pub fn new() -> Duration {
-        Duration::default()
+    pub fn new(i: int64) -> Duration {
+        Duration(i)
     }
-    pub fn String(&self) -> string {
+    pub fn String(&self) -> String {
         let d = self.0;
         let mut buf: [byte; 32] = [0; 32];
         let mut w = buf.len();
@@ -55,7 +69,6 @@ impl Duration {
             u = uint64!(d);
         }
 
-        uint64!(Second);
         if u < uint64!(Second) {
             let prec: int;
             w -= 1;
@@ -69,31 +82,33 @@ impl Duration {
             } else if u < uint64!(Millisecond) {
                 prec = 3;
                 w -= 1;
-                buf[w..].copy_from_slice(&[byte!('µ')])
+                let s = "µ";
+                buf[w..].copy_from_slice(s.as_bytes());
             } else {
                 prec = 6;
                 buf[w] = byte!('m');
             }
-            let (w2, u2) = fmtFrac(&mut buf[w..], uint64!(u), prec);
-            w = fmtInt(&mut buf[w2..], u2 % 60);
+            let (w2, u2) = fmtFrac(&mut buf[..w], uint64!(u), prec);
             u = uint64!(u2);
+            w = fmtInt(&mut buf[..w2], u);
         } else {
             w -= 1;
             buf[w] = byte!('s');
 
-            let (w3, u3) = fmtFrac(&mut buf[w..], u, 9);
-            w = fmtInt(&mut buf[w3..], u3 % 60);
-            u = u3 / 60;
+            let (w3, u3) = fmtFrac(&mut buf[..w], u, 9);
+            u = u3;
+            w = fmtInt(&mut buf[..w3], u3 % 60);
+            u /= 60;
             if u > 0 {
                 w -= 1;
                 buf[w] = byte!('m');
-                w = fmtInt(&mut buf[w..], u % 60);
+                w = fmtInt(&mut buf[..w], u % 60);
                 u /= 60;
 
                 if u > 0 {
                     w -= 1;
                     buf[w] = byte!('h');
-                    w = fmtInt(&mut buf[w..], u);
+                    w = fmtInt(&mut buf[..w], u);
                 }
             }
         }
@@ -209,7 +224,7 @@ use std::rc::Rc;
 pub struct Time {
     wall: uint64,
     ext: int64,
-    loc: Rc<RefCell<Location>>,
+    loc: Location,
 }
 
 impl Time {
@@ -266,7 +281,7 @@ impl Time {
             loc = Location::new();
         }
         self.stripMono();
-        self.loc = Rc::new(RefCell::new(loc));
+        self.loc = loc;
     }
 
     fn stripMono(&mut self) {
@@ -302,7 +317,22 @@ impl Time {
         let us = u.sec();
         ts > us || ts == us && self.nsec() > u.nsec()
     }
-
+    /// Before reports whether the time instant t is before u.
+    /// <details>
+    /// <summary>zh-cn</summary>
+    /// 如果t代表的时间点在u之前，返回真；否则返回假。
+    /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    /// let first = time::Now();
+    /// let second = time::Now();
+    /// let is_befor = first.Before(&second);
+    /// let not_befor = second.Before(&first);
+    /// assert_eq!(true, is_befor);
+    /// assert_eq!(false, not_befor);
+    /// ```
     pub fn Before(&self, u: &Time) -> bool {
         if self.wall & u.wall & uint64!(hasMonotonic) != 0 {
             return self.ext < u.ext;
@@ -342,6 +372,31 @@ impl Time {
         absDate(self.abs(), full)
     }
 
+    /// Add returns the time t+d.
+    /// <details>
+    /// <summary>zh-cn</summary>
+    /// Add返回时间点t+d。
+    /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    /// use gostd::time::Duration;
+    ///
+    /// let mut start = time::Date(2009, 1, 1, 12, 0, 0, 0, time::UTC.clone());
+    ///
+    ///	let afterTenSeconds = start.Add(&Duration::new(time::Second * 10));
+    ///	let afterTenMinutes = start.Add(&Duration::new(time::Minute * 10));
+    ///	let afterTenHours = start.Add(&Duration::new(time::Hour * 10));
+    ///	let afterTenDays = start.Add(&Duration::new(time::Hour * 24 * 10));
+
+    ///	println!("start = {:?}\n", start);
+    ///	println!("start.Add(time.Second * 10) = {:?}\n", afterTenSeconds);
+    ///	println!("start.Add(time.Minute * 10) = {:?}\n", afterTenMinutes);
+    ///	println!("start.Add(time.Hour * 10) = {:?}\n", afterTenHours);
+    ///	println!("start.Add(time.Hour * 24 * 10) = {:?}\n", afterTenDays);
+    ///
+    /// ```
     pub fn Add(&mut self, d: &Duration) -> Time {
         let mut t = self;
         let mut dsec = d.0 / 1_000_000_000;
@@ -369,7 +424,23 @@ impl Time {
         result.loc = t.loc.clone();
         result
     }
-
+    /// Sub returns the duration t-u. If the result exceeds the maximum (or minimum) value that can be stored in a Duration, the maximum (or minimum) duration will be returned. To compute t-d for a duration d, use t.Add(-d).
+    /// <details>
+    /// <summary>zh-cn</summary>
+    /// 返回一个时间段t-u。如果结果超出了Duration可以表示的最大值/最小值，将返回最大值/最小值。要获取时间点t-d（d为Duration），可以使用t.Add(-d)。
+    /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    /// let loc = time::UTC.clone();
+    /// let mut start = time::Date(2000, 1, 1, 0, 0, 0, 0, loc.clone());
+    /// let end = time::Date(2000, 1, 1, 12, 0, 0, 0, loc.clone());
+    ///
+    /// let difference = end.Sub(&mut start);
+    /// println!("difference: {}",difference);
+    /// assert_eq!(12_f64,difference.Hours());
+    /// ```
     pub fn Sub(&self, u: &mut Time) -> Duration {
         if self.wall & u.wall & uint64!(hasMonotonic) != 0 {
             let te = self.ext;
@@ -460,7 +531,7 @@ impl Time {
     }
 
     pub fn Location(&self) -> Location {
-        let mut l = self.loc.borrow().clone();
+        let mut l = self.loc.clone();
         if l.name.len() == 0 {
             l = utcLoc.clone();
         }
@@ -468,7 +539,7 @@ impl Time {
     }
 
     pub fn Zone(&self) -> (string, int) {
-        let (name, offset, _, _, _) = self.loc.borrow().lookup(self.unixSec());
+        let (name, offset, _, _, _) = self.loc.lookup(self.unixSec());
         (name, offset)
     }
 
@@ -493,7 +564,7 @@ impl Time {
         let (hour, min, sec) = self.Clock();
         return Date(
             year + years,
-            Month::indexOf(uint!(months) + uint!(month)),
+            uint!(months) + uint!(month),
             day + days,
             hour,
             min,
@@ -504,7 +575,7 @@ impl Time {
     }
 
     pub fn IsDST(&self) -> bool {
-        let (_, _, _, _, isDST) = self.loc.borrow().lookup(self.Unix());
+        let (_, _, _, _, isDST) = self.loc.lookup(self.Unix());
         isDST
     }
 }
@@ -535,26 +606,29 @@ pub fn UnixMicro(usec: int64) -> Time {
 /// # Example
 /// ```
 /// use gostd::time;
-/// let start = time::Now();
-/// println!("{:?}",start);
+/// let d = time::Date(2000, 2, 1, 12, 30, 0, 0, time::UTC.clone());
+/// let (year, month, day) = d.Date();
+/// println!("year = {}",year);
+/// println!("month = {}",month.String());
+/// println!("day = {}",day);
 /// ```
 pub fn Date(
     year: int,
-    month: Month,
+    month: uint,
     day: int,
     hour: int,
     min: int,
     sec: int,
     nsec: int,
-    location: Rc<RefCell<Location>>,
+    location: Location,
 ) -> Time {
     let loc = Some(location);
     if loc.is_none() {
         panic!("time: missing Location in call to Date")
     }
 
-    let mut m = int!(month) - 1;
-    let (year, m) = norm(year, m, 12);
+    let mut m = month - 1;
+    let (year, m) = norm(year, int!(m), 12);
     let month = Month::indexOf(uint!(m + 1));
 
     let (sec, nsec) = norm(sec, nsec, 1000_000_000);
@@ -579,21 +653,21 @@ pub fn Date(
 
     let mut unix = int64!(abs) + (absoluteToInternal + internalToUnix);
     let l = loc.unwrap();
-    let (_, offset, start, end, _) = l.borrow_mut().lookup(unix);
+    let (_, offset, start, end, _) = l.lookup(unix);
     if offset != 0 {
         let utc = unix - int64!(offset);
 
         if utc < start {
-            let (_, offset, _, _, _) = l.borrow_mut().lookup(start - 1);
+            let (_, offset, _, _, _) = l.lookup(start - 1);
         }
 
         if utc >= end {
-            let (_, offset, _, _, _) = l.borrow_mut().lookup(end);
+            let (_, offset, _, _, _) = l.lookup(end);
         }
         unix -= int64!(offset);
     }
-    let t = unixTime(unix, int32!(nsec));
-    t.loc.replace(l.borrow().clone());
+    let mut t = unixTime(unix, int32!(nsec));
+    t.loc = l.clone();
     t
 }
 
@@ -805,13 +879,14 @@ pub fn FixedZone(name: string, offset: int) -> Location {
 mod unix;
 use lazy_static;
 lazy_static::lazy_static! {
-    static ref startNano:int64 =runtimeNano() - 1;
-    static ref Local:Location = Location::new();
-    static ref utcLoc:Location = {
+   pub  static ref startNano:int64 =runtimeNano() - 1;
+   pub  static ref Local:Location = Location::new();
+   pub  static ref utcLoc:Location = {
     let mut l = Location::new();
     l.name="UTC".to_string();
      l
     };
+    pub static ref UTC:Location =utcLoc.clone() ;
 }
 
 fn runtimeNano() -> int64 {
@@ -832,7 +907,7 @@ pub fn Now() -> Time {
         return Time {
             wall: uint64!(nsec),
             ext: sec + minWall,
-            loc: Rc::new(RefCell::new(Local.clone())),
+            loc: Local.clone(),
         };
     }
     Time {
@@ -840,7 +915,7 @@ pub fn Now() -> Time {
             | (uint64!(sec) << uint64!(nsecShift)) as int64
             | nsec as int64) as uint64,
         ext: mono,
-        loc: Rc::new(RefCell::new(Local.clone())),
+        loc: Local.clone(),
     }
 }
 
@@ -1151,11 +1226,11 @@ fn fmtInt(buf: &mut [byte], v: uint64) -> uint {
     let mut v = v;
     let mut w = buf.len();
     if v == 0 {
-        w -= w;
+        w -= 1;
         buf[w] = byte!('0');
     } else {
         while v > 0 {
-            w = w - 1;
+            w -= 1;
             buf[w] = byte!(v % 10) + byte!('0');
             v /= 10;
         }
