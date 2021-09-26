@@ -324,7 +324,8 @@ impl Time {
     /// </details>
     ///
     /// # Example
-    /// ```
+    ///
+    /// ```rust
     /// use gostd::time;
     /// let first = time::Now();
     /// let second = time::Now();
@@ -379,7 +380,8 @@ impl Time {
     /// </details>
     ///
     /// # Example
-    /// ```
+    ///
+    /// ```rust
     /// use gostd::time;
     /// use gostd::time::Duration;
     ///
@@ -431,7 +433,8 @@ impl Time {
     /// </details>
     ///
     /// # Example
-    /// ```
+    ///
+    /// ```rust
     /// use gostd::time;
     /// let loc = time::UTC.clone();
     /// let mut start = time::Date(2000, 1, 1, 0, 0, 0, 0, loc.clone());
@@ -604,7 +607,8 @@ pub fn UnixMicro(usec: int64) -> Time {
 }
 
 /// # Example
-/// ```
+///
+/// ```rust
 /// use gostd::time;
 /// let d = time::Date(2000, 2, 1, 12, 30, 0, 0, time::UTC.clone());
 /// let (year, month, day) = d.Date();

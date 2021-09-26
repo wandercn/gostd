@@ -141,7 +141,8 @@ pub const iota: int32 = 0;
 /// </details>
 ///
 /// # Example
-/// ```
+///
+/// ```rust
 /// use gostd::builtin::*;
 /// let c: int = 128;
 /// let a = uint8!(c);
@@ -165,7 +166,8 @@ macro_rules! uint8 {
 /// </details>
 ///
 /// # Example
-/// ```
+///
+/// ```rust
 /// use gostd::builtin::*;
 /// let c: int = 128;
 /// let a = uint16!(c);
@@ -189,7 +191,8 @@ macro_rules! uint16 {
 /// </details>
 ///
 /// # Example
-/// ```
+///
+/// ```rust
 /// use gostd::builtin::*;
 /// let c: int = 128;
 /// let a = uint32!(c);
@@ -213,7 +216,8 @@ macro_rules! uint32 {
 /// </details>
 ///
 /// # Example
-/// ```
+///
+/// ```rust
 /// use gostd::builtin::*;
 /// let c: int = 128;
 /// let a = uint64!(c);
@@ -237,7 +241,8 @@ macro_rules! uint64 {
 /// </details>
 ///
 /// # Example
-/// ```
+///
+/// ```rust
 /// use gostd::builtin::*;
 /// let c: int = 127;
 /// let a = int8!(c);
@@ -261,7 +266,8 @@ macro_rules! int8 {
 /// </details>
 ///
 /// # Example
-/// ```
+///
+/// ```rust
 /// use gostd::builtin::*;
 /// let c: int = 30;
 /// let a = int16!(c);
@@ -285,7 +291,8 @@ macro_rules! int16 {
 /// </details>
 ///
 /// # Example
-/// ```
+///
+/// ```rust
 /// use gostd::builtin::*;
 /// let c: int = 80;
 /// let a = int32!(c);
@@ -309,7 +316,8 @@ macro_rules! int32 {
 /// </details>
 ///
 /// # Example
-/// ```
+///
+/// ```rust
 /// use gostd::builtin::*;
 /// let c: int = 1000;
 /// let a = int64!(c);
@@ -333,7 +341,8 @@ macro_rules! int64 {
 /// </details>
 ///
 /// # Example
-/// ```
+///
+/// ```rust
 /// use gostd::builtin::*;
 /// let c: int32 = 2000;
 /// let a = float32!(c);
@@ -357,7 +366,8 @@ macro_rules! float32 {
 /// </details>
 ///
 /// # Example
-/// ```
+///
+/// ```rust
 /// use gostd::builtin::*;
 /// let c: int32 = 2000;
 /// let a = float64!(c);
@@ -381,7 +391,8 @@ macro_rules! float64 {
 /// </details>
 ///
 /// # Example
-/// ```
+///
+/// ```rust
 /// use gostd::builtin::*;
 /// let c: float32 = 20.0;
 /// let a = int!(c);
@@ -405,7 +416,8 @@ macro_rules! int {
 /// </details>
 ///
 /// # Example
-/// ```
+///
+/// ```rust
 /// use gostd::builtin::*;
 /// let c: int = 11;
 /// let a = uint!(c);
@@ -429,7 +441,8 @@ macro_rules! uint {
 /// </details>
 ///
 /// # Example
-/// ```
+///
+/// ```rust
 /// use gostd::builtin::*;
 /// let c: int = 100;
 /// let a = uintptr!(c);
@@ -453,7 +466,8 @@ macro_rules! uintptr {
 /// </details>
 ///
 /// # Example
-/// ```
+///
+/// ```rust
 /// use gostd::builtin::*;
 /// let c: int = 1;
 /// let a = byte!(c);
@@ -477,7 +491,8 @@ macro_rules! byte {
 /// </details>
 ///
 /// # Example
-/// ```
+///
+/// ```rust
 /// use gostd::builtin::*;
 /// let c: int8 = 1;
 /// let a = rune!(c);
@@ -502,7 +517,8 @@ macro_rules! rune {
 /// </details>
 ///
 /// # Example
-/// ```
+///
+/// ```rust
 /// use gostd::builtin::*;
 /// let sparkle_array:[byte;4] = [240, 159, 146, 150];
 /// let sparkle_heart = string(&sparkle_array);
