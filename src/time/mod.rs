@@ -880,7 +880,7 @@ pub fn FixedZone(name: string, offset: int) -> Location {
     };
     loc
 }
-mod unix;
+mod sys;
 use lazy_static;
 lazy_static::lazy_static! {
    pub  static ref startNano:int64 =runtimeNano() - 1;
@@ -894,12 +894,12 @@ lazy_static::lazy_static! {
 }
 
 fn runtimeNano() -> int64 {
-    unix::monotonic_now() as int64
+    sys::monotonic_now() as int64
 }
 
 fn now() -> (int64, int32, int64) {
-    let (sec, nsec) = unix::real_time_now();
-    let mono = unix::monotonic_now();
+    let (sec, nsec) = sys::real_time_now();
+    let mono = sys::monotonic_now();
     (int64!(sec), int32!(nsec), int64!(mono))
 }
 
