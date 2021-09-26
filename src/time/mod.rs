@@ -324,7 +324,8 @@ impl Time {
     /// </details>
     ///
     /// # Example
-    /// ```
+    ///
+    /// ```rust
     /// use gostd::time;
     /// let first = time::Now();
     /// let second = time::Now();
@@ -379,7 +380,8 @@ impl Time {
     /// </details>
     ///
     /// # Example
-    /// ```
+    ///
+    /// ```rust
     /// use gostd::time;
     /// use gostd::time::Duration;
     ///
@@ -431,7 +433,8 @@ impl Time {
     /// </details>
     ///
     /// # Example
-    /// ```
+    ///
+    /// ```rust
     /// use gostd::time;
     /// let loc = time::UTC.clone();
     /// let mut start = time::Date(2000, 1, 1, 0, 0, 0, 0, loc.clone());
@@ -604,7 +607,8 @@ pub fn UnixMicro(usec: int64) -> Time {
 }
 
 /// # Example
-/// ```
+///
+/// ```rust
 /// use gostd::time;
 /// let d = time::Date(2000, 2, 1, 12, 30, 0, 0, time::UTC.clone());
 /// let (year, month, day) = d.Date();
@@ -876,7 +880,7 @@ pub fn FixedZone(name: string, offset: int) -> Location {
     };
     loc
 }
-mod unix;
+mod sys;
 use lazy_static;
 lazy_static::lazy_static! {
    pub  static ref startNano:int64 =runtimeNano() - 1;
@@ -890,12 +894,12 @@ lazy_static::lazy_static! {
 }
 
 fn runtimeNano() -> int64 {
-    unix::monotonic_now() as int64
+    sys::monotonic_now() as int64
 }
 
 fn now() -> (int64, int32, int64) {
-    let (sec, nsec) = unix::real_time_now();
-    let mono = unix::monotonic_now();
+    let (sec, nsec) = sys::real_time_now();
+    let mono = sys::monotonic_now();
     (int64!(sec), int32!(nsec), int64!(mono))
 }
 

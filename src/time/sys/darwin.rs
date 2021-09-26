@@ -1,6 +1,7 @@
 use crate::builtin::*;
 use cvt::cvt;
 use std::ptr;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 pub fn monotonic_now() -> uint64 {
     extern "C" {
         fn mach_absolute_time() -> uint64;
@@ -8,6 +9,7 @@ pub fn monotonic_now() -> uint64 {
     unsafe { mach_absolute_time() }
 }
 
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 pub fn real_time_now() -> (uint64, uint64) {
     let mut t = libc::timespec {
         tv_sec: 0,
