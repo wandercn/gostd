@@ -1,8 +1,8 @@
 //! Package time provides functionality for measuring and displaying time.
 //! The calendrical calculations always assume a Gregorian calendar, with no leap seconds.
 //!
-//! <details>
-//! <summary>zh-cn</summary>
+//! <details class="rustdoc-toggle top-doc">
+//! <summary class="docblock">zh-cn</summary>
 //! time包提供了时间的显示和测量用的函数。日历的计算采用的是公历。
 //! </details>
 // #![allow(unused_assignments)]
@@ -318,8 +318,8 @@ impl Time {
         ts > us || ts == us && self.nsec() > u.nsec()
     }
     /// Before reports whether the time instant t is before u.
-    /// <details>
-    /// <summary>zh-cn</summary>
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
     /// 如果t代表的时间点在u之前，返回真；否则返回假。
     /// </details>
     ///
@@ -374,8 +374,8 @@ impl Time {
     }
 
     /// Add returns the time t+d.
-    /// <details>
-    /// <summary>zh-cn</summary>
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
     /// Add返回时间点t+d。
     /// </details>
     ///
@@ -427,8 +427,8 @@ impl Time {
         result
     }
     /// Sub returns the duration t-u. If the result exceeds the maximum (or minimum) value that can be stored in a Duration, the maximum (or minimum) duration will be returned. To compute t-d for a duration d, use t.Add(-d).
-    /// <details>
-    /// <summary>zh-cn</summary>
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
     /// 返回一个时间段t-u。如果结果超出了Duration可以表示的最大值/最小值，将返回最大值/最小值。要获取时间点t-d（d为Duration），可以使用t.Add(-d)。
     /// </details>
     ///
