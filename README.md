@@ -1,5 +1,5 @@
 # gostd
-rust 语法比go复杂，但是go代码简单好理解，想通过这个项目把go的标准库通过rust实现。以后有什么go的项目可以通过，比如 import "bytes" 改成 use gostd::bytes 可以实现转换。
+rust 语法比go复杂，但是go代码简单好理解，想通过这个项目把go的标准库通过rust实现。以后有什么go的项目可以通过它方便翻译代码到rust，比如把 import "bytes" 改成 use gostd::bytes 就可以实现转换。
 
 本项目纯粹个人兴趣，大概率会失败，但是梦想还是要有的万一它实现了。
 
@@ -14,7 +14,7 @@ go to rust,to be rust or to be failed.
 
 ## 需要用rust实现的go标准库列表，go.1.17.1代码做参考。
 
-go包看呢个不会实现，因为我们转换成rust基本用不上这个包。
+go 这个包不会实现，因为我们转换成rust基本用不上这个包。
 ```
 ├── archive
 ├── bufio
@@ -116,12 +116,12 @@ use gostd::vendor
 
 # 大致方向
 
-- 分析go标准库的依赖情况，从最底层的库还是实现。
+- 分析go标准库的依赖情况，从最底层的库开始实现。
 - go源码中的单元测试也会一并用rust实现，这样可以保证代码的健壮性。
 
 # todo
 
-- [x] Go基础类型在rust实现 gostd::builtin, int64 = i64, int32 = i32
+- [x] Go基础类型在rust实现，在gostd::builtin 中,比如 int64 = i64, int32 = i32
 - [x] 强制转换宏,例如 2 as i64 等价 int64!(2) 跟Go的int64(2)就多个！
 - [x] time库在rust实现 gostd::time
-- [x] time库支持macOSX 和linux平台
+- [x] time库支持macOSX 和linux平台，通过libc库调用C函数实现 time::Now()
