@@ -1,4 +1,13 @@
-# gostd
+# [Gostd](https://github.com/wandercn/gostd)
+
+[![crates.io](https://img.shields.io/crates/v/gostd.svg?color=yellow)](https://crates.io/crates/gostd)
+[![Released API docs](https://docs.rs/gostd/badge.svg)](https://docs.rs/gostd)
+[![GPL3 licensed](https://img.shields.io/github/license/wandercn/gostd.svg)](./LICENSE)
+[![Downloads of Crates.io](https://img.shields.io/crates/d/gostd.svg)](https://crates.io/crates/gostd)
+[![Lines of code](https://img.shields.io/tokei/lines/github/wandercn/gostd.svg)](#)
+[![Build](https://img.shields.io/github/workflow/status/wandercn/gostd/Rust.svg)](#)
+[![Languages](https://img.shields.io/github/languages/top/wandercn/gostd.svg)](#)
+
 rust 语法比go复杂，但是go代码简单好理解，想通过这个项目把go的标准库通过rust实现。以后有什么go的项目可以通过它方便翻译代码到rust，比如把 import "bytes" 改成 use gostd::bytes 就可以实现转换。
 
 本项目纯粹个人兴趣，大概率会失败，但是梦想还是要有的万一它实现了。
