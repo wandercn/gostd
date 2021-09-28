@@ -135,5 +135,5 @@ use gostd::vendor
 - [x] time库在rust实现 gostd::time
 - [x] time库支持macOSX 和linux平台，通过libc库调用C函数实现 time::Now()
 - [ ] time，支持各种格式显示时间。
-- [ ] time, 支持local时区自动从系统获取。
+- [ ] time，支持local时区自动从系统获取。
 
