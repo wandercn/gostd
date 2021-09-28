@@ -13,7 +13,7 @@
 #![allow(non_camel_case_types)]
 #[macro_use]
 use crate::builtin::*;
-use gostd_dervie::Fmt;
+use gostd_derive::Fmt;
 const Layout: &str = "01/02 03:04:05PM '06 -0700"; // The reference time, in numerical order.
 const ANSIC: &str = "Mon Jan _2 15:04:05 2006";
 const UnixDate: &str = "Mon Jan _2 15:04:05 MST 2006";

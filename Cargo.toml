@@ -1,7 +1,7 @@
 [package]
 name = "gostd"
 license = "MIT"
-version = "0.0.8"
+version = "0.0.9"
 edition = "2018"
 authors = ["wandercn<wander@ffactory.org>"]
 description = "gostd is the go standard library implementation in rust. gostd 是Go标准库的rust实现"
@@ -16,7 +16,7 @@ opt-level = 0
 [profile.release]
 opt-level = 3
 [dependencies]
-gostd_dervie = "0.0.1"
+gostd_derive = "0.0.1"
 libc = "0.2"
 cvt = "0.1.1"
 lazy_static = "1.4.0"
