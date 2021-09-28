@@ -344,11 +344,20 @@ impl Time {
         self.sec() == 0 && self.nsec() == 0
     }
 
-    /// 待完善
     fn abs(&self) -> uint64 {
-        // let l = self.loc;
+        let mut l = self.loc.clone();
+        if l.name.len() == 0 || l.name.as_str() == "Local" {
+            l = l.get();
+        }
         let mut sec = self.unixSec();
-        // if self.loc.borrow().name != utcLoc.name {}
+        if l.name.as_str() != "UTC" {
+            if l.cacheZone.name.len() != 0 && l.cacheStart <= sec && sec < l.cacheEnd {
+                sec += int64!(l.cacheZone.offset);
+            } else {
+                let (_, offset, _, _, _) = l.lookup(sec);
+                sec += int64!(offset);
+            }
+        }
         uint64!(sec + (unixToInternal + internalToAbsolute))
     }
     /// 待完善
@@ -710,13 +719,14 @@ impl Location {
     fn new() -> Location {
         Location::default()
     }
+
     fn get(&self) -> Location {
-        if self.name == "".to_string() {
+        if self.name.len() == 0 {
             return utcLoc.clone();
         }
 
-        if self.name == "Local".to_string() {
-            return Local.clone();
+        if self.name.as_str() == "Local" {
+            return UTC.clone(); //待完善
         }
         self.clone()
     }
@@ -1138,13 +1148,13 @@ impl Month {
 
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Fmt)]
 pub enum Weekday {
+    Sunday = 0,
     Monday = 1,
     Tuesday = 2,
     Wednesday = 3,
     Thursday = 4,
     Friday = 5,
     Saturday = 6,
-    Sunday = 7,
 }
 
 impl Weekday {
