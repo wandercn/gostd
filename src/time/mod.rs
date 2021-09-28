@@ -344,11 +344,20 @@ impl Time {
         self.sec() == 0 && self.nsec() == 0
     }
 
-    /// 待完善
     fn abs(&self) -> uint64 {
-        // let l = self.loc;
+        let mut l = self.loc.clone();
+        if l.name.len() == 0 || l.name.as_str() == "Local" {
+            l = l.get();
+        }
         let mut sec = self.unixSec();
-        // if self.loc.borrow().name != utcLoc.name {}
+        if l.name.as_str() != "UTC" {
+            if l.cacheZone.name.len() != 0 && l.cacheStart <= sec && sec < l.cacheEnd {
+                sec += int64!(l.cacheZone.offset);
+            } else {
+                let (_, offset, _, _, _) = l.lookup(sec);
+                sec += int64!(offset);
+            }
+        }
         uint64!(sec + (unixToInternal + internalToAbsolute))
     }
     /// 待完善
@@ -467,6 +476,21 @@ impl Time {
         year
     }
 
+    /// Month returns the month of the year specified by t.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 返回时间点t对应那一年的第几月。
+    /// </details>
+    ///
+    /// #Example
+    ///
+    /// ```rust
+    /// use gostd::time;
+    /// let t = time::Date(2009, 11, 1, 1, 1, 1, 1, time::UTC.clone());
+    ///
+    /// assert_eq!(time::Month::November,t.Month());
+    /// assert_eq!("November",t.Month().String());
+    /// ```
     pub fn Month(&self) -> Month {
         let (_, month, _, _) = self.date(true);
         month
@@ -476,11 +500,40 @@ impl Time {
         absClock(self.abs())
     }
 
+    /// Day returns the day of the month specified by t.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 返回时间点t对应那一月的第几日。
+    /// </details>
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use gostd::time;
+    /// let t = time::Date(2009, 11, 1, 1, 1, 1, 1, time::UTC.clone());
+    ///
+    /// assert_eq!(1,t.Day());
+    /// ```
     pub fn Day(&self) -> int {
         let (_, _, day, _) = self.date(true);
         day
     }
 
+    /// Weekday returns the day of the week specified by t.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 返回时间点t对应的那一周的周几。
+    /// </details>
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use gostd::time;
+    /// let t = time::Date(2009, 11, 1, 1, 1, 1, 1, time::UTC.clone());
+    ///
+    /// assert_eq!(time::Weekday::Sunday,t.Weekday());
+    /// assert_eq!("Sunday",t.Weekday().String());
+    /// ```
     pub fn Weekday(&self) -> Weekday {
         absWeekday(self.abs())
     }
@@ -710,13 +763,14 @@ impl Location {
     fn new() -> Location {
         Location::default()
     }
+
     fn get(&self) -> Location {
-        if self.name == "".to_string() {
+        if self.name.len() == 0 {
             return utcLoc.clone();
         }
 
-        if self.name == "Local".to_string() {
-            return Local.clone();
+        if self.name.as_str() == "Local" {
+            return UTC.clone(); //待完善
         }
         self.clone()
     }
@@ -1138,17 +1192,17 @@ impl Month {
 
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Fmt)]
 pub enum Weekday {
+    Sunday = 0,
     Monday = 1,
     Tuesday = 2,
     Wednesday = 3,
     Thursday = 4,
     Friday = 5,
     Saturday = 6,
-    Sunday = 7,
 }
 
 impl Weekday {
-    fn String(&self) -> string {
+    pub fn String(&self) -> string {
         let d = *self;
         if Weekday::Sunday <= d && d <= Weekday::Saturday {
             return longDayNames[d as usize].to_string();

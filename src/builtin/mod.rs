@@ -46,7 +46,7 @@ pub type uint64 = u64;
 /// Go: int8 type eq Rust: i8
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-// Go中的int8类型 等价于 Rust的i8
+/// Go中的int8类型 等价于 Rust的i8
 /// </details>
 pub type int8 = i8;
 
