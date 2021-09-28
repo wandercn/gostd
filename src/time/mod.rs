@@ -476,6 +476,21 @@ impl Time {
         year
     }
 
+    /// Month returns the month of the year specified by t.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 返回时间点t对应那一年的第几月。
+    /// </details>
+    ///
+    /// #Example
+    ///
+    /// ```rust
+    /// use gostd::time;
+    /// let t = time::Date(2009, 11, 1, 1, 1, 1, 1, time::UTC.clone());
+    ///
+    /// assert_eq!(time::Month::November,t.Month());
+    /// assert_eq!("November",t.Month().String());
+    /// ```
     pub fn Month(&self) -> Month {
         let (_, month, _, _) = self.date(true);
         month
@@ -485,11 +500,40 @@ impl Time {
         absClock(self.abs())
     }
 
+    /// Day returns the day of the month specified by t.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 返回时间点t对应那一月的第几日。
+    /// </details>
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use gostd::time;
+    /// let t = time::Date(2009, 11, 1, 1, 1, 1, 1, time::UTC.clone());
+    ///
+    /// assert_eq!(1,t.Day());
+    /// ```
     pub fn Day(&self) -> int {
         let (_, _, day, _) = self.date(true);
         day
     }
 
+    /// Weekday returns the day of the week specified by t.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 返回时间点t对应的那一周的周几。
+    /// </details>
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use gostd::time;
+    /// let t = time::Date(2009, 11, 1, 1, 1, 1, 1, time::UTC.clone());
+    ///
+    /// assert_eq!(time::Weekday::Sunday,t.Weekday());
+    /// assert_eq!("Sunday",t.Weekday().String());
+    /// ```
     pub fn Weekday(&self) -> Weekday {
         absWeekday(self.abs())
     }
@@ -1158,7 +1202,7 @@ pub enum Weekday {
 }
 
 impl Weekday {
-    fn String(&self) -> string {
+    pub fn String(&self) -> string {
         let d = *self;
         if Weekday::Sunday <= d && d <= Weekday::Saturday {
             return longDayNames[d as usize].to_string();
