@@ -13,7 +13,7 @@
 #![allow(non_camel_case_types)]
 #[macro_use]
 use crate::builtin::*;
-
+use gostd_dervie::Fmt;
 const Layout: &str = "01/02 03:04:05PM '06 -0700"; // The reference time, in numerical order.
 const ANSIC: &str = "Mon Jan _2 15:04:05 2006";
 const UnixDate: &str = "Mon Jan _2 15:04:05 MST 2006";
@@ -38,17 +38,9 @@ pub const Millisecond: int64 = 1000 * Microsecond;
 pub const Second: int64 = 1000 * Millisecond;
 pub const Minute: int64 = 60 * Second;
 pub const Hour: int64 = 60 * Minute;
-
-#[derive(Default, PartialEq, PartialOrd, Debug)]
+#[derive(Default, PartialEq, PartialOrd, Fmt)]
 pub struct Duration(int64); // 由于类型别名不能绑定方法通过元组类型结构体实现,访问元组内容用d.0数字下标访问，go源码是 type Duration int64
 
-use std::fmt;
-
-impl fmt::Display for Duration {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.String())
-    }
-}
 const minDuration: int64 = int64!(-1) << 63;
 const maxDuration: int64 = int64!((uint64!(1) << 63) - 1);
 
@@ -56,7 +48,7 @@ impl Duration {
     pub fn new(i: int64) -> Duration {
         Duration(i)
     }
-    pub fn String(&self) -> String {
+    pub fn String(&self) -> string {
         let d = self.0;
         let mut buf: [byte; 32] = [0; 32];
         let mut w = buf.len();
@@ -218,8 +210,6 @@ const minWall: int64 = wallToInternal; // year 1885
 const nsecMask: int32 = (1 << 30) - 1;
 const nsecShift: int32 = 30;
 
-use std::cell::RefCell;
-use std::rc::Rc;
 #[derive(Default, PartialEq, PartialOrd, Debug)]
 pub struct Time {
     wall: uint64,
@@ -689,7 +679,7 @@ fn absWeekday(abs: uint64) -> Weekday {
     Weekday::indexOf(uint!(sec / secondsPerDay))
 }
 
-#[derive(Default, PartialEq, PartialOrd, Clone, Debug)]
+#[derive(Default, PartialEq, PartialOrd, Clone, Debug, Fmt)]
 pub struct Location {
     name: string,
     zone: Vec<zone>,
@@ -982,21 +972,23 @@ fn absDate(abs: uint64, full: bool) -> (int, Month, int, int) {
         } else if day == 31 + 29 - 1 {
             month = Month::February;
             day = 29;
+            return (year, month, day, yday);
         }
     }
 
-    let mut m = day / 31;
-    let end = daysBefore[(m + 1) as uint] as int;
+    let mut m = uint!(day / 31);
+    let end = int!(daysBefore[m + 1]);
     let begin: int;
     if day >= end {
         m += 1;
         begin = end;
     } else {
-        begin = daysBefore[m as uint] as int;
+        begin = int!(daysBefore[m]);
     }
 
+    m += 1; // because January is 1
     day = day - begin + 1;
-    month = Month::indexOf(m as uint);
+    month = Month::indexOf(m);
     (year, month, day, yday)
 }
 
@@ -1094,7 +1086,7 @@ const longMonthNames: [&str; 12] = [
     "December",
 ];
 
-#[derive(PartialEq, PartialOrd, Clone, Copy, Debug)]
+#[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Fmt)]
 pub enum Month {
     January = 1,
     February = 2,
@@ -1144,7 +1136,7 @@ impl Month {
     }
 }
 
-#[derive(PartialEq, PartialOrd, Clone, Copy, Debug)]
+#[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Fmt)]
 pub enum Weekday {
     Monday = 1,
     Tuesday = 2,
