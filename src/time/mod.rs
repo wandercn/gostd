@@ -409,7 +409,7 @@ impl Time {
             dsec -= 1;
             nsec += 1_000_000_000;
         }
-        t.wall = t.wall >> 30 << 30 | uint64!(nsec);
+        t.wall = t.wall ^ (t.wall & uint64!(nsecMask)) | uint64!(nsec);
         t.addSec(dsec);
         if t.wall & uint64!(hasMonotonic) != 0 {
             let te = t.ext + d.0;
