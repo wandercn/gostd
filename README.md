@@ -8,6 +8,10 @@
 [![Build](https://img.shields.io/github/workflow/status/wandercn/gostd/Rust.svg)](#)
 [![Languages](https://img.shields.io/github/languages/top/wandercn/gostd.svg)](#)
 
+Gostd is the golang standard library implementation in rust-lang.
+
+Gostd是rust-lang中的golang标准库实现。
+
 rust 语法比go复杂，但是go代码简单好理解，想通过这个项目把go的标准库通过rust实现。以后有什么go的项目可以通过它方便翻译代码到rust，比如把 import "bytes" 改成 use gostd::bytes 就可以实现转换。
 
 本项目纯粹个人兴趣，大概率会失败，但是梦想还是要有的万一它实现了。
