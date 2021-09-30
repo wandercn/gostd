@@ -1381,7 +1381,7 @@ fn div(t: Time, d: Duration) -> (int, Duration) {
 // match报告s1和s2是否匹配，忽略大小写。
 // 假设s1和s2的长度相同。
 // 注意：因为match是rust的保留字，这里改成isMatch。
-fn isMatch(s1: string, s2: string) -> bool {
+fn isMatch(s1: &str, s2: &str) -> bool {
     //检查长度一致
     if s1.len() != s2.len() {
         return false;
@@ -1403,6 +1403,49 @@ fn isMatch(s1: string, s2: string) -> bool {
     true
 }
 
-fn lookup(tab: Vec<string>, val: string) -> (int, string, error) {}
+const errBad: &'static str = "bad value for field";
+
+fn lookup(tab: Vec<string>, val: string) -> Result<(int, string), &'static str> {
+    for (i, v) in tab.iter().enumerate() {
+        if val.len() >= v.len() && isMatch(&val[0..v.len()], v) {
+            let index = uint!(v.len());
+            let vstr = v.as_str();
+            return Ok((int!(i), vstr[index..].to_string()));
+        }
+    }
+
+    Err(errBad) // go源码:return -1, val, errBad
+}
+
+fn appendInt(b: Vec<byte>, x: int, width: int) -> Vec<byte> {
+    let mut b = b;
+    let width = uint!(width);
+    let mut u = uint!(x);
+
+    if x < 0 {
+        b.push(byte!('-'));
+        u = uint!(-x);
+    }
+
+    let mut buf: [byte; 20] = [0; 20];
+    let mut i = buf.len();
+    while (u >= 10) {
+        i -= 1;
+        let q = u / 10;
+        buf[i] = byte!(uint!(byte!('0')) + u - q * 10);
+        u = q;
+    }
+    i -= 1;
+    buf[i] = byte!(uint!('0') + u);
+
+    let mut w = buf.len() - i;
+    for _ in w..width {
+        b.push(byte!('0'));
+    }
+
+    // b.append(buf[i..])
+    b.extend_from_slice(&buf[i..]);
+    b
+}
 
 // format.go -end
