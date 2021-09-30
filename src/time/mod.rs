@@ -1373,3 +1373,36 @@ fn div(t: Time, d: Duration) -> (int, Duration) {
     }
     (qmod2, r)
 }
+
+// format.go -start
+
+// private fn
+
+// match报告s1和s2是否匹配，忽略大小写。
+// 假设s1和s2的长度相同。
+// 注意：因为match是rust的保留字，这里改成isMatch。
+fn isMatch(s1: string, s2: string) -> bool {
+    //检查长度一致
+    if s1.len() != s2.len() {
+        return false;
+    }
+    let s1 = s1.as_bytes();
+    let s2 = s2.as_bytes();
+
+    for i in 0..s1.len() {
+        let mut c1 = s1[i];
+        let mut c2 = s2[i];
+        if c1 != c2 {
+            c1 |= byte!('a') - byte!('A');
+            c2 |= byte!('a') - byte!('A');
+            if c1 != c2 || c1 < byte!('a') || c1 > byte!('z') {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+fn lookup(tab: Vec<string>, val: string) -> (int, string, error) {}
+
+// format.go -end
