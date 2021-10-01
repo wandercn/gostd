@@ -221,6 +221,43 @@ impl Time {
     fn new() -> Time {
         Time::default()
     }
+
+    fn Format(&self, layout: &str) -> string {
+        string::new()
+    }
+
+    fn String(&self) -> string {
+        let mut s = self.Format("2006-01-02 15:04:05.999999999 -0700 MST");
+        if self.wall & uint64!(hasMonotonic) != 0 {
+            let mut m2 = int64!(self.ext);
+            let mut sign = byte!('+');
+            if self.ext < 0 {
+                sign = byte!('+');
+                m2 = int64!(-m2);
+            }
+            let mut m1 = m2 / 1000_000_000;
+            m2 = m2 % 1000_000_000;
+            let m0 = m1 / 100_000_000;
+            m1 = m1 % 1000_000_000;
+            let mut buf = Vec::with_capacity(24);
+            buf.extend_from_slice((" m=".as_bytes()));
+            buf.push(sign);
+            let mut wid = 0;
+
+            if m0 != 0 {
+                buf = appendInt(buf, int!(m0), wid);
+                wid = 9;
+            }
+
+            buf = appendInt(buf, int!(m1), wid);
+            buf.push(byte!('.'));
+            buf = appendInt(buf, int!(m2), 9);
+            s += string::from_utf8(buf.to_vec())
+                .expect("time String failed from_utf8")
+                .as_str();
+        }
+        s
+    }
     // nsec returns the time's nanoseconds.
     fn nsec(&self) -> int32 {
         int32!(self.wall & uint64!(nsecMask))
@@ -360,12 +397,31 @@ impl Time {
         }
         uint64!(sec + (unixToInternal + internalToAbsolute))
     }
-    /// 待完善
+
+    // locabs是Zone和abs方法的组合。
+    // 从一个区的查询中提取两个返回值。
     fn locabs(&self) -> (string, int, uint64) {
-        let sec = self.unixSec();
-        let name = "UTC".to_string();
+        let mut name: string = "".to_string();
+        let mut offset: int = 0;
+        let mut l = self.loc.clone();
+        if l.name.len() == 0 || l.name.as_str() == "Local" {
+            l = l.get();
+        }
+
+        let mut sec = self.unixSec();
+        if l.name.as_str() != "UTC" {
+            if l.cacheZone.name.len() != 0 && l.cacheStart <= sec && sec < l.cacheEnd {
+                name = l.cacheZone.name;
+                offset = l.cacheZone.offset;
+            } else {
+                let (name, offset, _, _, _) = l.lookup(sec);
+            }
+            sec += int64!(offset);
+        } else {
+            name = "UTC".to_string();
+        }
         let abs = uint64!(sec + (unixToInternal + internalToAbsolute));
-        (name, 0, abs)
+        (name, offset, abs)
     }
 
     fn date(&self, full: bool) -> (int, Month, int, int) {
