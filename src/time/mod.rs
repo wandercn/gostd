@@ -1431,6 +1431,57 @@ fn div(t: Time, d: Duration) -> (int, Duration) {
 }
 
 // format.go -start
+const stdLongMonth: int32 = stdNeedDate; // "January"
+const stdMonth: int32 = stdNeedDate + 1; // "Jan"
+const stdNumMonth: int32 = stdNeedDate + 2; // "1"
+const stdZeroMonth: int32 = stdNeedDate + 3; // "01"
+const stdLongWeekDay: int32 = stdNeedDate + 4; // "Monday"
+const stdWeekDay: int32 = stdNeedDate + 5; // "Mon"
+const stdDay: int32 = stdNeedDate + 6; // "2"
+const stdUnderDay: int32 = stdNeedDate + 7; // "_2"
+const stdZeroDay: int32 = stdNeedDate + 8; // "02"
+const stdUnderYearDay: int32 = stdNeedDate + 9; // "__2"
+const stdZeroYearDay: int32 = stdNeedDate + 10; // "002"
+const stdHour: int32 = stdNeedClock + 12; // "15"
+const stdHour12: int32 = stdHour + 1; // "3"
+const stdZeroHour12: int32 = stdHour + 2; // "03"
+const stdMinute: int32 = stdHour + 3; // "4"
+const stdZeroMinute: int32 = stdHour + 4; // "04"
+const stdSecond: int32 = stdHour + 5; // "5"
+const stdZeroSecond: int32 = stdHour + 6; // "05"
+const stdLongYear: int32 = stdNeedDate + 19; // "2006"
+const stdYear: int32 = stdLongYear + 1; // "06"
+const stdPM: int32 = stdNeedClock + 21; // "PM"
+const stdpm: int32 = stdPM + 1; // "pm"
+
+const stdTZ: int32 = 23; // "MST"
+const stdISO8601TZ: int32 = 24; // "Z0700"  // prints Z for UTC
+const stdISO8601SecondsTZ: int32 = 25; // "Z070000"
+const stdISO8601ShortTZ: int32 = 26; // "Z07"
+const stdISO8601ColonTZ: int32 = 27; // "Z07:00" // prints Z for UTC
+const stdISO8601ColonSecondsTZ: int32 = 28; // "Z07:00:00"
+const stdNumTZ: int32 = 29; // "-0700"  // always numeric
+const stdNumSecondsTz: int32 = 30; // "-070000"
+const stdNumShortTZ: int32 = 31; // "-07"    // always numeric
+const stdNumColonTZ: int32 = 32; // "-07:00" // always numeric
+const stdNumColonSecondsTZ: int32 = 33; // "-07:00:00"
+const stdFracSecond0: int32 = 34; // ".0", ".00", ... , trailing zeros included
+const stdFracSecond9: int32 = 35; // ".9", ".99", ..., trailing zeros omitted
+
+const stdNeedDate: int32 = 1 << 8; // need month, day, year
+const stdNeedClock: int32 = 2 << 8; // need hour, minute, second
+const stdArgShift: int32 = 16; // extra argument in high bits, above low stdArgShift
+const stdSeparatorShift: int32 = 28; // extra argument in high 4 bits for fractional second separators
+const stdMask: int32 = 1 << stdArgShift - 1; // mask out argument
+
+static std0x: [int32; 6] = [
+    stdZeroMonth,
+    stdZeroDay,
+    stdZeroHour12,
+    stdZeroMinute,
+    stdZeroSecond,
+    stdYear,
+];
 
 // private fn
 
@@ -1502,6 +1553,55 @@ fn appendInt(b: Vec<byte>, x: int, width: int) -> Vec<byte> {
     // b.append(buf[i..])
     b.extend_from_slice(&buf[i..]);
     b
+}
+
+fn startWithLowerCase(s: &str) -> bool {
+    if 0 == s.len() {
+        return false;
+    }
+    let c = s.chars().nth(0);
+    return Some('a') <= c && c <= Some('z');
+}
+
+fn nextStdChunk(layout: &str) -> (&str, int32, &str) {
+    let length = layout.len();
+    for (i, c) in layout.chars().enumerate() {
+        match c {
+            'J' => {
+                if layout.len() >= i + 3 && layout[i..i + 3] == "Jan".to_string() {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdLongMonth,
+                        layout[i + 7..].as_ref(),
+                    );
+                }
+                if !startWithLowerCase(layout[i + 3..].as_ref()) {
+                    return (layout[0..i].as_ref(), stdMonth, layout[i + 3..].as_ref());
+                }
+            }
+
+            'M' => {
+                if layout.len() >= 3 {
+                    if layout[i..i + 3].to_string() == "Mon".to_string() {
+                        if layout.len() >= i+6 && layout[i..i+6] == "Mondays    "
+                        return (
+                            layout[0..i].as_ref(),
+                            stdLongWeekDay,
+                            layout[i + 6..].as_ref(),
+                        );
+                    }
+                }
+            }
+
+            '0' => {
+                if layout.len() >= i + 2
+                    && '1' <= layout.chars().nth(i + 1).unwrap()
+                    && layout.chars().nth(i + 1).unwrap() <= '6'
+                {}
+            }
+        }
+    }
+    ("", 0, "")
 }
 
 // format.go -end
