@@ -14,30 +14,56 @@
 #[macro_use]
 use crate::builtin::*;
 use gostd_derive::Fmt;
-const Layout: &str = "01/02 03:04:05PM '06 -0700"; // The reference time, in numerical order.
-const ANSIC: &str = "Mon Jan _2 15:04:05 2006";
-const UnixDate: &str = "Mon Jan _2 15:04:05 MST 2006";
-const RubyDate: &str = "Mon Jan 02 15:04:05 -0700 2006";
-const RFC822: &str = "02 Jan 06 15:04 MST";
-const RFC822Z: &str = "02 Jan 06 15:04 -0700"; // RFC822 with numeric zone
-const RFC850: &str = "Monday, 02-Jan-06 15:04:05 MST";
-const RFC1123: &str = "Mon, 02 Jan 2006 15:04:05 MST";
-const RFC1123Z: &str = "Mon, 02 Jan 2006 15:04:05 -0700"; // RFC1123 with numeric zone
-const RFC3339: &str = "2006-01-02T15:04:05Z07:00";
-const RFC3339Nano: &str = "2006-01-02T15:04:05.999999999Z07:00";
-const Kitchen: &str = "3:04PM";
-// Handy time stamps.
-const Stamp: &str = "Jan _2 15:04:05";
-const StampMilli: &str = "Jan _2 15:04:05.000";
-const StampMicro: &str = "Jan _2 15:04:05.000000";
-const StampNano: &str = "Jan _2 15:04:05.000000000";
-
+/// Time Format - Layout
+pub const Layout: &str = "01/02 03:04:05PM '06 -0700"; // The reference time, in numerical order.
+/// Time Format - ANSIC
+pub const ANSIC: &str = "Mon Jan _2 15:04:05 2006";
+/// Time Format - UnixDate
+pub const UnixDate: &str = "Mon Jan _2 15:04:05 MST 2006";
+/// Time Format - RubyDate
+pub const RubyDate: &str = "Mon Jan 02 15:04:05 -0700 2006";
+/// Time Format - RFC822
+pub const RFC822: &str = "02 Jan 06 15:04 MST";
+/// Time Format - RFC822Z
+pub const RFC822Z: &str = "02 Jan 06 15:04 -0700"; // RFC822 with numeric zone
+/// Time Format - RFC850
+pub const RFC850: &str = "Monday, 02-Jan-06 15:04:05 MST";
+/// Time Format - RFC1123
+pub const RFC1123: &str = "Mon, 02 Jan 2006 15:04:05 MST";
+/// Time Format - RFC1123Z
+pub const RFC1123Z: &str = "Mon, 02 Jan 2006 15:04:05 -0700"; // RFC1123 with numeric zone
+/// Time Format - RFC3339
+pub const RFC3339: &str = "2006-01-02T15:04:05Z07:00";
+/// Time Format - RFC3339Nano
+pub const RFC3339Nano: &str = "2006-01-02T15:04:05.999999999Z07:00";
+/// Time Format - Kitchen
+pub const Kitchen: &str = "3:04PM";
+/// Handy time stamps.
+pub const Stamp: &str = "Jan _2 15:04:05";
+/// Handy time StampMilli.
+pub const StampMilli: &str = "Jan _2 15:04:05.000";
+/// Handy time StampMicro.
+pub const StampMicro: &str = "Jan _2 15:04:05.000000";
+/// Handy time StampNano.
+pub const StampNano: &str = "Jan _2 15:04:05.000000000";
+/// Time Unit Nanosecond
 pub const Nanosecond: int64 = 1;
+/// Time Unit Microsecond
 pub const Microsecond: int64 = 1000 * Nanosecond;
+/// Time Unit Millisecond
 pub const Millisecond: int64 = 1000 * Microsecond;
+/// Time Unit Second
 pub const Second: int64 = 1000 * Millisecond;
+/// Time Unit Minute
 pub const Minute: int64 = 60 * Second;
+/// Time Unit Hour
 pub const Hour: int64 = 60 * Minute;
+
+/// A Duration represents the elapsed time between two instants as an int64 nanosecond count. The representation limits the largest representable duration to approximately 290 years.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Duration类型代表两个时间点之间经过的时间，以纳秒为单位。可表示的最长时间段大约290年。
+/// </details>
 #[derive(Default, PartialEq, PartialOrd, Fmt)]
 pub struct Duration(int64); // 由于类型别名不能绑定方法通过元组类型结构体实现,访问元组内容用d.0数字下标访问，go源码是 type Duration int64
 
@@ -209,7 +235,29 @@ const maxWall: int64 = wallToInternal + (1 << 33 - 1); // year 2157
 const minWall: int64 = wallToInternal; // year 1885
 const nsecMask: int32 = (1 << 30) - 1;
 const nsecShift: int32 = 30;
-
+/// A Time represents an instant in time with nanosecond precision.
+/// Programs using times should typically store and pass them as values, not pointers. That is, time variables and struct fields should be of type time.Time, not *time.Time.
+///
+/// A Time value can be used by multiple goroutines simultaneously except that the methods GobDecode, UnmarshalBinary, UnmarshalJSON and UnmarshalText are not concurrency-safe.
+///
+/// Time instants can be compared using the Before, After, and Equal methods. The Sub method subtracts two instants, producing a Duration. The Add method adds a Time and a Duration, producing a Time.
+///
+/// The zero value of type Time is January 1, year 1, 00:00:00.000000000 UTC. As this time is unlikely to come up in practice, the IsZero method gives a simple way of detecting a time that has not been initialized explicitly.
+///
+/// Each Time has associated with it a Location, consulted when computing the presentation form of the time, such as in the Format, Hour, and Year methods. The methods Local, UTC, and In return a Time with a specific location. Changing the location in this way changes only the presentation; it does not change the instant in time being denoted and therefore does not affect the computations described in earlier paragraphs.
+///
+/// Representations of a Time value saved by the GobEncode, MarshalBinary, MarshalJSON, and MarshalText methods store the Time.Location's offset, but not the location name. They therefore lose information about Daylight Saving Time.
+///
+/// In addition to the required “wall clock” reading, a Time may contain an optional reading of the current process's monotonic clock, to provide additional precision for comparison or subtraction. See the “Monotonic Clocks” section in the package documentation for details.
+///
+/// Note that the Go == operator compares not just the time instant but also the Location and the monotonic clock reading. Therefore, Time values should not be used as map or database keys without first guaranteeing that the identical Location has been set for all values, which can be achieved through use of the UTC or Local method, and that the monotonic clock reading has been stripped by setting t = t.Round(0). In general, prefer t.Equal(u) to t == u, since t.Equal uses the most accurate comparison available and correctly handles the case when only one of its arguments has a monotonic clock reading.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Time代表一个纳秒精度的时间点。
+/// 程序中应使用Time类型值来保存和传递时间，而不能用指针。就是说，表示时间的变量和字段，应为time.Time类型，而不是*time.Time.类型。一个Time类型值可以被多个go程同时使用。时间点可以使用Before、After和Equal方法进行比较。Sub方法让两个时间点相减，生成一个Duration类型值（代表时间段）。Add方法给一个时间点加上一个时间段，生成一个新的Time类型时间点。
+/// Time零值代表时间点January 1, year 1, 00:00:00.000000000 UTC。因为本时间点一般不会出现在使用中，IsZero方法提供了检验时间是否显式初始化的一个简单途径。
+/// 每一个时间都具有一个地点信息（及对应地点的时区信息），当计算时间的表示格式时，如Format、Hour和Year等方法，都会考虑该信息。Local、UTC和In方法返回一个指定时区（但指向同一时间点）的Time。修改地点/时区信息只是会改变其表示；不会修改被表示的时间点，因此也不会影响其计算。
+/// </details>
 #[derive(Default, PartialEq, PartialOrd, Debug, Fmt)]
 pub struct Time {
     wall: uint64,
@@ -714,6 +762,11 @@ impl Time {
     }
 }
 
+/// Unix returns the local Time corresponding to the given Unix time, sec seconds and nsec nanoseconds since January 1, 1970 UTC. It is valid to pass nsec outside the range [0, 999999999]. Not all sec values have a corresponding time value. One such value is 1<<63-1 (the largest int64 value).
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Unix返回与给定的Unix时间相对应的本地时间，自1970年1月1日UTC以来的秒数和纳秒数。在[0, 999999999]范围之外传递nsec是有效的。不是所有的sec值都有相应的时间值。一个这样的值是1<<63-1（最大的int64值）。
+/// </details>
 pub fn Unix(sec: int64, nsec: int64) -> Time {
     let mut sec = sec;
     let mut nsec = nsec;
@@ -729,14 +782,50 @@ pub fn Unix(sec: int64, nsec: int64) -> Time {
     unixTime(sec, int32!(nsec))
 }
 
+/// UnixMilli returns the local Time corresponding to the given Unix time, msec milliseconds since January 1, 1970 UTC.
+///
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// UnixMilli返回与给定的Unix时间相对应的本地时间，自1970年1月1日UTC以来的毫秒数。
+/// </details>
 pub fn UnixMilli(msec: int64) -> Time {
     Unix(msec / 1000, (msec % 1000) / 1000_000)
 }
 
+/// UnixMicro returns the local Time corresponding to the given Unix time, usec microseconds since January 1, 1970 UTC.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// UnixMicro返回与给定的Unix时间相对应的本地时间，自1970年1月1日UTC以来的微秒数。
+/// </details>
 pub fn UnixMicro(usec: int64) -> Time {
     Unix(usec / 1000_000, (usec % 1000_000) * 1000)
 }
-
+/// Date returns the Time corresponding to
+///
+/// `yyyy-mm-dd hh:mm:ss + nsec nanoseconds`
+///
+/// in the appropriate zone for that time in the given location.
+///
+/// The month, day, hour, min, sec, and nsec values may be outside their usual ranges and will be normalized during the conversion. For example, October 32 converts to November 1.
+///
+/// A daylight savings time transition skips or repeats times. For example, in the United States, March 13, 2011 2:15am never occurred, while November 6, 2011 1:15am occurred twice. In such cases, the choice of time zone, and therefore the time, is not well-defined. Date returns a time that is correct in one of the two zones involved in the transition, but it does not guarantee which.
+///
+/// Date panics if loc is nil.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Date返回一个时区为loc、当地时间为：
+///
+/// `year-month-day hour:min:sec + nsec nanoseconds`
+///
+/// 的时间点。
+///
+/// month、day、hour、min、sec和nsec的值可能会超出它们的正常范围，在转换前函数会自动将之规范化。如October 32被修正为November 1。
+///
+/// 夏时制的时区切换会跳过或重复时间。如，在美国，March 13, 2011 2:15am从来不会出现，而November 6, 2011 1:15am 会出现两次。此时，时区的选择和时间是没有良好定义的。Date会返回在时区切换的两个时区其中一个时区
+/// 正确的时间，但本函数不会保证在哪一个时区正确。
+/// 如果loc为nil会panic。
+/// </details>
+///
 /// # Example
 ///
 /// ```rust
@@ -751,11 +840,12 @@ pub fn UnixMicro(usec: int64) -> Time {
 /// println!("month = {}",month.String());
 /// println!("day = {}",day);
 /// println!("{}",d);
-/// // output
-/// // year = 2009
-/// // month = November
-/// // day = 10
-/// // 2009-11-10 14:30:12.000000013 +0000 UTC
+///
+///  //  output:
+///  //  year = 2009
+///  //  month = November
+///  //  day = 10
+///  //  2009-11-10 14:30:12.000000013 +0000 UTC
 /// ```
 pub fn Date(
     year: int,
@@ -765,16 +855,16 @@ pub fn Date(
     min: int,
     sec: int,
     nsec: int,
-    location: Location,
+    loc: Location,
 ) -> Time {
-    let loc = Some(location);
+    let loc = Some(loc);
     if loc.is_none() {
         panic!("time: missing Location in call to Date")
     }
 
     let mut m = month - 1;
     let (year, m) = norm(year, int!(m), 12);
-    let month = Month::indexOf(uint!(m + 1));
+    let month = Month::IndexOf(uint!(m + 1));
 
     let (sec, nsec) = norm(sec, nsec, 1000_000_000);
     let (min, sec) = norm(min, sec, 60);
@@ -830,6 +920,11 @@ fn absWeekday(abs: uint64) -> Weekday {
     Weekday::indexOf(uint!(sec / secondsPerDay))
 }
 
+/// A Location maps time instants to the zone in use at that time. Typically, the Location represents the collection of time offsets in use in a geographical area. For many Locations the time offset varies depending on whether daylight savings time is in use at the time instant.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Location代表一个（关联到某个时间点的）地点，以及该地点所在的时区。
+/// </details>
 #[derive(Default, PartialEq, PartialOrd, Clone, Debug, Fmt)]
 pub struct Location {
     name: string,
@@ -872,7 +967,12 @@ impl Location {
         }
         self.clone()
     }
-
+    /// String returns a descriptive name for the time zone information, corresponding to the name argument to LoadLocation or FixedZone.
+    ///
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// String返回对时区信息的描述，返回值绑定为LoadLocation或FixedZone函数创建l时的name参数。
+    /// </details>
     pub fn String(&self) -> string {
         self.get().name
     }
@@ -1000,6 +1100,28 @@ struct zoneTrans {
 const alpha: int64 = (-1) << 63; // math.MinInt64
 const omega: int64 = int64!((uint64!(1) << 63) - 1); // math.MaxInt64
 
+/// FixedZone returns a Location that always uses the given zone name and offset (seconds east of UTC).
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// FixedZone使用给定的地点名name和时间偏移量offset（单位秒）创建并返回一个Location
+/// </details>
+///
+/// # Example
+///
+/// ```
+/// use gostd::time;
+///
+/// let mut t = time::Date(2009, 11, 10, 14, 30, 12, 13, time::UTC.clone());
+/// assert_eq!(t.String(),"2009-11-10 14:30:12.000000013 +0000 UTC".to_string());
+/// println!("UTC: {}", t);
+/// let cst_zone = time::FixedZone("CST".to_string(), 8 * 3600); //北京时区 CST = UTC时区+8小时
+/// t.In(cst_zone);
+/// assert_eq!(t.String(),"2009-11-10 22:30:12.000000013 +0800 CST".to_string());
+/// println!("CST: {}", t);
+/// // output:
+/// // UTC: 2009-11-10 14:30:12.000000013 +0000 UTC
+/// // CST: 2009-11-10 22:30:12.000000013 +0800 CST
+/// ```
 pub fn FixedZone(name: string, offset: int) -> Location {
     let zo = vec![zone {
         name: name.to_string(),
@@ -1025,13 +1147,25 @@ pub fn FixedZone(name: string, offset: int) -> Location {
 mod sys;
 use lazy_static;
 lazy_static::lazy_static! {
-   pub  static ref startNano:int64 =runtimeNano() - 1;
-   pub  static ref Local:Location = Location::new();
-   pub  static ref utcLoc:Location = {
+     static ref startNano:int64 =runtimeNano() - 1;
+/// Local represents the system's local time zone. On Unix systems, Local consults the TZ environment variable to find the time zone to use. No TZ means use the system default /etc/localtime. TZ="" means use UTC. TZ="foo" means use file foo in the system timezone directory.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Local代表系统本地，对应本地时区。
+/// </details>
+     pub static ref Local:Location = Location::new();
+     static ref utcLoc:Location = {
     let mut l = Location::new();
     l.name="UTC".to_string();
      l
     };
+
+
+/// UTC represents Universal Coordinated Time (UTC).
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// UTC代表通用协调时间，对应零时区。
+/// </details>
     pub static ref UTC:Location =utcLoc.clone() ;
 }
 
@@ -1045,6 +1179,11 @@ fn now() -> (int64, int32, int64) {
     (int64!(sec), int32!(nsec), int64!(mono))
 }
 
+/// Now returns the current local time.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Now返回当前本地时间。
+/// </details>
 pub fn Now() -> Time {
     let (mut sec, mut nsec, mut mono) = now();
     mono -= *startNano;
@@ -1140,7 +1279,7 @@ fn absDate(abs: uint64, full: bool) -> (int, Month, int, int) {
 
     m += 1; // because January is 1
     day = day - begin + 1;
-    month = Month::indexOf(m);
+    month = Month::IndexOf(m);
     (year, month, day, yday)
 }
 
@@ -1238,24 +1377,47 @@ const longMonthNames: [&str; 12] = [
     "December",
 ];
 
+/// A Month specifies a month of the year (January = 1, ...).
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Month代表一年的某个月。
+/// </details>
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Fmt)]
 pub enum Month {
+    ///初始0值，实际没有这个月份
     Default = 0,
+    /// 一月
     January = 1,
+    /// 二月
     February = 2,
+    /// 三月
     March = 3,
+    /// 四月
     April = 4,
+    /// 五月
     May = 5,
+    /// 六月
     June = 6,
+    /// 七月
     July = 7,
+    /// 八月
     August = 8,
+    /// 九月
     September = 9,
+    /// 十月
     October = 10,
+    /// 十一月
     November = 11,
+    /// 十二月
     December = 12,
 }
 
 impl Month {
+    /// String returns the English name of the month ("January", "February", ...).
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// String返回月份的英文名（"January"，"February"，……）
+    /// </details>
     pub fn String(&self) -> string {
         let m = *self;
         if Month::January <= m && m <= Month::December {
@@ -1270,7 +1432,12 @@ impl Month {
         mon.push(')');
         mon
     }
-    pub fn indexOf(i: uint) -> Month {
+    /// IndexOf returns the month according to the numeric index such as the numbers 1 to 12.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 根据数字1~12等数字索引返回月份。
+    /// </details>
+    pub fn IndexOf(i: uint) -> Month {
         match i {
             1 => Month::January,
             2 => Month::February,
@@ -1289,18 +1456,35 @@ impl Month {
     }
 }
 
+/// A Weekday specifies a day of the week (Sunday = 0, ...).
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Weekday代表一周的某一天。
+/// </details>
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Fmt)]
 pub enum Weekday {
+    /// 星期日
     Sunday = 0,
+    /// 星期一
     Monday = 1,
+    /// 星期二
     Tuesday = 2,
+    /// 星期三
     Wednesday = 3,
+    /// 星期四
     Thursday = 4,
+    /// 星期五
     Friday = 5,
+    /// 星期六
     Saturday = 6,
 }
 
 impl Weekday {
+    /// String returns the English name of the day ("Sunday", "Monday", ...).
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// String返回该日（周几）的英文名（"Sunday"、"Monday"，……）
+    /// </details>
     pub fn String(&self) -> string {
         let d = *self;
         if Weekday::Sunday <= d && d <= Weekday::Saturday {
@@ -1314,6 +1498,12 @@ impl Weekday {
         mon.push(')');
         mon
     }
+
+    /// IndexOf returns the day of the week according to the numerical index such as the number 0 to 6.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 根据数字0~6等数字索引返周几。
+    /// </details>
     pub fn indexOf(i: uint) -> Weekday {
         match i {
             1 => Weekday::Monday,
@@ -1322,13 +1512,18 @@ impl Weekday {
             4 => Weekday::Thursday,
             5 => Weekday::Friday,
             6 => Weekday::Saturday,
-            7 => Weekday::Sunday,
+            0 => Weekday::Sunday,
             _ => Weekday::Sunday,
         }
     }
 }
 
 // 函数
+/// Since returns the time elapsed since t. It is shorthand for time.Now().Sub(t).
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// 它是time.Now().Sub(t)的简写。
+/// </details>
 pub fn Since(mut t: Time) -> Duration {
     let mut now = Time::new();
     if t.wall & uint64!(hasMonotonic) != 0 {
@@ -1339,7 +1534,11 @@ pub fn Since(mut t: Time) -> Duration {
     }
     now.Sub(&mut t)
 }
-
+/// Until returns the duration until t. It is shorthand for t.Sub(time.Now()).
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// 它是t.Sub(time.Now())的简写。
+/// </details>
 pub fn Until(t: Time) -> Duration {
     let mut now = Time::new();
     if t.wall & uint64!(hasMonotonic) != 0 {
