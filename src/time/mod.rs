@@ -14,30 +14,56 @@
 #[macro_use]
 use crate::builtin::*;
 use gostd_derive::Fmt;
-const Layout: &str = "01/02 03:04:05PM '06 -0700"; // The reference time, in numerical order.
-const ANSIC: &str = "Mon Jan _2 15:04:05 2006";
-const UnixDate: &str = "Mon Jan _2 15:04:05 MST 2006";
-const RubyDate: &str = "Mon Jan 02 15:04:05 -0700 2006";
-const RFC822: &str = "02 Jan 06 15:04 MST";
-const RFC822Z: &str = "02 Jan 06 15:04 -0700"; // RFC822 with numeric zone
-const RFC850: &str = "Monday, 02-Jan-06 15:04:05 MST";
-const RFC1123: &str = "Mon, 02 Jan 2006 15:04:05 MST";
-const RFC1123Z: &str = "Mon, 02 Jan 2006 15:04:05 -0700"; // RFC1123 with numeric zone
-const RFC3339: &str = "2006-01-02T15:04:05Z07:00";
-const RFC3339Nano: &str = "2006-01-02T15:04:05.999999999Z07:00";
-const Kitchen: &str = "3:04PM";
-// Handy time stamps.
-const Stamp: &str = "Jan _2 15:04:05";
-const StampMilli: &str = "Jan _2 15:04:05.000";
-const StampMicro: &str = "Jan _2 15:04:05.000000";
-const StampNano: &str = "Jan _2 15:04:05.000000000";
-
+/// Time Format - Layout
+pub const Layout: &str = "01/02 03:04:05PM '06 -0700"; // The reference time, in numerical order.
+/// Time Format - ANSIC
+pub const ANSIC: &str = "Mon Jan _2 15:04:05 2006";
+/// Time Format - UnixDate
+pub const UnixDate: &str = "Mon Jan _2 15:04:05 MST 2006";
+/// Time Format - RubyDate
+pub const RubyDate: &str = "Mon Jan 02 15:04:05 -0700 2006";
+/// Time Format - RFC822
+pub const RFC822: &str = "02 Jan 06 15:04 MST";
+/// Time Format - RFC822Z
+pub const RFC822Z: &str = "02 Jan 06 15:04 -0700"; // RFC822 with numeric zone
+/// Time Format - RFC850
+pub const RFC850: &str = "Monday, 02-Jan-06 15:04:05 MST";
+/// Time Format - RFC1123
+pub const RFC1123: &str = "Mon, 02 Jan 2006 15:04:05 MST";
+/// Time Format - RFC1123Z
+pub const RFC1123Z: &str = "Mon, 02 Jan 2006 15:04:05 -0700"; // RFC1123 with numeric zone
+/// Time Format - RFC3339
+pub const RFC3339: &str = "2006-01-02T15:04:05Z07:00";
+/// Time Format - RFC3339Nano
+pub const RFC3339Nano: &str = "2006-01-02T15:04:05.999999999Z07:00";
+/// Time Format - Kitchen
+pub const Kitchen: &str = "3:04PM";
+/// Handy time stamps.
+pub const Stamp: &str = "Jan _2 15:04:05";
+/// Handy time StampMilli.
+pub const StampMilli: &str = "Jan _2 15:04:05.000";
+/// Handy time StampMicro.
+pub const StampMicro: &str = "Jan _2 15:04:05.000000";
+/// Handy time StampNano.
+pub const StampNano: &str = "Jan _2 15:04:05.000000000";
+/// Time Unit Nanosecond
 pub const Nanosecond: int64 = 1;
+/// Time Unit Microsecond
 pub const Microsecond: int64 = 1000 * Nanosecond;
+/// Time Unit Millisecond
 pub const Millisecond: int64 = 1000 * Microsecond;
+/// Time Unit Second
 pub const Second: int64 = 1000 * Millisecond;
+/// Time Unit Minute
 pub const Minute: int64 = 60 * Second;
+/// Time Unit Hour
 pub const Hour: int64 = 60 * Minute;
+
+/// A Duration represents the elapsed time between two instants as an int64 nanosecond count. The representation limits the largest representable duration to approximately 290 years.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Duration类型代表两个时间点之间经过的时间，以纳秒为单位。可表示的最长时间段大约290年。
+/// </details>
 #[derive(Default, PartialEq, PartialOrd, Fmt)]
 pub struct Duration(int64); // 由于类型别名不能绑定方法通过元组类型结构体实现,访问元组内容用d.0数字下标访问，go源码是 type Duration int64
 
@@ -209,8 +235,30 @@ const maxWall: int64 = wallToInternal + (1 << 33 - 1); // year 2157
 const minWall: int64 = wallToInternal; // year 1885
 const nsecMask: int32 = (1 << 30) - 1;
 const nsecShift: int32 = 30;
-
-#[derive(Default, PartialEq, PartialOrd, Debug)]
+/// A Time represents an instant in time with nanosecond precision.
+/// Programs using times should typically store and pass them as values, not pointers. That is, time variables and struct fields should be of type time.Time, not *time.Time.
+///
+/// A Time value can be used by multiple goroutines simultaneously except that the methods GobDecode, UnmarshalBinary, UnmarshalJSON and UnmarshalText are not concurrency-safe.
+///
+/// Time instants can be compared using the Before, After, and Equal methods. The Sub method subtracts two instants, producing a Duration. The Add method adds a Time and a Duration, producing a Time.
+///
+/// The zero value of type Time is January 1, year 1, 00:00:00.000000000 UTC. As this time is unlikely to come up in practice, the IsZero method gives a simple way of detecting a time that has not been initialized explicitly.
+///
+/// Each Time has associated with it a Location, consulted when computing the presentation form of the time, such as in the Format, Hour, and Year methods. The methods Local, UTC, and In return a Time with a specific location. Changing the location in this way changes only the presentation; it does not change the instant in time being denoted and therefore does not affect the computations described in earlier paragraphs.
+///
+/// Representations of a Time value saved by the GobEncode, MarshalBinary, MarshalJSON, and MarshalText methods store the Time.Location's offset, but not the location name. They therefore lose information about Daylight Saving Time.
+///
+/// In addition to the required “wall clock” reading, a Time may contain an optional reading of the current process's monotonic clock, to provide additional precision for comparison or subtraction. See the “Monotonic Clocks” section in the package documentation for details.
+///
+/// Note that the Go == operator compares not just the time instant but also the Location and the monotonic clock reading. Therefore, Time values should not be used as map or database keys without first guaranteeing that the identical Location has been set for all values, which can be achieved through use of the UTC or Local method, and that the monotonic clock reading has been stripped by setting t = t.Round(0). In general, prefer t.Equal(u) to t == u, since t.Equal uses the most accurate comparison available and correctly handles the case when only one of its arguments has a monotonic clock reading.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Time代表一个纳秒精度的时间点。
+/// 程序中应使用Time类型值来保存和传递时间，而不能用指针。就是说，表示时间的变量和字段，应为time.Time类型，而不是*time.Time.类型。一个Time类型值可以被多个go程同时使用。时间点可以使用Before、After和Equal方法进行比较。Sub方法让两个时间点相减，生成一个Duration类型值（代表时间段）。Add方法给一个时间点加上一个时间段，生成一个新的Time类型时间点。
+/// Time零值代表时间点January 1, year 1, 00:00:00.000000000 UTC。因为本时间点一般不会出现在使用中，IsZero方法提供了检验时间是否显式初始化的一个简单途径。
+/// 每一个时间都具有一个地点信息（及对应地点的时区信息），当计算时间的表示格式时，如Format、Hour和Year等方法，都会考虑该信息。Local、UTC和In方法返回一个指定时区（但指向同一时间点）的Time。修改地点/时区信息只是会改变其表示；不会修改被表示的时间点，因此也不会影响其计算。
+/// </details>
+#[derive(Default, PartialEq, PartialOrd, Debug, Fmt)]
 pub struct Time {
     wall: uint64,
     ext: int64,
@@ -220,6 +268,84 @@ pub struct Time {
 impl Time {
     fn new() -> Time {
         Time::default()
+    }
+
+    /// Format returns a textual representation of the time value formatted according to the layout defined by the argument. See the documentation for the constant called Layout to see how to represent the layout format.
+    ///
+    /// The executable example for Time.Format demonstrates the working of the layout string in detail and is a good reference.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Format根据layout指定的格式返回t代表的时间点的格式化文本表示。layout定义了参考时间：
+    ///
+    /// `Mon Jan 2 15:04:05 -0700 MST 2006`
+    ///
+    /// 格式化后的字符串表示，它作为期望输出的例子。同样的格式规则会被用于格式化时间。
+    ///
+    /// 预定义的ANSIC、UnixDate、RFC3339和其他版式描述了参考时间的标准或便捷表示。要获得更多参考时间的定义和格式，参见本包的ANSIC和其他版式常量。
+    /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let t = time::Date(2009, 11, 10, 14, 30, 12, 13, time::UTC.clone());
+    /// assert_eq!(t.String(),"2009-11-10 14:30:12.000000013 +0000 UTC".to_string());
+    /// assert_eq!(t.Format(time::RFC822),"10 Nov 09 14:30 UTC".to_string());
+    /// assert_eq!(t.Format(time::RFC1123),"Tue, 10 Nov 2009 14:30:12 UTC".to_string());
+    /// println!("default: {}", t);
+    /// println!("RFC822: {}", t.Format(time::RFC822));
+    /// println!("RFC1123: {}", t.Format(time::RFC1123));
+    /// // output:
+    /// // default: 2009-11-10 14:30:12.000000013 +0000 UTC
+    /// // RFC822: 11/10 02:30:12PM '09 +0000
+    /// // RFC1123: Tue, 10 Nov 2009 14:30:12 UTC
+    /// ```
+    pub fn Format(&self, layout: &str) -> string {
+        const bufSize: uint = 64;
+        let mut b: Vec<byte> = vec![];
+        let max = layout.len() + 10;
+        if max < bufSize {
+            let buf: [byte; bufSize] = [0; bufSize];
+            b = buf[..0].to_vec()
+        } else {
+            b = Vec::with_capacity(max);
+        }
+
+        b = self.AppendFormat(b, layout);
+        string(&b)
+    }
+
+    pub fn String(&self) -> string {
+        let mut s = self.Format("2006-01-02 15:04:05.999999999 -0700 MST");
+        if self.wall & uint64!(hasMonotonic) != 0 {
+            let mut m2 = int64!(self.ext);
+            let mut sign = byte!('+');
+            if self.ext < 0 {
+                sign = byte!('+');
+                m2 = int64!(-m2);
+            }
+            let mut m1 = m2 / 1000_000_000;
+            m2 = m2 % 1000_000_000;
+            let m0 = m1 / 100_000_000;
+            m1 = m1 % 1000_000_000;
+            let mut buf = Vec::with_capacity(24);
+            buf.extend_from_slice((" m=".as_bytes()));
+            buf.push(sign);
+            let mut wid = 0;
+
+            if m0 != 0 {
+                buf = appendInt(buf, int!(m0), wid);
+                wid = 9;
+            }
+
+            buf = appendInt(buf, int!(m1), wid);
+            buf.push(byte!('.'));
+            buf = appendInt(buf, int!(m2), 9);
+            s += string::from_utf8(buf.to_vec())
+                .expect("time String failed from_utf8")
+                .as_str();
+        }
+        s
     }
     // nsec returns the time's nanoseconds.
     fn nsec(&self) -> int32 {
@@ -360,12 +486,31 @@ impl Time {
         }
         uint64!(sec + (unixToInternal + internalToAbsolute))
     }
-    /// 待完善
+
+    // locabs是Zone和abs方法的组合。
+    // 从一个区的查询中提取两个返回值。
     fn locabs(&self) -> (string, int, uint64) {
-        let sec = self.unixSec();
-        let name = "UTC".to_string();
+        let mut name: string = "".to_string();
+        let mut offset: int = 0;
+        let mut l = self.loc.clone();
+        if l.name.len() == 0 || l.name.as_str() == "Local" {
+            l = l.get();
+        }
+
+        let mut sec = self.unixSec();
+        if l.name.as_str() != "UTC" {
+            if l.cacheZone.name.len() != 0 && l.cacheStart <= sec && sec < l.cacheEnd {
+                name = l.cacheZone.name;
+                offset = l.cacheZone.offset;
+            } else {
+                let (name, offset, _, _, _) = l.lookup(sec);
+            }
+            sec += int64!(offset);
+        } else {
+            name = "UTC".to_string();
+        }
         let abs = uint64!(sec + (unixToInternal + internalToAbsolute));
-        (name, 0, abs)
+        (name, offset, abs)
     }
 
     fn date(&self, full: bool) -> (int, Month, int, int) {
@@ -391,7 +536,7 @@ impl Time {
     ///	let afterTenHours = start.Add(&Duration::new(time::Hour * 10));
     ///	let afterTenDays = start.Add(&Duration::new(time::Hour * 24 * 10));
 
-    ///	println!("start = {:?}\n", start);
+    ///	println!("start = {} \n", start);
     ///	println!("start.Add(time.Second * 10) = {:?}\n", afterTenSeconds);
     ///	println!("start.Add(time.Minute * 10) = {:?}\n", afterTenMinutes);
     ///	println!("start.Add(time.Hour * 10) = {:?}\n", afterTenHours);
@@ -519,6 +664,27 @@ impl Time {
         day
     }
 
+    pub fn Hour(&self) -> int {
+        int!(int64!(self.abs()) % secondsPerDay / secondsPerHour)
+    }
+
+    pub fn Minute(&self) -> int {
+        int!(int64!(self.abs()) % secondsPerHour / secondsPerMinute)
+    }
+
+    pub fn Second(&self) -> int {
+        int!(int64!(self.abs()) % secondsPerMinute)
+    }
+
+    pub fn Nanosecond(&self) -> int {
+        int!(self.nsec())
+    }
+
+    pub fn YeayDay(&self) -> int {
+        let (_, _, _, yday) = self.date(false);
+        yday + 1
+    }
+
     /// Weekday returns the day of the week specified by t.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
@@ -626,6 +792,11 @@ impl Time {
     }
 }
 
+/// Unix returns the local Time corresponding to the given Unix time, sec seconds and nsec nanoseconds since January 1, 1970 UTC. It is valid to pass nsec outside the range [0, 999999999]. Not all sec values have a corresponding time value. One such value is 1<<63-1 (the largest int64 value).
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Unix返回与给定的Unix时间相对应的本地时间，自1970年1月1日UTC以来的秒数和纳秒数。在[0, 999999999]范围之外传递nsec是有效的。不是所有的sec值都有相应的时间值。一个这样的值是1<<63-1（最大的int64值）。
+/// </details>
 pub fn Unix(sec: int64, nsec: int64) -> Time {
     let mut sec = sec;
     let mut nsec = nsec;
@@ -641,23 +812,70 @@ pub fn Unix(sec: int64, nsec: int64) -> Time {
     unixTime(sec, int32!(nsec))
 }
 
+/// UnixMilli returns the local Time corresponding to the given Unix time, msec milliseconds since January 1, 1970 UTC.
+///
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// UnixMilli返回与给定的Unix时间相对应的本地时间，自1970年1月1日UTC以来的毫秒数。
+/// </details>
 pub fn UnixMilli(msec: int64) -> Time {
     Unix(msec / 1000, (msec % 1000) / 1000_000)
 }
 
+/// UnixMicro returns the local Time corresponding to the given Unix time, usec microseconds since January 1, 1970 UTC.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// UnixMicro返回与给定的Unix时间相对应的本地时间，自1970年1月1日UTC以来的微秒数。
+/// </details>
 pub fn UnixMicro(usec: int64) -> Time {
     Unix(usec / 1000_000, (usec % 1000_000) * 1000)
 }
-
+/// Date returns the Time corresponding to
+///
+/// `yyyy-mm-dd hh:mm:ss + nsec nanoseconds`
+///
+/// in the appropriate zone for that time in the given location.
+///
+/// The month, day, hour, min, sec, and nsec values may be outside their usual ranges and will be normalized during the conversion. For example, October 32 converts to November 1.
+///
+/// A daylight savings time transition skips or repeats times. For example, in the United States, March 13, 2011 2:15am never occurred, while November 6, 2011 1:15am occurred twice. In such cases, the choice of time zone, and therefore the time, is not well-defined. Date returns a time that is correct in one of the two zones involved in the transition, but it does not guarantee which.
+///
+/// Date panics if loc is nil.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Date返回一个时区为loc、当地时间为：
+///
+/// `year-month-day hour:min:sec + nsec nanoseconds`
+///
+/// 的时间点。
+///
+/// month、day、hour、min、sec和nsec的值可能会超出它们的正常范围，在转换前函数会自动将之规范化。如October 32被修正为November 1。
+///
+/// 夏时制的时区切换会跳过或重复时间。如，在美国，March 13, 2011 2:15am从来不会出现，而November 6, 2011 1:15am 会出现两次。此时，时区的选择和时间是没有良好定义的。Date会返回在时区切换的两个时区其中一个时区
+/// 正确的时间，但本函数不会保证在哪一个时区正确。
+/// 如果loc为nil会panic。
+/// </details>
+///
 /// # Example
 ///
 /// ```rust
 /// use gostd::time;
-/// let d = time::Date(2000, 2, 1, 12, 30, 0, 0, time::UTC.clone());
+/// let d = time::Date(2009, 11, 10, 14, 30, 12, 13, time::UTC.clone());
 /// let (year, month, day) = d.Date();
+/// assert_eq!(year, 2009);
+/// assert_eq!(month.String(), "November");
+/// assert_eq!(day, 10);
+/// assert_eq!(d.String(),"2009-11-10 14:30:12.000000013 +0000 UTC".to_string());
 /// println!("year = {}",year);
 /// println!("month = {}",month.String());
 /// println!("day = {}",day);
+/// println!("{}",d);
+///
+///  //  output:
+///  //  year = 2009
+///  //  month = November
+///  //  day = 10
+///  //  2009-11-10 14:30:12.000000013 +0000 UTC
 /// ```
 pub fn Date(
     year: int,
@@ -667,16 +885,16 @@ pub fn Date(
     min: int,
     sec: int,
     nsec: int,
-    location: Location,
+    loc: Location,
 ) -> Time {
-    let loc = Some(location);
+    let loc = Some(loc);
     if loc.is_none() {
         panic!("time: missing Location in call to Date")
     }
 
     let mut m = month - 1;
     let (year, m) = norm(year, int!(m), 12);
-    let month = Month::indexOf(uint!(m + 1));
+    let month = Month::IndexOf(uint!(m + 1));
 
     let (sec, nsec) = norm(sec, nsec, 1000_000_000);
     let (min, sec) = norm(min, sec, 60);
@@ -732,6 +950,11 @@ fn absWeekday(abs: uint64) -> Weekday {
     Weekday::indexOf(uint!(sec / secondsPerDay))
 }
 
+/// A Location maps time instants to the zone in use at that time. Typically, the Location represents the collection of time offsets in use in a geographical area. For many Locations the time offset varies depending on whether daylight savings time is in use at the time instant.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Location代表一个（关联到某个时间点的）地点，以及该地点所在的时区。
+/// </details>
 #[derive(Default, PartialEq, PartialOrd, Clone, Debug, Fmt)]
 pub struct Location {
     name: string,
@@ -774,7 +997,12 @@ impl Location {
         }
         self.clone()
     }
-
+    /// String returns a descriptive name for the time zone information, corresponding to the name argument to LoadLocation or FixedZone.
+    ///
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// String返回对时区信息的描述，返回值绑定为LoadLocation或FixedZone函数创建l时的name参数。
+    /// </details>
     pub fn String(&self) -> string {
         self.get().name
     }
@@ -902,6 +1130,28 @@ struct zoneTrans {
 const alpha: int64 = (-1) << 63; // math.MinInt64
 const omega: int64 = int64!((uint64!(1) << 63) - 1); // math.MaxInt64
 
+/// FixedZone returns a Location that always uses the given zone name and offset (seconds east of UTC).
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// FixedZone使用给定的地点名name和时间偏移量offset（单位秒）创建并返回一个Location
+/// </details>
+///
+/// # Example
+///
+/// ```
+/// use gostd::time;
+///
+/// let mut t = time::Date(2009, 11, 10, 14, 30, 12, 13, time::UTC.clone());
+/// assert_eq!(t.String(),"2009-11-10 14:30:12.000000013 +0000 UTC".to_string());
+/// println!("UTC: {}", t);
+/// let cst_zone = time::FixedZone("CST".to_string(), 8 * 3600); //北京时区 CST = UTC时区+8小时
+/// t.In(cst_zone);
+/// assert_eq!(t.String(),"2009-11-10 22:30:12.000000013 +0800 CST".to_string());
+/// println!("CST: {}", t);
+/// // output:
+/// // UTC: 2009-11-10 14:30:12.000000013 +0000 UTC
+/// // CST: 2009-11-10 22:30:12.000000013 +0800 CST
+/// ```
 pub fn FixedZone(name: string, offset: int) -> Location {
     let zo = vec![zone {
         name: name.to_string(),
@@ -927,13 +1177,25 @@ pub fn FixedZone(name: string, offset: int) -> Location {
 mod sys;
 use lazy_static;
 lazy_static::lazy_static! {
-   pub  static ref startNano:int64 =runtimeNano() - 1;
-   pub  static ref Local:Location = Location::new();
-   pub  static ref utcLoc:Location = {
+     static ref startNano:int64 =runtimeNano() - 1;
+/// Local represents the system's local time zone. On Unix systems, Local consults the TZ environment variable to find the time zone to use. No TZ means use the system default /etc/localtime. TZ="" means use UTC. TZ="foo" means use file foo in the system timezone directory.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Local代表系统本地，对应本地时区。
+/// </details>
+     pub static ref Local:Location = Location::new();
+     static ref utcLoc:Location = {
     let mut l = Location::new();
     l.name="UTC".to_string();
      l
     };
+
+
+/// UTC represents Universal Coordinated Time (UTC).
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// UTC代表通用协调时间，对应零时区。
+/// </details>
     pub static ref UTC:Location =utcLoc.clone() ;
 }
 
@@ -947,6 +1209,11 @@ fn now() -> (int64, int32, int64) {
     (int64!(sec), int32!(nsec), int64!(mono))
 }
 
+/// Now returns the current local time.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Now返回当前本地时间。
+/// </details>
 pub fn Now() -> Time {
     let (mut sec, mut nsec, mut mono) = now();
     mono -= *startNano;
@@ -1042,7 +1309,7 @@ fn absDate(abs: uint64, full: bool) -> (int, Month, int, int) {
 
     m += 1; // because January is 1
     day = day - begin + 1;
-    month = Month::indexOf(m);
+    month = Month::IndexOf(m);
     (year, month, day, yday)
 }
 
@@ -1140,23 +1407,47 @@ const longMonthNames: [&str; 12] = [
     "December",
 ];
 
+/// A Month specifies a month of the year (January = 1, ...).
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Month代表一年的某个月。
+/// </details>
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Fmt)]
 pub enum Month {
+    ///初始0值，实际没有这个月份
+    Default = 0,
+    /// 一月
     January = 1,
+    /// 二月
     February = 2,
+    /// 三月
     March = 3,
+    /// 四月
     April = 4,
+    /// 五月
     May = 5,
+    /// 六月
     June = 6,
+    /// 七月
     July = 7,
+    /// 八月
     August = 8,
+    /// 九月
     September = 9,
+    /// 十月
     October = 10,
+    /// 十一月
     November = 11,
+    /// 十二月
     December = 12,
 }
 
 impl Month {
+    /// String returns the English name of the month ("January", "February", ...).
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// String返回月份的英文名（"January"，"February"，……）
+    /// </details>
     pub fn String(&self) -> string {
         let m = *self;
         if Month::January <= m && m <= Month::December {
@@ -1171,7 +1462,12 @@ impl Month {
         mon.push(')');
         mon
     }
-    pub fn indexOf(i: uint) -> Month {
+    /// IndexOf returns the month according to the numeric index such as the numbers 1 to 12.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 根据数字1~12等数字索引返回月份。
+    /// </details>
+    pub fn IndexOf(i: uint) -> Month {
         match i {
             1 => Month::January,
             2 => Month::February,
@@ -1190,18 +1486,35 @@ impl Month {
     }
 }
 
+/// A Weekday specifies a day of the week (Sunday = 0, ...).
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Weekday代表一周的某一天。
+/// </details>
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Fmt)]
 pub enum Weekday {
+    /// 星期日
     Sunday = 0,
+    /// 星期一
     Monday = 1,
+    /// 星期二
     Tuesday = 2,
+    /// 星期三
     Wednesday = 3,
+    /// 星期四
     Thursday = 4,
+    /// 星期五
     Friday = 5,
+    /// 星期六
     Saturday = 6,
 }
 
 impl Weekday {
+    /// String returns the English name of the day ("Sunday", "Monday", ...).
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// String返回该日（周几）的英文名（"Sunday"、"Monday"，……）
+    /// </details>
     pub fn String(&self) -> string {
         let d = *self;
         if Weekday::Sunday <= d && d <= Weekday::Saturday {
@@ -1215,6 +1528,12 @@ impl Weekday {
         mon.push(')');
         mon
     }
+
+    /// IndexOf returns the day of the week according to the numerical index such as the number 0 to 6.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 根据数字0~6等数字索引返周几。
+    /// </details>
     pub fn indexOf(i: uint) -> Weekday {
         match i {
             1 => Weekday::Monday,
@@ -1223,13 +1542,18 @@ impl Weekday {
             4 => Weekday::Thursday,
             5 => Weekday::Friday,
             6 => Weekday::Saturday,
-            7 => Weekday::Sunday,
+            0 => Weekday::Sunday,
             _ => Weekday::Sunday,
         }
     }
 }
 
 // 函数
+/// Since returns the time elapsed since t. It is shorthand for time.Now().Sub(t).
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// 它是time.Now().Sub(t)的简写。
+/// </details>
 pub fn Since(mut t: Time) -> Duration {
     let mut now = Time::new();
     if t.wall & uint64!(hasMonotonic) != 0 {
@@ -1240,7 +1564,11 @@ pub fn Since(mut t: Time) -> Duration {
     }
     now.Sub(&mut t)
 }
-
+/// Until returns the duration until t. It is shorthand for t.Sub(time.Now()).
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// 它是t.Sub(time.Now())的简写。
+/// </details>
 pub fn Until(t: Time) -> Duration {
     let mut now = Time::new();
     if t.wall & uint64!(hasMonotonic) != 0 {
@@ -1373,3 +1701,659 @@ fn div(t: Time, d: Duration) -> (int, Duration) {
     }
     (qmod2, r)
 }
+
+// format.go -start
+const stdLongMonth: int32 = stdNeedDate; // "January"
+const stdMonth: int32 = stdNeedDate + 1; // "Jan"
+const stdNumMonth: int32 = stdNeedDate + 2; // "1"
+const stdZeroMonth: int32 = stdNeedDate + 3; // "01"
+const stdLongWeekDay: int32 = stdNeedDate + 4; // "Monday"
+const stdWeekDay: int32 = stdNeedDate + 5; // "Mon"
+const stdDay: int32 = stdNeedDate + 6; // "2"
+const stdUnderDay: int32 = stdNeedDate + 7; // "_2"
+const stdZeroDay: int32 = stdNeedDate + 8; // "02"
+const stdUnderYearDay: int32 = stdNeedDate + 9; // "__2"
+const stdZeroYearDay: int32 = stdNeedDate + 10; // "002"
+const stdHour: int32 = stdNeedClock + 12; // "15"
+const stdHour12: int32 = stdHour + 1; // "3"
+const stdZeroHour12: int32 = stdHour + 2; // "03"
+const stdMinute: int32 = stdHour + 3; // "4"
+const stdZeroMinute: int32 = stdHour + 4; // "04"
+const stdSecond: int32 = stdHour + 5; // "5"
+const stdZeroSecond: int32 = stdHour + 6; // "05"
+const stdLongYear: int32 = stdNeedDate + 19; // "2006"
+const stdYear: int32 = stdLongYear + 1; // "06"
+const stdPM: int32 = stdNeedClock + 21; // "PM"
+const stdpm: int32 = stdPM + 1; // "pm"
+
+const stdTZ: int32 = 23; // "MST"
+const stdISO8601TZ: int32 = 24; // "Z0700"  // prints Z for UTC
+const stdISO8601SecondsTZ: int32 = 25; // "Z070000"
+const stdISO8601ShortTZ: int32 = 26; // "Z07"
+const stdISO8601ColonTZ: int32 = 27; // "Z07:00" // prints Z for UTC
+const stdISO8601ColonSecondsTZ: int32 = 28; // "Z07:00:00"
+const stdNumTZ: int32 = 29; // "-0700"  // always numeric
+const stdNumSecondsTz: int32 = 30; // "-070000"
+const stdNumShortTZ: int32 = 31; // "-07"    // always numeric
+const stdNumColonTZ: int32 = 32; // "-07:00" // always numeric
+const stdNumColonSecondsTZ: int32 = 33; // "-07:00:00"
+const stdFracSecond0: int32 = 34; // ".0", ".00", ... , trailing zeros included
+const stdFracSecond9: int32 = 35; // ".9", ".99", ..., trailing zeros omitted
+
+const stdNeedDate: int32 = 1 << 8; // need month, day, year
+const stdNeedClock: int32 = 2 << 8; // need hour, minute, second
+const stdArgShift: int32 = 16; // extra argument in high bits, above low stdArgShift
+const stdSeparatorShift: int32 = 28; // extra argument in high 4 bits for fractional second separators
+const stdMask: int32 = (1 << stdArgShift) - 1; // mask out argument
+
+static std0x: [int32; 6] = [
+    stdZeroMonth,
+    stdZeroDay,
+    stdZeroHour12,
+    stdZeroMinute,
+    stdZeroSecond,
+    stdYear,
+];
+
+impl Time {
+    pub fn AppendFormat(&self, b: Vec<byte>, layout: &str) -> Vec<byte> {
+        let (mut name, mut offset, mut abs) = self.locabs();
+        let mut year: int = -1;
+        let mut month: Month = Month::Default;
+        let mut day: int = 0;
+        let mut yday: int = 0;
+        let mut hour: int = -1;
+        let mut min: int = 0;
+        let mut sec: int = 0;
+
+        let mut b = b;
+        let mut layout = layout;
+
+        while (layout != "") {
+            let (prefix, std, suffix) = nextStdChunk(layout);
+            if prefix != "" {
+                b.extend_from_slice(prefix.as_bytes());
+            }
+
+            if std == 0 {
+                break;
+            }
+            layout = suffix;
+
+            if year < 0 && (std & stdNeedDate) != 0 {
+                let abs_date = absDate(abs, true);
+                year = abs_date.0;
+                month = abs_date.1;
+                day = abs_date.2;
+                yday = abs_date.3;
+                yday += 1;
+            }
+
+            if hour < 0 && (std & stdNeedClock) != 0 {
+                let abs_clock = absClock(abs);
+                hour = abs_clock.0;
+                min = abs_clock.1;
+                sec = abs_clock.2;
+            }
+
+            match (std & stdMask) {
+                stdYear => {
+                    let mut y = year;
+                    if y < 0 {
+                        y = -y;
+                    }
+                    b = appendInt(b, y % 100, 2);
+                }
+
+                stdLongYear => {
+                    b = appendInt(b, year, 4);
+                }
+
+                stdMonth => {
+                    b.extend_from_slice(&month.clone().String().as_bytes()[..3]);
+                }
+
+                stdLongMonth => {
+                    b.extend_from_slice(&month.clone().String().as_bytes());
+                }
+
+                stdNumMonth => {
+                    b = appendInt(b, int!(month), 0);
+                }
+
+                stdZeroMonth => b = appendInt(b, int!(month), 2),
+
+                stdWeekDay => {
+                    b.extend_from_slice(absWeekday(abs).String().as_bytes()[..3].as_ref())
+                }
+
+                stdLongWeekDay => {
+                    let s = absWeekday(abs).String();
+                    b.extend_from_slice(&s.as_bytes());
+                }
+
+                stdDay => {
+                    b = appendInt(b, day, 0);
+                }
+
+                stdUnderDay => {
+                    if day < 10 {
+                        b.push(b' ');
+                    }
+                    b = appendInt(b, day, 0);
+                }
+
+                stdZeroDay => {
+                    b = appendInt(b, day, 2);
+                }
+
+                stdUnderYearDay => {
+                    if yday < 100 {
+                        b.push(b' ');
+                        if yday < 10 {
+                            b.push(b' ');
+                        }
+                    }
+
+                    b = appendInt(b, yday, 0);
+                }
+
+                stdZeroYearDay => {
+                    b = appendInt(b, yday, 3);
+                }
+
+                stdHour => {
+                    b = appendInt(b, hour, 2);
+                }
+
+                stdHour12 => {
+                    let mut hr = hour % 12;
+                    if hr == 0 {
+                        hr = 12
+                    }
+                    b = appendInt(b, hr, 0);
+                }
+
+                stdZeroHour12 => {
+                    let mut hr = hour % 12;
+                    if hr == 0 {
+                        hr = 12
+                    }
+                    b = appendInt(b, hr, 2);
+                }
+
+                stdMinute => {
+                    b = appendInt(b, min, 0);
+                }
+
+                stdZeroMinute => {
+                    b = appendInt(b, min, 2);
+                }
+
+                stdSecond => {
+                    b = appendInt(b, sec, 0);
+                }
+
+                stdZeroSecond => {
+                    b = appendInt(b, sec, 2);
+                }
+
+                stdPM => {
+                    if hour >= 12 {
+                        b.extend_from_slice("PM".as_bytes());
+                    } else {
+                        b.extend_from_slice("AM".as_bytes());
+                    }
+                }
+
+                stdpm => {
+                    if hour >= 12 {
+                        b.extend_from_slice("pm".as_bytes());
+                    } else {
+                        b.extend_from_slice("am".as_bytes());
+                    }
+                }
+
+                stdISO8601TZ
+                | stdISO8601ColonTZ
+                | stdISO8601SecondsTZ
+                | stdISO8601ShortTZ
+                | stdISO8601ColonSecondsTZ
+                | stdNumTZ
+                | stdNumColonTZ
+                | stdNumSecondsTz
+                | stdNumShortTZ
+                | stdNumColonSecondsTZ => {
+                    if offset == 0
+                        && (std == stdISO8601TZ
+                            || std == stdISO8601ColonTZ
+                            || std == stdISO8601ColonSecondsTZ
+                            || std == stdISO8601ShortTZ
+                            || std == stdISO8601ColonSecondsTZ)
+                    {
+                        b.push(b'Z');
+                        break;
+                    }
+
+                    let mut zone = offset / 60;
+                    let mut absoffset = offset;
+                    if zone < 0 {
+                        b.push(b'-');
+                        zone = -zone;
+                        absoffset = -absoffset;
+                    } else {
+                        b.push(b'+');
+                    }
+                    b = appendInt(b, zone / 60, 2);
+
+                    if std == stdISO8601ColonTZ
+                        || std == stdNumColonTZ
+                        || std == stdISO8601ColonSecondsTZ
+                        || std == stdNumColonSecondsTZ
+                    {
+                        b.push(b':');
+                    }
+
+                    if std != stdNumShortTZ && std != stdISO8601ShortTZ {
+                        b = appendInt(b, zone % 60, 2);
+                    }
+
+                    if std == stdISO8601SecondsTZ
+                        || std == stdNumSecondsTz
+                        || std == stdNumColonSecondsTZ
+                        || std == stdISO8601ColonSecondsTZ
+                    {
+                        if std == stdNumColonSecondsTZ || std == stdISO8601ColonSecondsTZ {
+                            b.push(b':');
+                        }
+                        b = appendInt(b, absoffset % 60, 2);
+                    }
+                }
+
+                stdTZ => {
+                    if name != "" {
+                        b.extend_from_slice(name.as_bytes());
+                        break;
+                    }
+
+                    let mut zone = offset / 60;
+                    if zone < 0 {
+                        b.push(b'-');
+                        zone = -zone;
+                    } else {
+                        b.push(b'+');
+                    }
+                    b = appendInt(b, zone / 60, 2);
+                    b = appendInt(b, zone % 60, 2);
+                }
+
+                stdFracSecond0 | stdFracSecond9 => {
+                    b = formatNano(b, uint!(self.Nanosecond()), int!(std))
+                }
+
+                _ => (), // 匹配不到什么都不做
+            }
+        }
+        b
+    }
+}
+
+// private fn
+
+// match报告s1和s2是否匹配，忽略大小写。
+// 假设s1和s2的长度相同。
+// 注意：因为match是rust的保留字，这里改成isMatch。
+fn isMatch(s1: &str, s2: &str) -> bool {
+    //检查长度一致
+    if s1.len() != s2.len() {
+        return false;
+    }
+    let s1 = s1.as_bytes();
+    let s2 = s2.as_bytes();
+
+    for i in 0..s1.len() {
+        let mut c1 = s1[i];
+        let mut c2 = s2[i];
+        if c1 != c2 {
+            c1 |= byte!('a') - byte!('A');
+            c2 |= byte!('a') - byte!('A');
+            if c1 != c2 || c1 < byte!('a') || c1 > byte!('z') {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+const errBad: &'static str = "bad value for field";
+
+fn lookup(tab: Vec<string>, val: string) -> Result<(int, string), &'static str> {
+    for (i, v) in tab.iter().enumerate() {
+        if val.len() >= v.len() && isMatch(&val[0..v.len()], v) {
+            let index = uint!(v.len());
+            let vstr = v.as_str();
+            return Ok((int!(i), vstr[index..].to_string()));
+        }
+    }
+
+    Err(errBad) // go源码:return -1, val, errBad
+}
+
+fn appendInt(b: Vec<byte>, x: int, width: int) -> Vec<byte> {
+    let mut b = b;
+    let width = uint!(width);
+    let mut u = uint!(x);
+
+    if x < 0 {
+        b.push(byte!('-'));
+        u = uint!(-x);
+    }
+
+    let mut buf: [byte; 20] = [0; 20];
+    let mut i = buf.len();
+    while (u >= 10) {
+        i -= 1;
+        let q = u / 10;
+        buf[i] = byte!(uint!(byte!('0')) + u - q * 10);
+        u = q;
+    }
+    i -= 1;
+    buf[i] = byte!(uint!('0') + u);
+
+    let mut w = buf.len() - i;
+    for _ in w..width {
+        b.push(byte!('0'));
+    }
+
+    // b.append(buf[i..])
+    b.extend_from_slice(&buf[i..]);
+    b
+}
+
+fn startWithLowerCase(s: &str) -> bool {
+    if 0 == s.len() {
+        return false;
+    }
+    let c = s.bytes().nth(0).unwrap();
+    b'a' <= c && c <= b'z'
+}
+
+fn isDigit(s: &str, i: int) -> bool {
+    if s.len() <= uint!(i) {
+        return false;
+    }
+    let c = s.bytes().nth(uint!(i)).unwrap();
+    return b'0' <= c && c <= b'9';
+}
+
+fn stdFracSecond(code: int, n: int, c: int) -> int {
+    // Use 0xfff to make the failure case even more absurd.
+    if uint8!(c) == b'.' {
+        return code | ((n & 0xfff) << stdArgShift);
+    }
+    code | ((n & 0xfff) << stdArgShift) | 1 << stdSeparatorShift
+}
+
+fn nextStdChunk(layout: &str) -> (&str, int32, &str) {
+    let length = layout.len();
+    for (i, c) in layout.bytes().enumerate() {
+        match c {
+            b'J' => {
+                if layout.len() >= i + 3 && &layout[i..i + 3] == "Jan" {
+                    if layout.len() >= i + 7 && &layout[i..i + 7] == "January" {
+                        return (
+                            layout[0..i].as_ref(),
+                            stdLongMonth,
+                            layout[i + 7..].as_ref(),
+                        );
+                    }
+                    if !startWithLowerCase(layout[i + 3..].as_ref()) {
+                        return (layout[0..i].as_ref(), stdMonth, layout[i + 3..].as_ref());
+                    }
+                }
+            }
+
+            b'M' => {
+                if layout.len() >= 3 {
+                    if &layout[i..i + 3] == "Mon" {
+                        if layout.len() >= i + 6 && &layout[i..i + 6] == "Monday" {
+                            return (
+                                layout[0..i].as_ref(),
+                                stdLongWeekDay,
+                                layout[i + 6..].as_ref(),
+                            );
+                        }
+                        if !startWithLowerCase(layout[i + 3..].as_ref()) {
+                            return (layout[0..i].as_ref(), stdWeekDay, layout[i + 3..].as_ref());
+                        }
+                    }
+                    if &layout[i..i + 3] == "MST" {
+                        return (layout[0..i].as_ref(), stdTZ, layout[i + 3..].as_ref());
+                    }
+                }
+            }
+
+            b'0' => {
+                if layout.len() >= i + 2
+                    && b'1' <= layout.bytes().nth(i + 1).unwrap()
+                    && layout.bytes().nth(i + 1).unwrap() <= b'6'
+                {
+                    let idx: uint = uint!(layout.bytes().nth(i + 1).unwrap() - b'1');
+                    return (layout[0..i].as_ref(), std0x[idx], layout[i + 2..].as_ref());
+                }
+
+                if layout.len() >= i + 3
+                    && layout.bytes().nth(i + 1).unwrap() == b'0'
+                    && layout.bytes().nth(i + 2).unwrap() == b'2'
+                {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdZeroYearDay,
+                        layout[i + 3..].as_ref(),
+                    );
+                }
+            }
+
+            b'1' => {
+                if layout.len() >= i + 2 && layout.bytes().nth(i + 1).unwrap() == b'5' {
+                    return (layout[0..i].as_ref(), stdHour, layout[i + 2..].as_ref());
+                }
+                return (layout[0..i].as_ref(), stdNumMonth, layout[i + 1..].as_ref());
+            }
+
+            b'2' => {
+                if layout.len() >= i + 4 && &layout[i..i + 4] == "2006" {
+                    return (layout[0..i].as_ref(), stdLongYear, layout[i + 4..].as_ref());
+                }
+                return (layout[0..i].as_ref(), stdDay, layout[i + 1..].as_ref());
+            }
+
+            b'_' => {
+                if layout.len() >= i + 2 && layout.bytes().nth(i + 1).unwrap() == b'2' {
+                    if layout.len() >= i + 5 && &layout[i + 1..i + 5] == "2006" {
+                        return (
+                            layout[0..i + 1].as_ref(),
+                            stdLongYear,
+                            layout[i + 5..].as_ref(),
+                        );
+                    }
+                    return (layout[0..i].as_ref(), stdUnderDay, layout[i + 2..].as_ref());
+                }
+                if layout.len() >= i + 3
+                    && layout.bytes().nth(i + 1).unwrap() == b'_'
+                    && layout.bytes().nth(i + 2).unwrap() == b'2'
+                {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdUnderYearDay,
+                        layout[i + 3..].as_ref(),
+                    );
+                }
+            }
+
+            b'3' => {
+                return (layout[0..i].as_ref(), stdHour12, layout[i + 1..].as_ref());
+            }
+
+            b'4' => {
+                return (layout[0..i].as_ref(), stdMinute, layout[i + 1..].as_ref());
+            }
+
+            b'5' => {
+                return (layout[0..i].as_ref(), stdSecond, layout[i + 1..].as_ref());
+            }
+
+            b'P' => {
+                if layout.len() >= i + 2 && layout.bytes().nth(i + 1).unwrap() == b'M' {
+                    return (layout[0..i].as_ref(), stdPM, layout[i + 2..].as_ref());
+                }
+            }
+
+            b'p' => {
+                if layout.len() >= i + 2 && layout.bytes().nth(i + 1).unwrap() == b'm' {
+                    return (layout[0..i].as_ref(), stdpm, layout[i + 2..].as_ref());
+                }
+            }
+
+            b'-' => {
+                if layout.len() >= i + 7 && &layout[i..i + 7] == "-070000" {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdNumSecondsTz,
+                        layout[i + 7..].as_ref(),
+                    );
+                }
+                if layout.len() >= i + 9 && &layout[i..i + 9] == "-07:00:00" {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdNumColonSecondsTZ,
+                        layout[i + 9..].as_ref(),
+                    );
+                }
+                if layout.len() >= i + 5 && &layout[i..i + 5] == "-0700" {
+                    return (layout[0..i].as_ref(), stdNumTZ, layout[i + 5..].as_ref());
+                }
+                if layout.len() >= i + 6 && &layout[i..i + 6] == "-07:00" {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdNumColonTZ,
+                        layout[i + 6..].as_ref(),
+                    );
+                }
+                if layout.len() >= i + 3 && &layout[i..i + 3] == "-07" {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdNumShortTZ,
+                        layout[i + 3..].as_ref(),
+                    );
+                }
+            }
+
+            b'Z' => {
+                if layout.len() >= i + 7 && &layout[i..i + 7] == "Z070000" {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdISO8601SecondsTZ,
+                        layout[i + 7..].as_ref(),
+                    );
+                }
+                if layout.len() >= i + 9 && &layout[i..i + 9] == "Z07:00:00" {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdISO8601ColonSecondsTZ,
+                        layout[i + 9..].as_ref(),
+                    );
+                }
+                if layout.len() >= i + 5 && &layout[i..i + 5] == "Z0700" {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdISO8601TZ,
+                        layout[i + 5..].as_ref(),
+                    );
+                }
+                if layout.len() >= i + 6 && &layout[i..i + 6] == "Z07:00" {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdISO8601ColonTZ,
+                        layout[i + 6..].as_ref(),
+                    );
+                }
+                if layout.len() >= i + 3 && &layout[i..i + 3] == "Z07" {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdISO8601ShortTZ,
+                        layout[i + 3..].as_ref(),
+                    );
+                }
+            }
+
+            b'.' | b',' => {
+                if i + 1 < layout.len()
+                    && (layout.bytes().nth(i + 1).unwrap() == b'0'
+                        || layout.bytes().nth(i + 1).unwrap() == b'9')
+                {
+                    let ch = layout.bytes().nth(i + 1).unwrap();
+                    let mut j = i + 1;
+                    while (j < layout.len() && layout.bytes().nth(j).unwrap() == ch) {
+                        j += 1;
+                    }
+                    // String of digits must end here - only fractional second is all digits.
+                    if !isDigit(layout, int!(j)) {
+                        let mut code = stdFracSecond0;
+                        if layout.bytes().nth(i + 1).unwrap() == b'9' {
+                            code = stdFracSecond9;
+                        }
+                        let std = stdFracSecond(int!(code), int!(j - (i + 1)), int!(c));
+                        return (layout[0..i].as_ref(), int32!(std), layout[j..].as_ref());
+                    }
+                }
+            }
+
+            _ => (), // match 必须穷举所有可能项,_=>()表示什么都不做
+        }
+    }
+    (layout, 0, "")
+}
+
+fn formatNano(b: Vec<byte>, nanosec: uint, std: int) -> Vec<byte> {
+    let mut b = b;
+    let mut n = digitsLen(std);
+
+    let separator = separator(std);
+    let trim = (int32!(std) & stdMask == stdFracSecond9);
+
+    let mut u = nanosec;
+    let mut buf: [byte; 9] = [0; 9];
+    for start in (0..buf.len()).rev() {
+        buf[start] = byte!(u % 10) + b'0';
+        u /= 10;
+    }
+
+    if n > 9 {
+        n = 9
+    }
+
+    if trim {
+        while (n > 0 && buf[uint!(n - 1)] == b'0') {
+            n -= 1;
+        }
+        if n == 0 {
+            return b;
+        }
+    }
+    b.push(separator);
+    b.extend_from_slice(&buf[..uint!(n)]);
+    b
+}
+
+fn digitsLen(std: int) -> int {
+    (std >> stdArgShift) & 0xfff
+}
+
+fn separator(std: int) -> byte {
+    if (std >> stdSeparatorShift) == 0 {
+        return b'.';
+    }
+    return b',';
+}
+// format.go -end
