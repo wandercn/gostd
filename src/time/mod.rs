@@ -71,9 +71,32 @@ const minDuration: int64 = int64!(-1) << 63;
 const maxDuration: int64 = int64!((uint64!(1) << 63) - 1);
 
 impl Duration {
+    /// Specifies the int64 number i to create for a period of time.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 指定int64 数字i 创建一段时间。
+    /// </details>
     pub fn new(i: int64) -> Duration {
         Duration(i)
     }
+    /// String returns a string representing the duration in the form "72h3m0.5s". Leading zero units are omitted. As a special case, durations less than one second format use a smaller unit (milli-, micro-, or nanoseconds) to ensure that the leading digit is non-zero. The zero duration formats as 0s.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 返回时间段采用"72h3m0.5s"格式的字符串表示。最前面可以有符号，数字+单位为一个单元，开始部分的0值单元会被省略；如果时间段<1s，会使用"ms"、"us"、"ns"来保证第一个单元的数字不是0；如果时间段为0，会返回"0"
+    /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let t0 = time::Duration::new(1 * time::Hour + 2 * time::Minute + 300 * time::Millisecond);
+    /// let t1 = time::Duration::new(300 * time::Millisecond);
+    /// println!("{}", t0);
+    /// println!("{}", t1);
+    /// assert_eq!(t0.String().as_str(), "1h2m0.3s");
+    /// assert_eq!(t1.String().as_str(), "300ms");
+    ///
+    /// ```
     pub fn String(&self) -> string {
         let d = self.0;
         let mut buf: [byte; 32] = [0; 32];
@@ -137,18 +160,38 @@ impl Duration {
         string(&buf[w..])
     }
 
+    /// Nanoseconds returns the duration as an integer nanosecond count.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Nanoseconds以整数纳秒计数的形式返回持续时间。
+    /// </details>
     pub fn Nanoseconds(&self) -> int64 {
         self.0
     }
 
+    /// Microseconds returns the duration as an integer microsecond count.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Microseconds 以整数微秒计数的形式返回持续时间。
+    /// </details>
     pub fn Microseconds(&self) -> int64 {
         self.0 / 1000
     }
 
+    /// Milliseconds returns the duration as an integer millisecond count.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Milliseconds以整数毫秒的形式返回持续时间。
+    /// </details>
     pub fn Milliseconds(&self) -> int64 {
         self.0 / 1000_000
     }
 
+    /// Seconds returns the duration as a floating point number of seconds.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Seconds返回持续时间的浮点数为秒。
+    /// </details>
     pub fn Seconds(&self) -> float64 {
         let d = self.0;
         let sec = d / Second;
@@ -156,6 +199,11 @@ impl Duration {
         float64!(sec) + float64!(nsec) / 1e9
     }
 
+    /// Minutes returns the duration as a floating point number of minutes.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Minutes以分钟的浮点数返回持续时间。
+    /// </details>
     pub fn Minutes(&self) -> float64 {
         let d = self.0;
         let min = d / Minute;
@@ -163,6 +211,11 @@ impl Duration {
         float64!(min) + float64!(nsec) / (60.0 * 1e9)
     }
 
+    /// Hours returns the duration as a floating point number of hours.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// hours以浮点数的形式返回持续时间。
+    /// </details>
     pub fn Hours(&self) -> float64 {
         let d = self.0;
         let hour = d / Hour;
@@ -170,42 +223,52 @@ impl Duration {
         float64!(hour) + float64!(nsec) / (60.0 * 60.0 * 1e9)
     }
 
+    /// Truncate returns the result of rounding d toward zero to a multiple of m. If m <= 0, Truncate returns d unchanged.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Truncate返回d向0舍入到m的倍数的结果。如果m<=0，Truncate返回d不变。
+    /// </details>
     pub fn Truncate(&self, m: Duration) -> Duration {
         let d = self.0;
         let m = m.0;
         if m <= 0 {
-            return Duration(d);
+            return Duration::new(d);
         }
-        Duration(d - d % m)
+        Duration::new(d - d % m)
     }
 
+    /// Round returns the result of rounding d to the nearest multiple of m. The rounding behavior for halfway values is to round away from zero. If the result exceeds the maximum (or minimum) value that can be stored in a Duration, Round returns the maximum (or minimum) duration. If m <= 0, Round returns d unchanged.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Round返回将d四舍五入到最接近的m的倍数的结果，对于半数的值，四舍五入的行为是从零开始。如果结果超过了可以存储在持续时间中的最大（或最小）值，Round返回最大（或最小）持续时间。如果m <= 0，Round返回d，不作任何改变。
+    /// </details>
     pub fn Round(&self, m: Duration) -> Duration {
         let d = self.0;
         let m = m.0;
         if m <= 0 {
-            return Duration(d);
+            return Duration::new(d);
         }
         let mut r = d % m;
 
         if d < 0 {
             r = -r;
             if lessThanHalf(r, m) {
-                return Duration(d + r);
+                return Duration::new(d + r);
             }
             let d1 = d - m + r;
             if d1 < d {
-                return Duration(d1);
+                return Duration::new(d1);
             }
-            return Duration(minDuration);
+            return Duration::new(minDuration);
         }
         if lessThanHalf(r, m) {
-            return Duration(d - r);
+            return Duration::new(d - r);
         }
         let d1 = d + m - r;
         if d1 > d {
-            return Duration(d1);
+            return Duration::new(d1);
         }
-        Duration(maxDuration)
+        Duration::new(maxDuration)
     }
 }
 
@@ -315,6 +378,19 @@ impl Time {
         string(&b)
     }
 
+    /// String returns the time formatted using the format string
+    ///
+    /// `2006-01-02 15:04:05.999999999 -0700 MST`
+    ///
+    /// If the time has a monotonic clock reading, the returned string includes a final field `m=±<value>`, where value is the monotonic clock reading formatted as a decimal number of seconds.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// String 返回使用格式化字符串的时间
+    ///
+    /// `2006-01-02 15:04:05.999999999 -0700 MST`
+    ///
+    /// 如果时间有一个单调的时钟读数，返回的字符串包括最后一个字段 `m=±<value>`，其中value是单调的时钟读数，格式为十进制的秒数。
+    /// </details>
     pub fn String(&self) -> string {
         let mut s = self.Format("2006-01-02 15:04:05.999999999 -0700 MST");
         if self.wall & uint64!(hasMonotonic) != 0 {
@@ -425,6 +501,11 @@ impl Time {
         self.ext
     }
 
+    /// After reports whether the time instant self is after u.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 如果self 代表的时间点在u之后，返回真；否则返回假。
+    /// </details>
     pub fn After(&self, u: Time) -> bool {
         if self.wall & u.wall & uint64!(hasMonotonic) != 0 {
             return self.ext > u.ext;
@@ -433,10 +514,10 @@ impl Time {
         let us = u.sec();
         ts > us || ts == us && self.nsec() > u.nsec()
     }
-    /// Before reports whether the time instant t is before u.
+    /// Before reports whether the time instant self is before u.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    /// 如果t代表的时间点在u之前，返回真；否则返回假。
+    /// 如果self代表的时间点在u之前，返回真；否则返回假。
     /// </details>
     ///
     /// # Example
@@ -459,6 +540,11 @@ impl Time {
         ts < us || ts == us && self.nsec() < u.nsec()
     }
 
+    /// Equal reports whether t and u represent the same time instant. Two times can be equal even if they are in different locations. For example, 6:00 +0200 and 4:00 UTC are Equal. See the documentation on the Time type for the pitfalls of using == with Time values; most code should use Equal instead.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 判断两个时间是否相同，会考虑时区的影响，因此不同时区标准的时间也可以正确比较。本方法和用t==u不同，这种方法还会比较地点和时区信息。
+    /// </details>
     pub fn Equal(&self, u: &Time) -> bool {
         if self.wall & u.wall & uint64!(hasMonotonic) != 0 {
             return self.ext == u.ext;
@@ -466,6 +552,11 @@ impl Time {
         self.sec() == u.sec() && self.nsec() == u.nsec()
     }
 
+    /// IsZero reports whether t represents the zero time instant, January 1, year 1, 00:00:00 UTC.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// IsZero报告t是否代表零点时刻，1年1月1日，00:00:00 UTC。
+    /// </details>
     pub fn IsZero(&self) -> bool {
         self.sec() == 0 && self.nsec() == 0
     }
@@ -536,11 +627,11 @@ impl Time {
     ///	let afterTenHours = start.Add(&Duration::new(time::Hour * 10));
     ///	let afterTenDays = start.Add(&Duration::new(time::Hour * 24 * 10));
 
-    ///	println!("start = {} \n", start);
-    ///	println!("start.Add(time.Second * 10) = {:?}\n", afterTenSeconds);
-    ///	println!("start.Add(time.Minute * 10) = {:?}\n", afterTenMinutes);
-    ///	println!("start.Add(time.Hour * 10) = {:?}\n", afterTenHours);
-    ///	println!("start.Add(time.Hour * 24 * 10) = {:?}\n", afterTenDays);
+    ///	println!("start = {}", start);
+    ///	println!("start.Add(time.Second * 10) = {}", afterTenSeconds);
+    ///	println!("start.Add(time.Minute * 10) = {}", afterTenMinutes);
+    ///	println!("start.Add(time.Hour * 10) = {}", afterTenHours);
+    ///	println!("start.Add(time.Hour * 24 * 10) = {}", afterTenDays);
     ///
     /// ```
     pub fn Add(&mut self, d: &Duration) -> Time {
@@ -592,42 +683,52 @@ impl Time {
         if self.wall & u.wall & uint64!(hasMonotonic) != 0 {
             let te = self.ext;
             let ue = self.ext;
-            let d = Duration(te - ue);
+            let d = Duration::new(te - ue);
             if d.0 < 0 && te > ue {
-                return Duration(maxDuration);
+                return Duration::new(maxDuration);
             }
             if d.0 > 0 && te < ue {
-                return Duration(minDuration);
+                return Duration::new(minDuration);
             }
             return d;
         }
-        let d = Duration((self.sec() - u.sec()) * Second + int64!(self.nsec() - u.nsec()));
+        let d = Duration::new((self.sec() - u.sec()) * Second + int64!(self.nsec() - u.nsec()));
         if u.Add(&d).Equal(self) {
             d
         } else if self.Before(u) {
-            Duration(minDuration)
+            Duration::new(minDuration)
         } else {
-            Duration(maxDuration)
+            Duration::new(maxDuration)
         }
     }
 
+    /// Date returns the year, month, and day in which self occurs.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 返回时间点self对应的年、月、日。
+    /// </details>
     pub fn Date(&self) -> (int, Month, int) {
         let (year, month, day, _) = self.date(true);
         (year, month, day)
     }
 
+    /// Year returns the year in which self occurs.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 返回时间点self对应的年份。
+    /// </details>
     pub fn Year(&self) -> int {
         let (year, _, _, _) = self.date(false);
         year
     }
 
-    /// Month returns the month of the year specified by t.
+    /// Month returns the month of the year specified by self.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    /// 返回时间点t对应那一年的第几月。
+    /// 返回时间点self对应那一年的第几月。
     /// </details>
     ///
-    /// #Example
+    /// # Example
     ///
     /// ```rust
     /// use gostd::time;
@@ -641,6 +742,11 @@ impl Time {
         month
     }
 
+    /// Clock returns the hour, minute, and second within the day specified by self.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Clock返回由self指定的一天中的时、分、秒。
+    /// </details>
     pub fn Clock(&self) -> (int, int, int) {
         absClock(self.abs())
     }
@@ -664,22 +770,47 @@ impl Time {
         day
     }
 
+    /// Hour returns the hour within the day specified by self, in the range [0, 23].
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Hour 返回由self指定的一天中的第几小时，范围为[0, 23]。
+    /// </details>
     pub fn Hour(&self) -> int {
         int!(int64!(self.abs()) % secondsPerDay / secondsPerHour)
     }
 
+    /// Minute returns the minute offset within the hour specified by self, in the range [0, 59].
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Minute 返回由self指定的小时内的第几分钟，范围为[0, 59]。
+    /// </details>
     pub fn Minute(&self) -> int {
         int!(int64!(self.abs()) % secondsPerHour / secondsPerMinute)
     }
 
+    /// Second returns the second offset within the minute specified by self, in the range [0, 59].
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Second 返回由self指定的分钟内的第几秒，范围为[0, 59]。
+    /// </details>
     pub fn Second(&self) -> int {
         int!(int64!(self.abs()) % secondsPerMinute)
     }
 
+    /// Nanosecond returns the nanosecond offset within the second specified by t, in the range [0, 999999999].
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Nanosecond 返回self对应的那一秒内的纳秒偏移量，范围[0, 999999999]。
+    /// </details>
     pub fn Nanosecond(&self) -> int {
         int!(self.nsec())
     }
 
+    /// YearDay returns the day of the year specified by t, in the range `[1, 365]` for non-leap years, and `[1, 366]` in leap years.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// YearDay 返回时间点self对应的那一年的第几天，平年的返回值范围`[1, 365]`，闰年`[1, 366]`。
+    /// </details>
     pub fn YeayDay(&self) -> int {
         let (_, _, _, yday) = self.date(false);
         yday + 1
@@ -704,6 +835,11 @@ impl Time {
         absWeekday(self.abs())
     }
 
+    /// ISOWeek returns the ISO 8601 year and week number in which t occurs. Week ranges from 1 to 53. Jan 01 to Jan 03 of year n might belong to week 52 or 53 of year n-1, and Dec 29 to Dec 31 might belong to week 1 of year n+1.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// ISOWeek 返回时间点t对应的ISO 9601标准下的年份和星期编号。星期编号范围[1,53]，1月1号到1月3号可能属于上一年的最后一周，12月29号到12月31号可能属于下一年的第一周。
+    /// </details>
     pub fn ISOWeek(&self) -> (int, int) {
         let mut abs = self.abs();
         let mut d = int!(Weekday::Thursday) - int!(absWeekday(abs));
@@ -715,6 +851,11 @@ impl Time {
         (year, yday / 7 + 1)
     }
 
+    /// UTC returns self with the location set to UTC.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// UTC返回采用UTC和零时区，但指向同一时间点的Time。
+    /// </details>
     pub fn UTC(&mut self) -> Time {
         self.setLoc(utcLoc.clone());
         let mut t = Time::new();
@@ -724,6 +865,11 @@ impl Time {
         t
     }
 
+    /// Local returns t with the location set to local time.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Local 返回采用本地和本地时区，但指向同一时间点的Time。
+    /// </details>
     pub fn Local(&mut self) -> Time {
         self.setLoc(Local.clone());
         let mut t = Time::new();
@@ -733,6 +879,15 @@ impl Time {
         t
     }
 
+    /// In returns a copy of t representing the same time instant, but with the copy's location information set to loc for display purposes.
+    ///
+    /// In panics if loc is nil.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// In 返回采用loc指定的地点和时区，但指向同一时间点的Time。
+    ///
+    /// 如果loc为nil会panic
+    /// </details>
     pub fn In(&mut self, loc: Location) -> Time {
         self.setLoc(loc);
         let mut t = Time::new();
@@ -742,6 +897,11 @@ impl Time {
         t
     }
 
+    /// Location returns the time zone information associated with self.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Location 返回与self相关的时区信息。
+    /// </details>
     pub fn Location(&self) -> Location {
         let mut l = self.loc.clone();
         if l.name.len() == 0 {
@@ -750,27 +910,60 @@ impl Time {
         l
     }
 
+    /// Zone computes the time zone in effect at time self, returning the abbreviated name of the zone (such as "CET") and its offset in seconds east of UTC.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Zone计算t所在的时区，返回该时区的规范名（如"CET"）和该时区相对于UTC的时间偏移量（单位秒）。
+    /// </details>
     pub fn Zone(&self) -> (string, int) {
         let (name, offset, _, _, _) = self.loc.lookup(self.unixSec());
         (name, offset)
     }
 
+    /// Unix returns t as a Unix time, the number of seconds elapsed since January 1, 1970 UTC. The result does not depend on the location associated with t. Unix-like operating systems often record time as a 32-bit count of seconds, but since the method here returns a 64-bit value it is valid for billions of years into the past or future.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Unix将t作为Unix时间返回，即从1970年1月1日UTC开始经过的秒数。类似Unix的操作系统通常将时间记录为32位的秒数，但由于这里的方法返回的是64位的值，所以对过去或未来的数十亿年都有效。
+    /// </details>
     pub fn Unix(&self) -> int64 {
         self.unixSec()
     }
 
+    /// UnixMilli returns self as a Unix time, the number of milliseconds elapsed since January 1, 1970 UTC.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// UnixMilli返回self作为Unix时间，即从1970年1月1日UTC开始经过的毫秒数。
+    /// </details>
     pub fn UnixMilli(&self) -> int64 {
         self.unixSec() * 1000 + int64!(self.nsec()) / 1000_000
     }
-
+    /// UnixMicro returns t as a Unix time, the number of microseconds elapsed since January 1, 1970 UTC.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// UnixMicro将t作为Unix时间返回，即从1970年1月1日UTC开始经过的微秒数。
+    /// </detail>
     pub fn UnixMicro(&self) -> int64 {
         self.unixSec() * 1000_000 + int64!(self.nsec()) / 1000
     }
 
+    /// UnixNano returns t as a Unix time, the number of nanoseconds elapsed since January 1, 1970 UTC.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// UnixNano返回t作为Unix时间，即从1970年1月1日UTC开始经过的纳秒数。
+    /// </details>
     pub fn UnixNano(&self) -> int64 {
         self.unixSec() * 1000_000_000 + int64!(self.nsec())
     }
 
+    /// AddDate returns the time corresponding to adding the given number of years, months, and days to t. For example, AddDate(-1, 2, 3) applied to January 1, 2011 returns March 4, 2010.
+    ///  
+    /// AddDate normalizes its result in the same way that Date does, so, for example, adding one month to October 31 yields December 1, the normalized form for November 31.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// AddDate返回与给定的年、月、日数相加的时间。例如，AddDate(-1, 2, 3)应用于2011年1月1日，返回2010年3月4日。
+    ///
+    /// AddDate以与Date相同的方式对其结果进行规范化处理，因此，例如，在10月31日的基础上增加一个月，得到12月1日，即11月31日的规范化形式。
+    /// </details>
     pub fn AddDate(&self, years: int, months: int, days: int) -> Time {
         let (year, month, day) = self.Date();
         let (hour, min, sec) = self.Clock();
@@ -786,6 +979,11 @@ impl Time {
         );
     }
 
+    /// IsDST reports whether the time in the configured location is in Daylight Savings Time.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// IsDST报告配置地点的时间是否处于夏令时。
+    /// </details>
     pub fn IsDST(&self) -> bool {
         let (_, _, _, _, isDST) = self.loc.lookup(self.Unix());
         isDST
@@ -1144,7 +1342,7 @@ const omega: int64 = int64!((uint64!(1) << 63) - 1); // math.MaxInt64
 /// let mut t = time::Date(2009, 11, 10, 14, 30, 12, 13, time::UTC.clone());
 /// assert_eq!(t.String(),"2009-11-10 14:30:12.000000013 +0000 UTC".to_string());
 /// println!("UTC: {}", t);
-/// let cst_zone = time::FixedZone("CST".to_string(), 8 * 3600); //北京时区 CST = UTC时区+8小时
+/// let cst_zone = time::FixedZone("CST", 8 * 3600); //北京时区 CST = UTC时区+8小时
 /// t.In(cst_zone);
 /// assert_eq!(t.String(),"2009-11-10 22:30:12.000000013 +0800 CST".to_string());
 /// println!("CST: {}", t);
@@ -1152,7 +1350,7 @@ const omega: int64 = int64!((uint64!(1) << 63) - 1); // math.MaxInt64
 /// // UTC: 2009-11-10 14:30:12.000000013 +0000 UTC
 /// // CST: 2009-11-10 22:30:12.000000013 +0800 CST
 /// ```
-pub fn FixedZone(name: string, offset: int) -> Location {
+pub fn FixedZone(name: &str, offset: int) -> Location {
     let zo = vec![zone {
         name: name.to_string(),
         offset: offset,
@@ -1552,7 +1750,7 @@ impl Weekday {
 /// Since returns the time elapsed since t. It is shorthand for time.Now().Sub(t).
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 它是time.Now().Sub(t)的简写。
+/// Since 是time.Now().Sub(t)的简写。
 /// </details>
 pub fn Since(mut t: Time) -> Duration {
     let mut now = Time::new();
@@ -1567,7 +1765,7 @@ pub fn Since(mut t: Time) -> Duration {
 /// Until returns the duration until t. It is shorthand for t.Sub(time.Now()).
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 它是t.Sub(time.Now())的简写。
+/// Until 是t.Sub(time.Now())的简写。
 /// </details>
 pub fn Until(t: Time) -> Duration {
     let mut now = Time::new();
@@ -1639,12 +1837,12 @@ fn div(t: Time, d: Duration) -> (int, Duration) {
 
     if d.0 < Second && Second % (d.0 + d.0) == 0 {
         qmod2 = int!(nsec / (int32!(d.0))) & 1;
-        r = Duration(int64!(nsec % int32!(d.0)));
+        r = Duration::new(int64!(nsec % int32!(d.0)));
         return (qmod2, r);
     } else if d.0 % Second == 0 {
         let d1 = int64!(d.0 / Second);
         qmod2 = int!((sec / d1) & 1);
-        r = Duration((sec % d1) * Second + int64!(nsec));
+        r = Duration::new((sec % d1) * Second + int64!(nsec));
         return (qmod2, r);
     } else {
         let sec = uint64!(sec);
@@ -1691,13 +1889,13 @@ fn div(t: Time, d: Duration) -> (int, Duration) {
             d1 >>= 1
         }
 
-        r = Duration(int64!(u0));
+        r = Duration::new(int64!(u0));
         return (qmod2, r);
     }
 
     if neg && r.0 != 0 {
         qmod2 ^= 1;
-        r = Duration(d.0 - r.0)
+        r = Duration::new(d.0 - r.0)
     }
     (qmod2, r)
 }
@@ -1756,6 +1954,11 @@ static std0x: [int32; 6] = [
 ];
 
 impl Time {
+    /// AppendFormat is like Format but appends the textual representation to b and returns the extended buffer.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// AppendFormat与Format类似，但将文本表示法追加到b，并返回扩展的缓冲区。
+    /// </details>
     pub fn AppendFormat(&self, b: Vec<byte>, layout: &str) -> Vec<byte> {
         let (mut name, mut offset, mut abs) = self.locabs();
         let mut year: int = -1;
