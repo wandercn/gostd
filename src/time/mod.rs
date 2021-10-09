@@ -270,6 +270,36 @@ impl Time {
         Time::default()
     }
 
+    /// Format returns a textual representation of the time value formatted according to the layout defined by the argument. See the documentation for the constant called Layout to see how to represent the layout format.
+    ///
+    /// The executable example for Time.Format demonstrates the working of the layout string in detail and is a good reference.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Format根据layout指定的格式返回t代表的时间点的格式化文本表示。layout定义了参考时间：
+    ///
+    /// `Mon Jan 2 15:04:05 -0700 MST 2006`
+    ///
+    /// 格式化后的字符串表示，它作为期望输出的例子。同样的格式规则会被用于格式化时间。
+    ///
+    /// 预定义的ANSIC、UnixDate、RFC3339和其他版式描述了参考时间的标准或便捷表示。要获得更多参考时间的定义和格式，参见本包的ANSIC和其他版式常量。
+    /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let t = time::Date(2009, 11, 10, 14, 30, 12, 13, time::UTC.clone());
+    /// assert_eq!(t.String(),"2009-11-10 14:30:12.000000013 +0000 UTC".to_string());
+    /// assert_eq!(t.Format(time::RFC822),"10 Nov 09 14:30 UTC".to_string());
+    /// assert_eq!(t.Format(time::RFC1123),"Tue, 10 Nov 2009 14:30:12 UTC".to_string());
+    /// println!("default: {}", t);
+    /// println!("RFC822: {}", t.Format(time::RFC822));
+    /// println!("RFC1123: {}", t.Format(time::RFC1123));
+    /// // output:
+    /// // default: 2009-11-10 14:30:12.000000013 +0000 UTC
+    /// // RFC822: 11/10 02:30:12PM '09 +0000
+    /// // RFC1123: Tue, 10 Nov 2009 14:30:12 UTC
+    /// ```
     pub fn Format(&self, layout: &str) -> string {
         const bufSize: uint = 64;
         let mut b: Vec<byte> = vec![];

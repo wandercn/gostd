@@ -138,6 +138,6 @@ use gostd::vendor
 - [x] 强制转换宏,例如 2 as i64 等价 int64!(2) 跟Go的int64(2)就多个！
 - [x] time库在rust实现 gostd::time
 - [x] time库支持macOSX 和linux平台，通过libc库调用C函数实现 time::Now()
-- [ ] time，支持各种格式显示时间。
+- [x] time，支持各种格式显示时间。
 - [ ] time，支持local时区自动从系统获取。
 
