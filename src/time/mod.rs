@@ -210,7 +210,7 @@ const minWall: int64 = wallToInternal; // year 1885
 const nsecMask: int32 = (1 << 30) - 1;
 const nsecShift: int32 = 30;
 
-#[derive(Default, PartialEq, PartialOrd, Debug)]
+#[derive(Default, PartialEq, PartialOrd, Debug, Fmt)]
 pub struct Time {
     wall: uint64,
     ext: int64,
@@ -222,11 +222,22 @@ impl Time {
         Time::default()
     }
 
-    fn Format(&self, layout: &str) -> string {
-        string::new()
+    pub fn Format(&self, layout: &str) -> string {
+        const bufSize: uint = 64;
+        let mut b: Vec<byte> = vec![];
+        let max = layout.len() + 10;
+        if max < bufSize {
+            let buf: [byte; bufSize] = [0; bufSize];
+            b = buf[..0].to_vec()
+        } else {
+            b = Vec::with_capacity(max);
+        }
+
+        b = self.AppendFormat(b, layout);
+        string(&b)
     }
 
-    fn String(&self) -> string {
+    pub fn String(&self) -> string {
         let mut s = self.Format("2006-01-02 15:04:05.999999999 -0700 MST");
         if self.wall & uint64!(hasMonotonic) != 0 {
             let mut m2 = int64!(self.ext);
@@ -447,7 +458,7 @@ impl Time {
     ///	let afterTenHours = start.Add(&Duration::new(time::Hour * 10));
     ///	let afterTenDays = start.Add(&Duration::new(time::Hour * 24 * 10));
 
-    ///	println!("start = {:?}\n", start);
+    ///	println!("start = {} \n", start);
     ///	println!("start.Add(time.Second * 10) = {:?}\n", afterTenSeconds);
     ///	println!("start.Add(time.Minute * 10) = {:?}\n", afterTenMinutes);
     ///	println!("start.Add(time.Hour * 10) = {:?}\n", afterTenHours);
@@ -573,6 +584,27 @@ impl Time {
     pub fn Day(&self) -> int {
         let (_, _, day, _) = self.date(true);
         day
+    }
+
+    pub fn Hour(&self) -> int {
+        int!(int64!(self.abs()) % secondsPerDay / secondsPerHour)
+    }
+
+    pub fn Minute(&self) -> int {
+        int!(int64!(self.abs()) % secondsPerHour / secondsPerMinute)
+    }
+
+    pub fn Second(&self) -> int {
+        int!(int64!(self.abs()) % secondsPerMinute)
+    }
+
+    pub fn Nanosecond(&self) -> int {
+        int!(self.nsec())
+    }
+
+    pub fn YeayDay(&self) -> int {
+        let (_, _, _, yday) = self.date(false);
+        yday + 1
     }
 
     /// Weekday returns the day of the week specified by t.
@@ -709,11 +741,21 @@ pub fn UnixMicro(usec: int64) -> Time {
 ///
 /// ```rust
 /// use gostd::time;
-/// let d = time::Date(2000, 2, 1, 12, 30, 0, 0, time::UTC.clone());
+/// let d = time::Date(2009, 11, 10, 14, 30, 12, 13, time::UTC.clone());
 /// let (year, month, day) = d.Date();
+/// assert_eq!(year, 2009);
+/// assert_eq!(month.String(), "November");
+/// assert_eq!(day, 10);
+/// assert_eq!(d.String(),"2009-11-10 14:30:12.000000013 +0000 UTC".to_string());
 /// println!("year = {}",year);
 /// println!("month = {}",month.String());
 /// println!("day = {}",day);
+/// println!("{}",d);
+/// // output
+/// // year = 2009
+/// // month = November
+/// // day = 10
+/// // 2009-11-10 14:30:12.000000013 +0000 UTC
 /// ```
 pub fn Date(
     year: int,
@@ -1198,6 +1240,7 @@ const longMonthNames: [&str; 12] = [
 
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Fmt)]
 pub enum Month {
+    Default = 0,
     January = 1,
     February = 2,
     March = 3,
@@ -1472,7 +1515,7 @@ const stdNeedDate: int32 = 1 << 8; // need month, day, year
 const stdNeedClock: int32 = 2 << 8; // need hour, minute, second
 const stdArgShift: int32 = 16; // extra argument in high bits, above low stdArgShift
 const stdSeparatorShift: int32 = 28; // extra argument in high 4 bits for fractional second separators
-const stdMask: int32 = 1 << stdArgShift - 1; // mask out argument
+const stdMask: int32 = (1 << stdArgShift) - 1; // mask out argument
 
 static std0x: [int32; 6] = [
     stdZeroMonth,
@@ -1482,6 +1525,249 @@ static std0x: [int32; 6] = [
     stdZeroSecond,
     stdYear,
 ];
+
+impl Time {
+    pub fn AppendFormat(&self, b: Vec<byte>, layout: &str) -> Vec<byte> {
+        let (mut name, mut offset, mut abs) = self.locabs();
+        let mut year: int = -1;
+        let mut month: Month = Month::Default;
+        let mut day: int = 0;
+        let mut yday: int = 0;
+        let mut hour: int = -1;
+        let mut min: int = 0;
+        let mut sec: int = 0;
+
+        let mut b = b;
+        let mut layout = layout;
+
+        while (layout != "") {
+            let (prefix, std, suffix) = nextStdChunk(layout);
+            if prefix != "" {
+                b.extend_from_slice(prefix.as_bytes());
+            }
+
+            if std == 0 {
+                break;
+            }
+            layout = suffix;
+
+            if year < 0 && (std & stdNeedDate) != 0 {
+                let abs_date = absDate(abs, true);
+                year = abs_date.0;
+                month = abs_date.1;
+                day = abs_date.2;
+                yday = abs_date.3;
+                yday += 1;
+            }
+
+            if hour < 0 && (std & stdNeedClock) != 0 {
+                let abs_clock = absClock(abs);
+                hour = abs_clock.0;
+                min = abs_clock.1;
+                sec = abs_clock.2;
+            }
+
+            match (std & stdMask) {
+                stdYear => {
+                    let mut y = year;
+                    if y < 0 {
+                        y = -y;
+                    }
+                    b = appendInt(b, y % 100, 2);
+                }
+
+                stdLongYear => {
+                    b = appendInt(b, year, 4);
+                }
+
+                stdMonth => {
+                    b.extend_from_slice(&month.clone().String().as_bytes()[..3]);
+                }
+
+                stdLongMonth => {
+                    b.extend_from_slice(&month.clone().String().as_bytes());
+                }
+
+                stdNumMonth => {
+                    b = appendInt(b, int!(month), 0);
+                }
+
+                stdZeroMonth => b = appendInt(b, int!(month), 2),
+
+                stdWeekDay => {
+                    b.extend_from_slice(absWeekday(abs).String().as_bytes()[..3].as_ref())
+                }
+
+                stdLongWeekDay => {
+                    let s = absWeekday(abs).String();
+                    b.extend_from_slice(&s.as_bytes());
+                }
+
+                stdDay => {
+                    b = appendInt(b, day, 0);
+                }
+
+                stdUnderDay => {
+                    if day < 10 {
+                        b.push(b' ');
+                    }
+                    b = appendInt(b, day, 0);
+                }
+
+                stdZeroDay => {
+                    b = appendInt(b, day, 2);
+                }
+
+                stdUnderYearDay => {
+                    if yday < 100 {
+                        b.push(b' ');
+                        if yday < 10 {
+                            b.push(b' ');
+                        }
+                    }
+
+                    b = appendInt(b, yday, 0);
+                }
+
+                stdZeroYearDay => {
+                    b = appendInt(b, yday, 3);
+                }
+
+                stdHour => {
+                    b = appendInt(b, hour, 2);
+                }
+
+                stdHour12 => {
+                    let mut hr = hour % 12;
+                    if hr == 0 {
+                        hr = 12
+                    }
+                    b = appendInt(b, hr, 0);
+                }
+
+                stdZeroHour12 => {
+                    let mut hr = hour % 12;
+                    if hr == 0 {
+                        hr = 12
+                    }
+                    b = appendInt(b, hr, 2);
+                }
+
+                stdMinute => {
+                    b = appendInt(b, min, 0);
+                }
+
+                stdZeroMinute => {
+                    b = appendInt(b, min, 2);
+                }
+
+                stdSecond => {
+                    b = appendInt(b, sec, 0);
+                }
+
+                stdZeroSecond => {
+                    b = appendInt(b, sec, 2);
+                }
+
+                stdPM => {
+                    if hour >= 12 {
+                        b.extend_from_slice("PM".as_bytes());
+                    } else {
+                        b.extend_from_slice("AM".as_bytes());
+                    }
+                }
+
+                stdpm => {
+                    if hour >= 12 {
+                        b.extend_from_slice("pm".as_bytes());
+                    } else {
+                        b.extend_from_slice("am".as_bytes());
+                    }
+                }
+
+                stdISO8601TZ
+                | stdISO8601ColonTZ
+                | stdISO8601SecondsTZ
+                | stdISO8601ShortTZ
+                | stdISO8601ColonSecondsTZ
+                | stdNumTZ
+                | stdNumColonTZ
+                | stdNumSecondsTz
+                | stdNumShortTZ
+                | stdNumColonSecondsTZ => {
+                    if offset == 0
+                        && (std == stdISO8601TZ
+                            || std == stdISO8601ColonTZ
+                            || std == stdISO8601ColonSecondsTZ
+                            || std == stdISO8601ShortTZ
+                            || std == stdISO8601ColonSecondsTZ)
+                    {
+                        b.push(b'Z');
+                        break;
+                    }
+
+                    let mut zone = offset / 60;
+                    let mut absoffset = offset;
+                    if zone < 0 {
+                        b.push(b'-');
+                        zone = -zone;
+                        absoffset = -absoffset;
+                    } else {
+                        b.push(b'+');
+                    }
+                    b = appendInt(b, zone / 60, 2);
+
+                    if std == stdISO8601ColonTZ
+                        || std == stdNumColonTZ
+                        || std == stdISO8601ColonSecondsTZ
+                        || std == stdNumColonSecondsTZ
+                    {
+                        b.push(b':');
+                    }
+
+                    if std != stdNumShortTZ && std != stdISO8601ShortTZ {
+                        b = appendInt(b, zone % 60, 2);
+                    }
+
+                    if std == stdISO8601SecondsTZ
+                        || std == stdNumSecondsTz
+                        || std == stdNumColonSecondsTZ
+                        || std == stdISO8601ColonSecondsTZ
+                    {
+                        if std == stdNumColonSecondsTZ || std == stdISO8601ColonSecondsTZ {
+                            b.push(b':');
+                        }
+                        b = appendInt(b, absoffset % 60, 2);
+                    }
+                }
+
+                stdTZ => {
+                    if name != "" {
+                        b.extend_from_slice(name.as_bytes());
+                        break;
+                    }
+
+                    let mut zone = offset / 60;
+                    if zone < 0 {
+                        b.push(b'-');
+                        zone = -zone;
+                    } else {
+                        b.push(b'+');
+                    }
+                    b = appendInt(b, zone / 60, 2);
+                    b = appendInt(b, zone % 60, 2);
+                }
+
+                stdFracSecond0 | stdFracSecond9 => {
+                    b = formatNano(b, uint!(self.Nanosecond()), int!(std))
+                }
+
+                _ => (), // 匹配不到什么都不做
+            }
+        }
+        b
+    }
+}
 
 // private fn
 
@@ -1559,49 +1845,286 @@ fn startWithLowerCase(s: &str) -> bool {
     if 0 == s.len() {
         return false;
     }
-    let c = s.chars().nth(0);
-    return Some('a') <= c && c <= Some('z');
+    let c = s.bytes().nth(0).unwrap();
+    b'a' <= c && c <= b'z'
+}
+
+fn isDigit(s: &str, i: int) -> bool {
+    if s.len() <= uint!(i) {
+        return false;
+    }
+    let c = s.bytes().nth(uint!(i)).unwrap();
+    return b'0' <= c && c <= b'9';
+}
+
+fn stdFracSecond(code: int, n: int, c: int) -> int {
+    // Use 0xfff to make the failure case even more absurd.
+    if uint8!(c) == b'.' {
+        return code | ((n & 0xfff) << stdArgShift);
+    }
+    code | ((n & 0xfff) << stdArgShift) | 1 << stdSeparatorShift
 }
 
 fn nextStdChunk(layout: &str) -> (&str, int32, &str) {
     let length = layout.len();
-    for (i, c) in layout.chars().enumerate() {
+    for (i, c) in layout.bytes().enumerate() {
         match c {
-            'J' => {
-                if layout.len() >= i + 3 && layout[i..i + 3] == "Jan".to_string() {
-                    return (
-                        layout[0..i].as_ref(),
-                        stdLongMonth,
-                        layout[i + 7..].as_ref(),
-                    );
-                }
-                if !startWithLowerCase(layout[i + 3..].as_ref()) {
-                    return (layout[0..i].as_ref(), stdMonth, layout[i + 3..].as_ref());
-                }
-            }
-
-            'M' => {
-                if layout.len() >= 3 {
-                    if layout[i..i + 3].to_string() == "Mon".to_string() {
-                        if layout.len() >= i+6 && layout[i..i+6] == "Mondays    "
+            b'J' => {
+                if layout.len() >= i + 3 && &layout[i..i + 3] == "Jan" {
+                    if layout.len() >= i + 7 && &layout[i..i + 7] == "January" {
                         return (
                             layout[0..i].as_ref(),
-                            stdLongWeekDay,
-                            layout[i + 6..].as_ref(),
+                            stdLongMonth,
+                            layout[i + 7..].as_ref(),
                         );
+                    }
+                    if !startWithLowerCase(layout[i + 3..].as_ref()) {
+                        return (layout[0..i].as_ref(), stdMonth, layout[i + 3..].as_ref());
                     }
                 }
             }
 
-            '0' => {
-                if layout.len() >= i + 2
-                    && '1' <= layout.chars().nth(i + 1).unwrap()
-                    && layout.chars().nth(i + 1).unwrap() <= '6'
-                {}
+            b'M' => {
+                if layout.len() >= 3 {
+                    if &layout[i..i + 3] == "Mon" {
+                        if layout.len() >= i + 6 && &layout[i..i + 6] == "Monday" {
+                            return (
+                                layout[0..i].as_ref(),
+                                stdLongWeekDay,
+                                layout[i + 6..].as_ref(),
+                            );
+                        }
+                        if !startWithLowerCase(layout[i + 3..].as_ref()) {
+                            return (layout[0..i].as_ref(), stdWeekDay, layout[i + 3..].as_ref());
+                        }
+                    }
+                    if &layout[i..i + 3] == "MST" {
+                        return (layout[0..i].as_ref(), stdTZ, layout[i + 3..].as_ref());
+                    }
+                }
             }
+
+            b'0' => {
+                if layout.len() >= i + 2
+                    && b'1' <= layout.bytes().nth(i + 1).unwrap()
+                    && layout.bytes().nth(i + 1).unwrap() <= b'6'
+                {
+                    let idx: uint = uint!(layout.bytes().nth(i + 1).unwrap() - b'1');
+                    return (layout[0..i].as_ref(), std0x[idx], layout[i + 2..].as_ref());
+                }
+
+                if layout.len() >= i + 3
+                    && layout.bytes().nth(i + 1).unwrap() == b'0'
+                    && layout.bytes().nth(i + 2).unwrap() == b'2'
+                {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdZeroYearDay,
+                        layout[i + 3..].as_ref(),
+                    );
+                }
+            }
+
+            b'1' => {
+                if layout.len() >= i + 2 && layout.bytes().nth(i + 1).unwrap() == b'5' {
+                    return (layout[0..i].as_ref(), stdHour, layout[i + 2..].as_ref());
+                }
+                return (layout[0..i].as_ref(), stdNumMonth, layout[i + 1..].as_ref());
+            }
+
+            b'2' => {
+                if layout.len() >= i + 4 && &layout[i..i + 4] == "2006" {
+                    return (layout[0..i].as_ref(), stdLongYear, layout[i + 4..].as_ref());
+                }
+                return (layout[0..i].as_ref(), stdDay, layout[i + 1..].as_ref());
+            }
+
+            b'_' => {
+                if layout.len() >= i + 2 && layout.bytes().nth(i + 1).unwrap() == b'2' {
+                    if layout.len() >= i + 5 && &layout[i + 1..i + 5] == "2006" {
+                        return (
+                            layout[0..i + 1].as_ref(),
+                            stdLongYear,
+                            layout[i + 5..].as_ref(),
+                        );
+                    }
+                    return (layout[0..i].as_ref(), stdUnderDay, layout[i + 2..].as_ref());
+                }
+                if layout.len() >= i + 3
+                    && layout.bytes().nth(i + 1).unwrap() == b'_'
+                    && layout.bytes().nth(i + 2).unwrap() == b'2'
+                {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdUnderYearDay,
+                        layout[i + 3..].as_ref(),
+                    );
+                }
+            }
+
+            b'3' => {
+                return (layout[0..i].as_ref(), stdHour12, layout[i + 1..].as_ref());
+            }
+
+            b'4' => {
+                return (layout[0..i].as_ref(), stdMinute, layout[i + 1..].as_ref());
+            }
+
+            b'5' => {
+                return (layout[0..i].as_ref(), stdSecond, layout[i + 1..].as_ref());
+            }
+
+            b'P' => {
+                if layout.len() >= i + 2 && layout.bytes().nth(i + 1).unwrap() == b'M' {
+                    return (layout[0..i].as_ref(), stdPM, layout[i + 2..].as_ref());
+                }
+            }
+
+            b'p' => {
+                if layout.len() >= i + 2 && layout.bytes().nth(i + 1).unwrap() == b'm' {
+                    return (layout[0..i].as_ref(), stdpm, layout[i + 2..].as_ref());
+                }
+            }
+
+            b'-' => {
+                if layout.len() >= i + 7 && &layout[i..i + 7] == "-070000" {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdNumSecondsTz,
+                        layout[i + 7..].as_ref(),
+                    );
+                }
+                if layout.len() >= i + 9 && &layout[i..i + 9] == "-07:00:00" {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdNumColonSecondsTZ,
+                        layout[i + 9..].as_ref(),
+                    );
+                }
+                if layout.len() >= i + 5 && &layout[i..i + 5] == "-0700" {
+                    return (layout[0..i].as_ref(), stdNumTZ, layout[i + 5..].as_ref());
+                }
+                if layout.len() >= i + 6 && &layout[i..i + 6] == "-07:00" {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdNumColonTZ,
+                        layout[i + 6..].as_ref(),
+                    );
+                }
+                if layout.len() >= i + 3 && &layout[i..i + 3] == "-07" {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdNumShortTZ,
+                        layout[i + 3..].as_ref(),
+                    );
+                }
+            }
+
+            b'Z' => {
+                if layout.len() >= i + 7 && &layout[i..i + 7] == "Z070000" {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdISO8601SecondsTZ,
+                        layout[i + 7..].as_ref(),
+                    );
+                }
+                if layout.len() >= i + 9 && &layout[i..i + 9] == "Z07:00:00" {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdISO8601ColonSecondsTZ,
+                        layout[i + 9..].as_ref(),
+                    );
+                }
+                if layout.len() >= i + 5 && &layout[i..i + 5] == "Z0700" {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdISO8601TZ,
+                        layout[i + 5..].as_ref(),
+                    );
+                }
+                if layout.len() >= i + 6 && &layout[i..i + 6] == "Z07:00" {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdISO8601ColonTZ,
+                        layout[i + 6..].as_ref(),
+                    );
+                }
+                if layout.len() >= i + 3 && &layout[i..i + 3] == "Z07" {
+                    return (
+                        layout[0..i].as_ref(),
+                        stdISO8601ShortTZ,
+                        layout[i + 3..].as_ref(),
+                    );
+                }
+            }
+
+            b'.' | b',' => {
+                if i + 1 < layout.len()
+                    && (layout.bytes().nth(i + 1).unwrap() == b'0'
+                        || layout.bytes().nth(i + 1).unwrap() == b'9')
+                {
+                    let ch = layout.bytes().nth(i + 1).unwrap();
+                    let mut j = i + 1;
+                    while (j < layout.len() && layout.bytes().nth(j).unwrap() == ch) {
+                        j += 1;
+                    }
+                    // String of digits must end here - only fractional second is all digits.
+                    if !isDigit(layout, int!(j)) {
+                        let mut code = stdFracSecond0;
+                        if layout.bytes().nth(i + 1).unwrap() == b'9' {
+                            code = stdFracSecond9;
+                        }
+                        let std = stdFracSecond(int!(code), int!(j - (i + 1)), int!(c));
+                        return (layout[0..i].as_ref(), int32!(std), layout[j..].as_ref());
+                    }
+                }
+            }
+
+            _ => (), // match 必须穷举所有可能项,_=>()表示什么都不做
         }
     }
-    ("", 0, "")
+    (layout, 0, "")
 }
 
+fn formatNano(b: Vec<byte>, nanosec: uint, std: int) -> Vec<byte> {
+    let mut b = b;
+    let mut n = digitsLen(std);
+
+    let separator = separator(std);
+    let trim = (int32!(std) & stdMask == stdFracSecond9);
+
+    let mut u = nanosec;
+    let mut buf: [byte; 9] = [0; 9];
+    for start in (0..buf.len()).rev() {
+        buf[start] = byte!(u % 10) + b'0';
+        u /= 10;
+    }
+
+    if n > 9 {
+        n = 9
+    }
+
+    if trim {
+        while (n > 0 && buf[uint!(n - 1)] == b'0') {
+            n -= 1;
+        }
+        if n == 0 {
+            return b;
+        }
+    }
+    b.push(separator);
+    b.extend_from_slice(&buf[..uint!(n)]);
+    b
+}
+
+fn digitsLen(std: int) -> int {
+    (std >> stdArgShift) & 0xfff
+}
+
+fn separator(std: int) -> byte {
+    if (std >> stdSeparatorShift) == 0 {
+        return b'.';
+    }
+    return b',';
+}
 // format.go -end
