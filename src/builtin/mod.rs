@@ -529,3 +529,26 @@ pub fn string(b: &[byte]) -> String {
     let s = unsafe { str::from_utf8_unchecked(b) };
     s.to_string()
 }
+
+/// len!() eq Go: len()
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// len!() 等价于 Go中的len()
+/// </details>
+///
+/// # Example
+///
+/// ```rust
+/// use gostd::builtin::*;
+/// let l = vec![1,2,34,5];
+/// let length = len!(l);
+/// assert_eq!(length, 4)
+/// ```
+#[macro_export]
+macro_rules! len {
+    ($x:ident) => {
+        ($x.len())
+    }; // ($x:expr) => {
+       // ($x.len())
+       // };
+}
