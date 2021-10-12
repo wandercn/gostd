@@ -1169,7 +1169,7 @@ fn parse<'a>(
     loop {
         let mut err: &str = "";
         let (prefix, mut std, suffix) = nextStdChunk(layout);
-        println!("prefix:{} suffix:{}", prefix, suffix);
+        println!("prefix:{} std:{} suffix:{}", prefix, std, suffix);
         let stdstr = &layout[len!(prefix)..(len!(layout) - len!(suffix))];
         let res = skip(value, prefix)?;
         value = res;
@@ -1232,7 +1232,7 @@ fn parse<'a>(
                     value = r.1;
                 }
                 month += 1;
-                println!("month:{} value:{}", month, value);
+                println!("stdMonth---month:{} value:{}", month, value);
             }
             stdLongMonth => {
                 let res = lookup(longMonthNames.to_vec(), value);
@@ -1612,10 +1612,10 @@ fn parse<'a>(
             }
             _ => (),
         }
-        if len!(rangeErrString) > 0 {
+        if rangeErrString != "" {
             return Err(format!("{} {}", rangeErrString, " out of range"));
         }
-        if len!(err) > 0 {
+        if err != "" {
             return Err(format!("{} {}", "ParseError:", err));
         }
     }
@@ -1683,7 +1683,7 @@ fn parse<'a>(
         ));
     }
 
-    if Some(z.clone()).is_some() {
+    if z.name != "" {
         return Ok(Date(
             year,
             uint!(month),
@@ -1719,6 +1719,7 @@ fn parse<'a>(
     }
 
     if zoneName != "" {
+        println!("----------------------------------");
         let mut t = Date(year, uint!(month), day, hour, min, sec, nsec, UTC.clone());
         // Look for local zone with the given offset.
         // If that zone was in effect at the given time, use it.
@@ -2202,6 +2203,7 @@ const omega: int64 = int64!((uint64!(1) << 63) - 1); // math.MaxInt64
 /// // CST: 2009-11-10 22:30:12.000000013 +0800 CST
 /// ```
 pub fn FixedZone(name: &str, offset: int) -> Location {
+    println!("FixedZone-1 name:{} offset:{}", name, offset);
     let zo = vec![zone {
         name: name.to_string(),
         offset: offset,
