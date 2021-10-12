@@ -11,8 +11,8 @@
 // prelude
 // 导出宏函数 byte!(),int8!()等.避免用gostd::byte!()，可以直接byte!()调用。
 pub use super::{
-    byte, float32, float64, int, int16, int32, int64, int8, rune, uint, uint16, uint32, uint64,
-    uint8, uintptr,
+    byte, float32, float64, int, int16, int32, int64, int8, len, rune, uint, uint16, uint32,
+    uint64, uint8, uintptr,
 };
 
 /// Go: uint8 type eq Rust: u8 .
@@ -528,4 +528,27 @@ pub fn string(b: &[byte]) -> String {
     use std::str;
     let s = unsafe { str::from_utf8_unchecked(b) };
     s.to_string()
+}
+
+/// len!() eq Go: len()
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// len!() 等价于 Go中的len()
+/// </details>
+///
+/// # Example
+///
+/// ```rust
+/// use gostd::builtin::*;
+/// let l = vec![1,2,34,5];
+/// let length = len!(l);
+/// assert_eq!(length, 4)
+/// ```
+#[macro_export]
+macro_rules! len {
+    ($x:ident) => {
+        $x.len()
+    }; // ($x:expr) => {
+       // ($x.len())
+       // };
 }

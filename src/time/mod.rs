@@ -1134,6 +1134,848 @@ pub fn Date(
     t
 }
 
+///
+/// Parse parses a formatted string and returns the time value it represents. See the documentation for the constant called Layout to see how to represent the format. The second argument must be parseable using the format string (layout) provided as the first argument.
+///
+/// The example for Time.Format demonstrates the working of the layout string in detail and is a good reference.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Parse解析一个格式化的时间字符串并返回它代表的时间。layout定义了参考时间：
+///
+/// `Mon Jan 2 15:04:05 -0700 MST 2006`
+/// 在输入格式下的字符串表示，作为输入的格式的示例。同样的格式规则会被用于输入字符串。
+///
+// 预定义的ANSIC、UnixDate、RFC3339和其他版式描述了参考时间的标准或便捷表示。要获得更多参考时间的定义和格式，参/// 见本包的ANSIC和其他版式常量。
+/// </details>
+///
+/// # Example:
+///```
+/// use gostd::time;
+///
+/// let layout = "Jan 2, 2006 at 3:04pm (MST)";
+/// let t = time::Parse(layout, "Feb 3, 2013 at 7:54pm (PST)")
+///     .ok()
+///     .expect("Parse faile:");
+/// assert_eq!( t.String() ,"2013-02-03 19:54:00 +0000 PST".to_string());
+/// println!("{}", t);
+/// // output:
+/// // 2013-02-03 19:54:00 +0000 PST
+///```
+pub fn Parse(layout: &str, value: &str) -> Result<Time, string> {
+    parse(layout, value, UTC.clone(), Local.clone())
+}
+
+fn parse(
+    layout: &str,
+    value: &str,
+    defaultLocation: Location,
+    local: Location,
+) -> Result<Time, string> {
+    let mut layout = layout;
+    let mut value = value;
+    let mut alayout = layout;
+    let mut avalue = value;
+    let mut rangeErrString = "";
+    let mut amSet = false;
+    let mut pmSet = false;
+
+    let mut year: int = 0;
+    let mut month: int = -1;
+    let mut day: int = -1;
+    let mut yday: int = -1;
+    let mut hour: int = 0;
+    let mut min: int = 0;
+    let mut sec: int = 0;
+    let mut nsec: int = 0;
+    let mut z = Location::new().clone();
+    let mut zoneOffset: int = -1;
+    let mut zoneName: &str = "";
+
+    // Each iteration processes one std value.
+    loop {
+        let mut err: &str = "";
+        let (prefix, mut std, suffix) = nextStdChunk(layout);
+        let stdstr = &layout[len!(prefix)..(len!(layout) - len!(suffix))];
+        let res = skip(value, prefix)?;
+        value = res;
+
+        if std == 0 {
+            if len!(value) != 0 {
+                return Err(format!("{} {}", "extra text:", value));
+            }
+            break;
+        }
+        layout = suffix;
+        let mut p: &str = "";
+        match (std & stdMask) {
+            stdYear => {
+                if len!(value) < 2 {
+                    err = "stdYear err1";
+                    break;
+                }
+                let hold = value;
+                p = &value[0..2];
+                value = &value[2..];
+                let res = atoi(p);
+                if res.is_err() {
+                    value = hold;
+                }
+                if res.is_ok() {
+                    year = res.ok().unwrap();
+                }
+                if year >= 69 {
+                    // Unix time starts Dec 31 1969 in some time zones
+                    year += 1900
+                } else {
+                    year += 2000
+                }
+            }
+            stdLongYear => {
+                if len!(value) < 4 || !isDigit(value, 0) {
+                    err = "stdLongYear err1";
+                    break;
+                }
+                p = &value[0..4];
+                value = &value[4..];
+                let res = atoi(p);
+                if res.is_err() {
+                    err = res.err().unwrap();
+                }
+                if res.is_ok() {
+                    year = res.ok().unwrap();
+                }
+            }
+            stdMonth => {
+                let res = lookup(shortMonthNames.to_vec(), value);
+                if res.is_err() {
+                    err = res.err().unwrap();
+                }
+
+                if res.is_ok() {
+                    let r = res.ok().unwrap();
+                    month = r.0;
+                    value = r.1;
+                }
+                month += 1;
+            }
+            stdLongMonth => {
+                let res = lookup(longMonthNames.to_vec(), value);
+                if res.is_err() {
+                    err = res.err().unwrap();
+                }
+                if res.is_ok() {
+                    let r = res.ok().unwrap();
+                    month = r.0;
+                    value = r.1;
+                }
+                month += 1;
+            }
+            stdNumMonth | stdZeroMonth => {
+                let res = getnum(value, std == stdZeroMonth);
+                if res.is_ok() {
+                    let r = res.ok().unwrap();
+                    month = r.0;
+                    value = r.1;
+                    if (month <= 0 || 12 < month) {
+                        rangeErrString = "month";
+                    }
+                }
+            }
+            stdWeekDay => {
+                // Ignore weekday except for error checking.
+                let res = lookup(shortDayNames.to_vec(), value);
+                if res.is_err() {
+                    err = res.err().unwrap();
+                }
+
+                if res.is_ok() {
+                    let r = res.ok().unwrap();
+                    value = r.1;
+                }
+            }
+            stdLongWeekDay => {
+                let res = lookup(longDayNames.to_vec(), value);
+                if res.is_err() {
+                    err = res.err().unwrap();
+                }
+                if res.is_ok() {
+                    let r = res.ok().unwrap();
+                    value = r.1;
+                }
+            }
+            stdDay | stdUnderDay | stdZeroDay => {
+                if std == stdUnderDay && len!(value) > 0 && value.bytes().nth(0) == Some(b' ') {
+                    value = &value[1..];
+                }
+                let res = getnum(value, std == stdZeroDay);
+                if res.is_err() {
+                    err = res.err().unwrap();
+                }
+
+                if res.is_ok() {
+                    let r = res.ok().unwrap();
+                    day = r.0;
+                    value = r.1;
+                }
+                // Note that we allow any one- or two-digit day here.
+                // The month, day, year combination is validated after we've completed parsing.
+            }
+            stdUnderYearDay | stdZeroYearDay => {
+                for i in 0..2 {
+                    if std == stdUnderYearDay
+                        && len!(value) > 0
+                        && value.bytes().nth(0) == Some(b' ')
+                    {
+                        value = &value[1..]
+                    }
+                }
+                let res = getnum3(value, std == stdZeroYearDay);
+                if res.is_err() {
+                    err = res.err().unwrap();
+                }
+                if res.is_ok() {
+                    let r = res.ok().unwrap();
+                    yday = r.0;
+                    value = r.1;
+                }
+                // Note that we allow any one-, two-, or three-digit year-day here.
+                // The year-day, year combination is validated after we've completed parsing.
+            }
+            stdHour => {
+                let res = getnum(value, false);
+                if res.is_err() {
+                    err = res.err().unwrap();
+                }
+                if res.is_ok() {
+                    let r = res.ok().unwrap();
+                    hour = r.0;
+                    value = r.1;
+                }
+
+                if hour < 0 || 24 <= hour {
+                    rangeErrString = "hour"
+                }
+            }
+            stdHour12 | stdZeroHour12 => {
+                let res = getnum(value, std == stdZeroHour12);
+                if res.is_err() {
+                    err = res.err().unwrap();
+                }
+                if res.is_ok() {
+                    let r = res.ok().unwrap();
+                    hour = r.0;
+                    value = r.1;
+                }
+                if hour < 0 || 12 < hour {
+                    rangeErrString = "hour"
+                }
+            }
+            stdMinute | stdZeroMinute => {
+                let res = getnum(value, std == stdZeroMinute);
+                if res.is_err() {
+                    err = res.err().unwrap();
+                }
+                if res.is_ok() {
+                    let r = res.ok().unwrap();
+                    min = r.0;
+                    value = r.1;
+                }
+
+                if min < 0 || 60 <= min {
+                    rangeErrString = "minute"
+                }
+            }
+            stdSecond | stdZeroSecond => {
+                let res = getnum(value, std == stdZeroSecond);
+                if res.is_err() {
+                    err = res.err().unwrap();
+                }
+                if res.is_ok() {
+                    let r = res.ok().unwrap();
+                    sec = r.0;
+                    value = r.1;
+                }
+                if sec < 0 || 60 <= sec {
+                    rangeErrString = "second";
+                    break;
+                }
+                // Special case: do we have a fractional second but no
+                // fractional second in the format?
+                if len!(value) >= 2
+                    && commaOrPeriod(value.bytes().nth(0).unwrap())
+                    && isDigit(value, 1)
+                {
+                    let stdResult = nextStdChunk(layout);
+                    std = stdResult.1;
+                    std &= stdMask;
+                    if std == stdFracSecond0 || std == stdFracSecond9 {
+                        // Fractional second in the layout; proceed normally
+                        break;
+                    }
+                    // No fractional second in the layout but we have one in the input.
+                    let mut n = 2;
+                    while (n < len!(value) && isDigit(value, int!(n))) {
+                        n += 1;
+                    }
+                    let res = parseNanoseconds(value, n);
+                    if res.is_err() {
+                        err = res.err().unwrap();
+                    }
+                    if res.is_ok() {
+                        nsec = res.ok().unwrap();
+                    }
+                    value = &value[n..];
+                }
+            }
+            stdPM => {
+                if len!(value) < 2 {
+                    err = errBad;
+                    break;
+                }
+                p = &value[0..2];
+                value = &value[2..];
+                match p {
+                    "PM" => pmSet = true,
+                    "AM" => amSet = true,
+                    _ => err = errBad,
+                }
+            }
+            stdpm => {
+                if len!(value) < 2 {
+                    err = errBad;
+                    break;
+                }
+                p = &value[0..2];
+                value = &value[2..];
+                match p {
+                    "pm" => pmSet = true,
+                    "am" => amSet = true,
+
+                    _ => err = errBad,
+                }
+            }
+            stdISO8601TZ
+            | stdISO8601ColonTZ
+            | stdISO8601SecondsTZ
+            | stdISO8601ShortTZ
+            | stdISO8601ColonSecondsTZ
+            | stdNumTZ
+            | stdNumShortTZ
+            | stdNumColonTZ
+            | stdNumSecondsTz
+            | stdNumColonSecondsTZ => {
+                if (std == stdISO8601TZ || std == stdISO8601ShortTZ || std == stdISO8601ColonTZ)
+                    && len!(value) >= 1
+                    && value.bytes().nth(0) == Some(b'Z')
+                {
+                    value = &value[1..];
+                    z = UTC.clone();
+                    break;
+                }
+                let mut sign: &str;
+                let mut hour: &str;
+                let mut min: &str;
+                let mut seconds: &str;
+                if std == stdISO8601ColonTZ || std == stdNumColonTZ {
+                    if len!(value) < 6 {
+                        err = errBad;
+                        break;
+                    }
+                    if value.bytes().nth(3) != Some(b':') {
+                        err = errBad;
+                        break;
+                    }
+
+                    sign = &value[0..1];
+                    hour = &value[1..3];
+                    min = &value[4..6];
+                    seconds = "00";
+                    value = &value[6..];
+                } else if std == stdNumShortTZ || std == stdISO8601ShortTZ {
+                    if len!(value) < 3 {
+                        err = errBad;
+                        break;
+                    }
+                    sign = &value[0..1];
+                    hour = &value[1..3];
+                    min = "00";
+                    seconds = "00";
+                    value = &value[3..];
+                } else if std == stdISO8601ColonSecondsTZ || std == stdNumColonSecondsTZ {
+                    if len!(value) < 9 {
+                        err = errBad;
+                        break;
+                    }
+                    if value.bytes().nth(3) != Some(b':') || value.bytes().nth(6) != Some(b':') {
+                        err = errBad;
+                        break;
+                    }
+                    sign = &value[0..1];
+                    hour = &value[1..3];
+                    min = &value[4..6];
+                    seconds = &value[7..9];
+                    value = &value[9..];
+                } else if std == stdISO8601SecondsTZ || std == stdNumSecondsTz {
+                    if len!(value) < 7 {
+                        err = errBad;
+                        break;
+                    }
+                    sign = &value[0..1];
+                    hour = &value[1..3];
+                    min = &value[3..5];
+                    seconds = &value[5..7];
+                    value = &value[7..];
+                } else {
+                    if len!(value) < 5 {
+                        err = errBad;
+                        break;
+                    }
+                    sign = &value[0..1];
+                    hour = &value[1..3];
+                    min = &value[3..5];
+                    seconds = "00";
+                    value = &value[5..];
+                }
+                let mut hr: int = 0;
+                let mut mm: int = 0;
+                let mut ss: int = 0;
+                let res = atoi(hour);
+                if res.is_err() {
+                    err = res.err().unwrap();
+                }
+                if res.is_ok() {
+                    hr = res.ok().unwrap();
+                    let res1 = atoi(min);
+                    if res1.is_err() {
+                        err = res1.err().unwrap();
+                    }
+                    if res1.is_ok() {
+                        mm = res1.ok().unwrap();
+
+                        let res2 = atoi(seconds);
+                        if res2.is_err() {
+                            err = res2.err().unwrap();
+                        }
+
+                        if res2.is_ok() {
+                            ss = res2.ok().unwrap();
+                        }
+                    }
+                }
+                zoneOffset = (hr * 60 + mm) * 60 + ss; // offset is in seconds
+                match sign.bytes().nth(0) {
+                    Some(b'+') => (),
+                    Some(b'-') => zoneOffset = -zoneOffset,
+                    _ => err = errBad,
+                }
+            }
+            stdTZ => {
+                // Does it look like a time zone?
+                if len!(value) >= 3 && &value[0..3] == "UTC" {
+                    z = UTC.clone();
+                    value = &value[3..];
+                    break;
+                }
+                let res = parseTimeZone(value);
+                let n = uint!(res.0);
+                let ok = res.1;
+                if !ok {
+                    err = errBad;
+                    break;
+                }
+                zoneName = &value[..n];
+                value = &value[n..];
+            }
+            stdFracSecond0 => {
+                // stdFracSecond0 requires the exact number of digits as specified in
+                // the layout.
+                let ndigit = uint!(1 + digitsLen(int!(std)));
+                if len!(value) < ndigit {
+                    err = errBad;
+                    break;
+                }
+                let res = parseNanoseconds(value, ndigit);
+                if res.is_err() {
+                    err = res.err().unwrap();
+                }
+                if res.is_ok() {
+                    nsec = res.ok().unwrap();
+                }
+                value = &value[ndigit..];
+            }
+            stdFracSecond9 => {
+                if len!(value) < 2
+                    || !commaOrPeriod(value.bytes().nth(0).unwrap())
+                    || value.bytes().nth(1) < Some(b'0')
+                    || Some(b'9') < value.bytes().nth(1)
+                {
+                    // Fractional second omitted.
+                    break;
+                }
+                // Take any number of digits, even more than asked for,
+                // because it is what the stdSecond case would do.
+                let mut i = 0;
+                while (i < 9
+                    && i + 1 < len!(value)
+                    && Some(b'0') <= value.bytes().nth(i + 1)
+                    && value.bytes().nth(i + 1) <= Some(b'9'))
+                {
+                    i += 1;
+                }
+                let res = parseNanoseconds(value, 1 + i);
+                if res.is_err() {
+                    err = res.err().unwrap();
+                }
+                if res.is_ok() {
+                    nsec = res.ok().unwrap();
+                }
+                value = &value[1 + i..];
+            }
+            _ => (),
+        }
+        if rangeErrString != "" {
+            return Err(format!("{} {}", rangeErrString, " out of range"));
+        }
+        if err != "" {
+            return Err(format!("{} {}", "ParseError:", err));
+        }
+    }
+    if pmSet && hour < 12 {
+        hour += 12;
+    } else if amSet && hour == 12 {
+        hour = 0;
+    }
+
+    // Convert yday to day, month.
+    if yday >= 0 {
+        let mut d: int = 0;
+        let mut m: int = 0;
+        if isLeap(year) {
+            if yday == 31 + 29 {
+                m = int!(Month::February);
+                d = 29;
+            } else if yday > 31 + 29 {
+                yday -= 1;
+            }
+        }
+        if yday < 1 || yday > 365 {
+            return Err(format!(
+                "{} {} {} {} {}",
+                alayout, avalue, "", value, ": day-of-year out of range"
+            ));
+        }
+        if m == 0 {
+            m = (yday - 1) / 31 + 1;
+            if int!(daysBefore[uint!(m)]) < yday {
+                m += 1;
+            }
+            d = yday - int!(daysBefore[uint!(m) - 1]);
+        }
+        // If month, day already seen, yday's m, d must match.
+        // Otherwise, set them from m, d.
+        if month >= 0 && month != m {
+            return Err(format!(
+                "{} {} {} {} {}",
+                alayout, avalue, "", value, ": day-of-year does not match month"
+            ));
+        }
+        month = m;
+        if day >= 0 && day != d {
+            return Err(format!(
+                "{} {} {} {} {}",
+                alayout, avalue, "", value, ": day-of-year does not match day"
+            ));
+        }
+        day = d;
+    } else {
+        if month < 0 {
+            month = int!(Month::January);
+        }
+        if day < 0 {
+            day = 1;
+        }
+    }
+
+    // Validate the day of the month.
+    if day < 1 || day > daysIn(Month::IndexOf(uint!(month)), year) {
+        return Err(format!(
+            "{} {} {} {} {}",
+            alayout, avalue, "", value, ": day out of range"
+        ));
+    }
+
+    if z.name != "" {
+        return Ok(Date(
+            year,
+            uint!(month),
+            day,
+            hour,
+            min,
+            sec,
+            nsec,
+            z.clone(),
+        ));
+    }
+
+    if zoneOffset != -1 {
+        let mut t = Date(year, uint!(month), day, hour, min, sec, nsec, UTC.clone());
+        t.addSec(-int64!(zoneOffset));
+
+        // Look for local zone with the given offset.
+        // If that zone was in effect at the given time, use it.
+        let (name, offset, _, _, _) = local.lookup(t.unixSec());
+        if offset == zoneOffset && (zoneName == "" || name == zoneName) {
+            t.setLoc(local);
+            return Ok(t);
+        }
+
+        // Otherwise create fake zone to record offset.
+
+        t.setLoc(FixedZone(zoneName, zoneOffset));
+        return Ok(t);
+    }
+
+    if zoneName != "" {
+        let mut t = Date(year, uint!(month), day, hour, min, sec, nsec, UTC.clone());
+        // Look for local zone with the given offset.
+        // If that zone was in effect at the given time, use it.
+        let (mut offset, ok) = local.lookupName(zoneName, t.unixSec());
+        if ok {
+            t.addSec(-int64!(offset));
+            t.setLoc(local);
+            return Ok(t);
+        }
+
+        // Otherwise, create fake zone with unknown offset.
+        if len!(zoneName) > 3 && &zoneName[..3] == "GMT" {
+            let res = atoi(&zoneName[3..]); // Guaranteed OK by parseGMT
+            if res.is_ok() {
+                offset = res.ok().unwrap();
+            }
+            offset *= 3600;
+        }
+        t.setLoc(FixedZone(zoneName, offset));
+        return Ok(t);
+    }
+
+    // Otherwise, fall back to default.
+    Ok(Date(
+        year,
+        uint!(month),
+        day,
+        hour,
+        min,
+        sec,
+        nsec,
+        defaultLocation,
+    ))
+}
+
+fn cutspace(s: &str) -> &str {
+    let mut s = s;
+    while (len!(s) > 0 && s.bytes().nth(0) == Some(b' ')) {
+        s = &s[1..];
+    }
+    s
+}
+
+fn getnum(s: &str, fixed: bool) -> Result<(int, &str), &str> {
+    if !isDigit(s, 0) {
+        return Err(errBad);
+    }
+
+    if !isDigit(s, 1) {
+        if fixed {
+            return Err(errBad);
+        }
+        return Ok((int!(s.bytes().nth(0).unwrap() - b'0'), &s[1..]));
+    }
+
+    Ok((
+        int!((s.bytes().nth(0).unwrap() - b'0') * 10) + int!(s.bytes().nth(1).unwrap() - b'0'),
+        &s[2..],
+    ))
+}
+
+fn getnum3(s: &str, fixed: bool) -> Result<(int, &str), &str> {
+    let mut n: int = 0;
+    let mut i: uint = 0;
+    while (i < 3 && isDigit(s, int!(i))) {
+        i += 1;
+        n = n * 10 + int!(s.bytes().nth(i).unwrap() - b'0');
+    }
+    if i == 0 || fixed && i != 3 {
+        return Err(errBad);
+    }
+    Ok((n, &s[i..]))
+}
+
+fn atoi(s: &str) -> Result<int, &str> {
+    let mut x = 0;
+    let mut s = s;
+    let mut neg = false;
+    if s != "" && (s.bytes().nth(0) == Some(b'-') || s.bytes().nth(0) == Some(b'+')) {
+        neg = (s.bytes().nth(0) == Some(b'-'));
+        s = &s[1..];
+    }
+    let (q, rem) = leadingInt(s)?; //?相当于原来的try!()宏，错误提前返回错误信息,相当于golang中的 if err! = nil { return err }
+    x = int!(q);
+    if neg {
+        x = -x;
+    }
+
+    Ok(x)
+}
+
+fn parseTimeZone(value: &str) -> (int, bool) {
+    if len!(value) < 3 {
+        return (0, false);
+    }
+    // Special case 1: ChST and MeST are the only zones with a lower-case letter.
+    if len!(value) >= 4 && (&value[..4] == "ChST" || &value[..4] == "MeST") {
+        return (4, true);
+    }
+    // Special case 2: GMT may have an hour offset; treat it specially.
+    if &value[..3] == "GMT" {
+        let length = parseGMT(value);
+        return (length, true);
+    }
+    // Special Case 3: Some time zones are not named, but have +/-00 format
+    if value.bytes().nth(0) == Some(b'+') || value.bytes().nth(0) == Some(b'-') {
+        let length = parseSignedOffset(value);
+        let ok = (length > 0); // parseSignedOffset returns 0 in case of bad input
+        return (length, ok);
+    }
+    // How many upper-case letters are there? Need at least three, at most five.
+    let mut nUpper: uint = 0;
+    for n in 0..6 {
+        nUpper = n;
+        if n >= len!(value) {
+            break;
+        }
+        let c = value.bytes().nth(n);
+        if c < Some(b'A') || Some(b'Z') < c {
+            break;
+        }
+    }
+    match nUpper {
+        0 | 1 | 2 | 6 => return (0, false),
+        5 => {
+            // Must end in T to match.
+            if value.bytes().nth(4) == Some(b'T') {
+                return (5, true);
+            }
+        }
+        4 => {
+            // Must end in T, except one special case.
+            if value.bytes().nth(3) == Some(b'T') || &value[..4] == "WITA" {
+                return (4, true);
+            }
+        }
+        3 => return (3, true),
+        _ => return (0, false),
+    }
+    (0, false)
+}
+
+fn parseGMT(value: &str) -> int {
+    let value = &value[3..];
+    if len!(value) == 0 {
+        return 3;
+    }
+
+    3 + parseSignedOffset(value)
+}
+
+fn parseSignedOffset(value: &str) -> int {
+    let sign = value.bytes().nth(0).unwrap();
+    if sign != b'-' && sign != b'+' {
+        return 0;
+    }
+
+    let mut res = leadingInt(&value[1..]);
+    if res.is_err() {
+        return 0;
+    }
+    let (mut x, mut rem) = res.ok().unwrap();
+    if &value[1..] == rem {
+        return 0;
+    }
+    if sign == b'-' {
+        x = -x;
+    }
+    if x < -23 || 23 < x {
+        return 0;
+    }
+    return int!(len!(value) - len!(rem));
+}
+
+fn commaOrPeriod(b: byte) -> bool {
+    return b == b'.' || b == b',';
+}
+
+fn parseNanoseconds(value: &str, nbytes: uint) -> Result<int, &str> {
+    if !commaOrPeriod(value.bytes().nth(0).unwrap()) {
+        return Err(errBad);
+    }
+
+    let mut ns = atoi(&value[1..nbytes])?;
+    if ns < 0 || 1000_0000_000 < ns {
+        return Err("fractional second");
+    }
+
+    let scaleDigits = 10 - nbytes;
+    for i in 0..scaleDigits {
+        ns *= 10;
+    }
+    Ok(ns)
+}
+
+const errLeadingInt: &str = "time: bad [0-9]*";
+fn leadingInt(s: &str) -> Result<(int64, &str), &str> {
+    let mut x: int64 = 0;
+    let rem: &str = "";
+    let mut j = 0;
+    for i in 0..len!(s) {
+        j = i;
+        let c = s.bytes().nth(i).unwrap();
+        if c < b'0' || c > b'9' {
+            break;
+        }
+        if x > (1 << 63 - 1) / 10 {
+            // overflow
+            return Err(errLeadingInt);
+        }
+        x = x * 10 + int64!(c - b'0');
+        if x < 0 {
+            // overflow
+            return Err(errLeadingInt);
+        }
+    }
+    Ok((x, &s[j..]))
+}
+
+fn skip<'a>(value: &'a str, prefix: &'a str) -> Result<&'a str, &'a str> {
+    let mut value = value;
+    let mut prefix = prefix;
+    while (len!(prefix) > 0) {
+        if prefix.bytes().nth(0) == Some(b' ') {
+            if len!(value) > 0 && value.bytes().nth(0) != Some(b' ') {
+                return Err("skip err1");
+            }
+            prefix = cutspace(prefix);
+            value = cutspace(value);
+            continue;
+        }
+        if len!(value) == 0 || (value.bytes().nth(0) != prefix.bytes().nth(0)) {
+            return Err("skip err2");
+        }
+        prefix = &prefix[1..];
+        value = &value[1..];
+    }
+    Ok(value)
+}
+
 fn absClock(abs: uint64) -> (int, int, int) {
     let mut sec = int!(abs % uint64!(secondsPerDay));
     let hour = int!(sec) / int!(secondsPerHour);
@@ -1306,6 +2148,29 @@ impl Location {
         }
         false
     }
+
+    fn lookupName(&self, name: &str, unix: int64) -> (int, bool) {
+        let mut offset: int = 0;
+        let ok: bool = false;
+        let l = self.get();
+        for zone in l.zone.as_slice() {
+            if zone.name == name {
+                let res = l.lookup(unix - int64!(zone.offset));
+                let nam = res.0;
+                offset = res.1;
+                if nam == zone.name {
+                    return (offset, true);
+                }
+            }
+        }
+
+        for zone in l.zone.as_slice() {
+            if zone.name == name {
+                return (zone.offset, true);
+            }
+        }
+        (offset, ok)
+    }
 }
 
 // A zone represents a single time zone such as CET.
@@ -1436,6 +2301,7 @@ fn unixTime(sec: int64, nsec: int32) -> Time {
     let mut t = Time::new();
     t.wall = uint64!(nsec);
     t.ext = sec + unixToInternal;
+    // t.loc = Local.clone();
     t
 }
 
@@ -2218,8 +3084,8 @@ fn isMatch(s1: &str, s2: &str) -> bool {
         let mut c1 = s1[i];
         let mut c2 = s2[i];
         if c1 != c2 {
-            c1 |= byte!('a') - byte!('A');
-            c2 |= byte!('a') - byte!('A');
+            c1 |= (byte!('a') - byte!('A'));
+            c2 |= (byte!('a') - byte!('A'));
             if c1 != c2 || c1 < byte!('a') || c1 > byte!('z') {
                 return false;
             }
@@ -2230,16 +3096,15 @@ fn isMatch(s1: &str, s2: &str) -> bool {
 
 const errBad: &'static str = "bad value for field";
 
-fn lookup(tab: Vec<string>, val: string) -> Result<(int, string), &'static str> {
+fn lookup<'a>(tab: Vec<&'a str>, val: &'a str) -> Result<(int, &'a str), &'a str> {
     for (i, v) in tab.iter().enumerate() {
         if val.len() >= v.len() && isMatch(&val[0..v.len()], v) {
             let index = uint!(v.len());
-            let vstr = v.as_str();
-            return Ok((int!(i), vstr[index..].to_string()));
+            return Ok((int!(i), &val[index..]));
         }
     }
 
-    Err(errBad) // go源码:return -1, val, errBad
+    Err("lookup err1") // go源码:return -1, val, errBad
 }
 
 fn appendInt(b: Vec<byte>, x: int, width: int) -> Vec<byte> {
@@ -2557,6 +3422,6 @@ fn separator(std: int) -> byte {
     if (std >> stdSeparatorShift) == 0 {
         return b'.';
     }
-    return b',';
+    b','
 }
 // format.go -end

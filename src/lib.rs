@@ -1,3 +1,4 @@
+#![doc(html_playground_url = "https://play.rust-lang.org/")]
 pub mod archive;
 pub mod bufio;
 #[macro_use]
