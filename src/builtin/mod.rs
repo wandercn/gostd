@@ -11,8 +11,8 @@
 // prelude
 // 导出宏函数 byte!(),int8!()等.避免用gostd::byte!()，可以直接byte!()调用。
 pub use super::{
-    byte, float32, float64, int, int16, int32, int64, int8, rune, uint, uint16, uint32, uint64,
-    uint8, uintptr,
+    byte, float32, float64, int, int16, int32, int64, int8, len, rune, uint, uint16, uint32,
+    uint64, uint8, uintptr,
 };
 
 /// Go: uint8 type eq Rust: u8 .
@@ -547,7 +547,7 @@ pub fn string(b: &[byte]) -> String {
 #[macro_export]
 macro_rules! len {
     ($x:ident) => {
-        ($x.len())
+        $x.len()
     }; // ($x:expr) => {
        // ($x.len())
        // };
