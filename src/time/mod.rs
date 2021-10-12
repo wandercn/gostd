@@ -1134,13 +1134,40 @@ pub fn Date(
     t
 }
 
-pub fn Parse<'a>(layout: &'a str, value: &'a str) -> Result<Time, string> {
+///
+/// Parse parses a formatted string and returns the time value it represents. See the documentation for the constant called Layout to see how to represent the format. The second argument must be parseable using the format string (layout) provided as the first argument.
+///
+/// The example for Time.Format demonstrates the working of the layout string in detail and is a good reference.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Parse解析一个格式化的时间字符串并返回它代表的时间。layout定义了参考时间：
+///
+/// `Mon Jan 2 15:04:05 -0700 MST 2006`
+/// 在输入格式下的字符串表示，作为输入的格式的示例。同样的格式规则会被用于输入字符串。
+///
+// 预定义的ANSIC、UnixDate、RFC3339和其他版式描述了参考时间的标准或便捷表示。要获得更多参考时间的定义和格式，参/// 见本包的ANSIC和其他版式常量。
+/// </details>
+///
+/// # Example:
+///```
+/// use gostd::time;
+///
+/// let layout = "Jan 2, 2006 at 3:04pm (MST)";
+/// let t = time::Parse(layout, "Feb 3, 2013 at 7:54pm (PST)")
+///     .ok()
+///     .expect("Parse faile:");
+/// assert_eq!( t.String() ,"2013-02-03 19:54:00 +0000 PST".to_string());
+/// println!("{}", t);
+/// // output:
+/// // 2013-02-03 19:54:00 +0000 PST
+///```
+pub fn Parse(layout: &str, value: &str) -> Result<Time, string> {
     parse(layout, value, UTC.clone(), Local.clone())
 }
 
-fn parse<'a>(
-    layout: &'a str,
-    value: &'a str,
+fn parse(
+    layout: &str,
+    value: &str,
     defaultLocation: Location,
     local: Location,
 ) -> Result<Time, string> {
@@ -1164,12 +1191,10 @@ fn parse<'a>(
     let mut zoneOffset: int = -1;
     let mut zoneName: &str = "";
 
-    println!("avalue:{} alayout:{}", avalue, alayout);
     // Each iteration processes one std value.
     loop {
         let mut err: &str = "";
         let (prefix, mut std, suffix) = nextStdChunk(layout);
-        println!("prefix:{} std:{} suffix:{}", prefix, std, suffix);
         let stdstr = &layout[len!(prefix)..(len!(layout) - len!(suffix))];
         let res = skip(value, prefix)?;
         value = res;
@@ -1232,7 +1257,6 @@ fn parse<'a>(
                     value = r.1;
                 }
                 month += 1;
-                println!("stdMonth---month:{} value:{}", month, value);
             }
             stdLongMonth => {
                 let res = lookup(longMonthNames.to_vec(), value);
@@ -1292,7 +1316,6 @@ fn parse<'a>(
                     let r = res.ok().unwrap();
                     day = r.0;
                     value = r.1;
-                    println!("day:{} value:{}", day, value);
                 }
                 // Note that we allow any one- or two-digit day here.
                 // The month, day, year combination is validated after we've completed parsing.
@@ -1539,7 +1562,6 @@ fn parse<'a>(
                         }
                     }
                 }
-                println!("hr:{} mm:{} ss:{}", hr, mm, ss);
                 zoneOffset = (hr * 60 + mm) * 60 + ss; // offset is in seconds
                 match sign.bytes().nth(0) {
                     Some(b'+') => (),
@@ -1563,7 +1585,6 @@ fn parse<'a>(
                 }
                 zoneName = &value[..n];
                 value = &value[n..];
-                println!("stdTZ- zoneName:{} value:{}", zoneName, value);
             }
             stdFracSecond0 => {
                 // stdFracSecond0 requires the exact number of digits as specified in
@@ -1710,16 +1731,11 @@ fn parse<'a>(
 
         // Otherwise create fake zone to record offset.
 
-        println!(
-            "FixedZone - zoneName:{} zoneOffset:{}",
-            zoneName, zoneOffset
-        );
         t.setLoc(FixedZone(zoneName, zoneOffset));
         return Ok(t);
     }
 
     if zoneName != "" {
-        println!("----------------------------------");
         let mut t = Date(year, uint!(month), day, hour, min, sec, nsec, UTC.clone());
         // Look for local zone with the given offset.
         // If that zone was in effect at the given time, use it.
@@ -1739,7 +1755,6 @@ fn parse<'a>(
             offset *= 3600;
         }
         t.setLoc(FixedZone(zoneName, offset));
-        println!("------t: {:?}", t);
         return Ok(t);
     }
 
@@ -1941,7 +1956,6 @@ fn leadingInt(s: &str) -> Result<(int64, &str), &str> {
 }
 
 fn skip<'a>(value: &'a str, prefix: &'a str) -> Result<&'a str, &'a str> {
-    println!("skip1-value:{} prefix:{}", value, prefix);
     let mut value = value;
     let mut prefix = prefix;
     while (len!(prefix) > 0) {
@@ -1959,7 +1973,6 @@ fn skip<'a>(value: &'a str, prefix: &'a str) -> Result<&'a str, &'a str> {
         prefix = &prefix[1..];
         value = &value[1..];
     }
-    println!("skip value:{}", value);
     Ok(value)
 }
 
@@ -2203,7 +2216,6 @@ const omega: int64 = int64!((uint64!(1) << 63) - 1); // math.MaxInt64
 /// // CST: 2009-11-10 22:30:12.000000013 +0800 CST
 /// ```
 pub fn FixedZone(name: &str, offset: int) -> Location {
-    println!("FixedZone-1 name:{} offset:{}", name, offset);
     let zo = vec![zone {
         name: name.to_string(),
         offset: offset,
@@ -3065,14 +3077,6 @@ fn isMatch(s1: &str, s2: &str) -> bool {
     if s1.len() != s2.len() {
         return false;
     }
-    /* if s1 == s2 {
-           println!("true-s1:{} s2:{}", s1, s2);
-           return true;
-       } else {
-           println!("false-s1:{} s2:{}", s1, s2);
-           return false;
-       }
-    */
     let s1 = s1.as_bytes();
     let s2 = s2.as_bytes();
 
@@ -3093,9 +3097,7 @@ fn isMatch(s1: &str, s2: &str) -> bool {
 const errBad: &'static str = "bad value for field";
 
 fn lookup<'a>(tab: Vec<&'a str>, val: &'a str) -> Result<(int, &'a str), &'a str> {
-    println!("lookup-tab:{:?} val:{}", tab, val);
     for (i, v) in tab.iter().enumerate() {
-        println!("i:{} v:{}", i, v);
         if val.len() >= v.len() && isMatch(&val[0..v.len()], v) {
             let index = uint!(v.len());
             return Ok((int!(i), &val[index..]));
@@ -3161,7 +3163,6 @@ fn stdFracSecond(code: int, n: int, c: int) -> int {
 }
 
 fn nextStdChunk(layout: &str) -> (&str, int32, &str) {
-    println!("layout:{}", layout);
     let length = layout.len();
     for (i, c) in layout.bytes().enumerate() {
         match c {
