@@ -64,7 +64,7 @@ pub const Hour: int64 = 60 * Minute;
 /// <summary class="docblock">zh-cn</summary>
 /// Duration类型代表两个时间点之间经过的时间，以纳秒为单位。可表示的最长时间段大约290年。
 /// </details>
-#[derive(Default, PartialEq, PartialOrd, Fmt)]
+#[derive(PartialEq, PartialOrd, Debug, Fmt)]
 pub struct Duration(int64); // 由于类型别名不能绑定方法通过元组类型结构体实现,访问元组内容用d.0数字下标访问，go源码是 type Duration int64
 
 const minDuration: int64 = int64!(-1) << 63;
@@ -124,7 +124,7 @@ impl Duration {
                 prec = 3;
                 w -= 1;
                 let s = "µ";
-                buf[w..].copy_from_slice(s.as_bytes());
+                buf[w..(w + 2)].copy_from_slice(s.as_bytes()); // go中slice copy()不要求dst必须与source长度一致，转换成rust后，copy_from_slice函数要求dst和source长度必须一致导致bug，所以修正为w.. w+2
             } else {
                 prec = 6;
                 buf[w] = byte!('m');
@@ -165,6 +165,14 @@ impl Duration {
     /// <summary class="docblock">zh-cn</summary>
     /// Nanoseconds以整数纳秒计数的形式返回持续时间。
     /// </details>
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let u = time::ParseDuration("1µs").ok().unwrap();
+    /// assert_eq!(u.Nanoseconds(),1000);
+    /// println!("One microsecond is {} nanoseconds.", u.Nanoseconds())
+    /// ```
     pub fn Nanoseconds(&self) -> int64 {
         self.0
     }
@@ -174,6 +182,15 @@ impl Duration {
     /// <summary class="docblock">zh-cn</summary>
     /// Microseconds 以整数微秒计数的形式返回持续时间。
     /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let u = time::ParseDuration("1s").ok().unwrap();
+    /// assert_eq!(u.Microseconds(),1000000);
+    /// println!("One second is {} microseconds.", u.Microseconds())
+    /// ```
     pub fn Microseconds(&self) -> int64 {
         self.0 / 1000
     }
@@ -183,6 +200,15 @@ impl Duration {
     /// <summary class="docblock">zh-cn</summary>
     /// Milliseconds以整数毫秒的形式返回持续时间。
     /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let u = time::ParseDuration("1s").ok().unwrap();
+    /// assert_eq!(u.Milliseconds(),1000);
+    /// println!("One second is {} milliseconds.", u.Milliseconds())
+    /// ```
     pub fn Milliseconds(&self) -> int64 {
         self.0 / 1000_000
     }
@@ -192,6 +218,15 @@ impl Duration {
     /// <summary class="docblock">zh-cn</summary>
     /// Seconds返回持续时间的浮点数为秒。
     /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let m = time::ParseDuration("1m30s").ok().unwrap();
+    /// assert_eq!(m.Seconds(),90.0);
+    /// println!("Take off in {} seconds.", m.Seconds())
+    /// ```
     pub fn Seconds(&self) -> float64 {
         let d = self.0;
         let sec = d / Second;
@@ -204,6 +239,15 @@ impl Duration {
     /// <summary class="docblock">zh-cn</summary>
     /// Minutes以分钟的浮点数返回持续时间。
     /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let m = time::ParseDuration("1h30m").ok().unwrap();
+    /// assert_eq!(m.Minutes(),90.0);
+    /// println!("The movie is {} minutes long.", m.Minutes())
+    /// ```
     pub fn Minutes(&self) -> float64 {
         let d = self.0;
         let min = d / Minute;
@@ -216,6 +260,15 @@ impl Duration {
     /// <summary class="docblock">zh-cn</summary>
     /// hours以浮点数的形式返回持续时间。
     /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let h = time::ParseDuration("4h30m").ok().unwrap();
+    /// assert_eq!(h.Hours(),4.5);
+    /// println!("I've got {} hours of work left.",h.Hours());
+    /// ```
     pub fn Hours(&self) -> float64 {
         let d = self.0;
         let hour = d / Hour;
@@ -925,6 +978,16 @@ impl Time {
     /// <summary class="docblock">zh-cn</summary>
     /// Unix将t作为Unix时间返回，即从1970年1月1日UTC开始经过的秒数。类似Unix的操作系统通常将时间记录为32位的秒数，但由于这里的方法返回的是64位的值，所以对过去或未来的数十亿年都有效。
     /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let t = time::Date(2001, 11, 9, 1, 46, 40, 0, time::UTC.clone());
+    /// println!("{}",t.Unix());     // seconds since 1970
+    /// println!("{}",t.UnixNano()); // nanoseconds since 1970
+    ///
+    /// ```
     pub fn Unix(&self) -> int64 {
         self.unixSec()
     }
@@ -1955,6 +2018,38 @@ fn leadingInt(s: &str) -> Result<(int64, &str), &str> {
     Ok((x, &s[j..]))
 }
 
+// leadingFraction consumes the leading [0-9]* from s.
+// It is used only for fractions, so does not return an error on overflow,
+// it just stops accumulating precision.
+fn leadingFraction(s: &str) -> (int64, float64, &str) {
+    let mut x: int64 = 0;
+    let mut index = 0;
+    let mut scale: float64 = 1.0;
+    let mut overflow = false;
+    for (i, c) in s.bytes().enumerate() {
+        index = i;
+        if c < b'0' || c > b'9' {
+            break;
+        }
+        if overflow {
+            continue;
+        }
+        if x > (1 << 63 - 1) / 10 {
+            // It's possible for overflow to give a positive number, so take care.
+            overflow = true;
+            continue;
+        }
+        let y = x * 10 + int64!(c) - int64!(b'0');
+        if y < 0 {
+            overflow = true;
+            continue;
+        }
+        x = y;
+        scale *= 10.0;
+    }
+    (x, scale, &s[index..])
+}
+
 fn skip<'a>(value: &'a str, prefix: &'a str) -> Result<&'a str, &'a str> {
     let mut value = value;
     let mut prefix = prefix;
@@ -2612,7 +2707,165 @@ impl Weekday {
     }
 }
 
+fn unitToInt64(unit: &str) -> Option<int64> {
+    match unit {
+        "ns" => Some(Nanosecond),
+        "us" => Some(Microsecond),
+        "µs" => Some(Microsecond), // U+00B5 = micro symbol
+        "μs" => Some(Microsecond), // U+03BC = Greek letter mu
+        "ms" => Some(Millisecond),
+        "s" => Some(Second),
+        "m" => Some(Minute),
+        "h" => Some(Hour),
+        _ => None,
+    }
+}
 // 函数
+/// ParseDuration parses a duration string.
+/// A duration string is a possibly signed sequence of
+/// decimal numbers, each with optional fraction and a unit suffix,
+/// such as "300ms", "-1.5h" or "2h45m".
+/// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+///
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// ParseDuration解析一个时间段字符串。一个时间段字符串是一个序列，每个片段包含可选的正负号、十进制数、可选的小数部分和单位后缀，如"300ms"、"-1.5h"、"2h45m"。合法的单位有"ns"、"us" /"µs"、"ms"、"s"、"m"、"h"。
+/// </details>
+///
+/// # Example
+/// ```
+/// use gostd::time;
+///
+/// let hours = time::ParseDuration("10h").ok().unwrap();
+///	let complex = time::ParseDuration("1h10m10s").ok().unwrap();
+///	let micro = time::ParseDuration("1µs").ok().unwrap();
+///	// The package also accepts the incorrect but common prefix u for micro.
+///	let micro2 = time::ParseDuration("1us").ok().unwrap();
+/// assert_eq!(hours,time::Duration::new(36000000000000));
+/// assert_eq!(complex,time::Duration::new(4210000000000));
+/// assert_eq!(micro,time::Duration::new(1000));
+/// assert_eq!(micro2,time::Duration::new(1000));
+///	println!("{}",hours);
+///	println!("{}",complex);
+///	println!("There are {} seconds in {}.", complex.Seconds(), complex);
+///	println!("There are {} nanoseconds in {}.", micro.Nanoseconds(), micro);
+///	println!("There are {} seconds in {}.", micro2.Seconds(), micro2);
+///	// output:
+///	// 10h0m0s
+/// // 1h10m10s
+/// // There are 4210 seconds in 1h10m10s.
+/// // There are 1000 nanoseconds in 1µs.
+/// // There are 0.000001 seconds in 1µs.
+/// ```
+pub fn ParseDuration(s: &str) -> Result<Duration, &str> {
+    // [-+]?([0-9]*(\.[0-9]*)?[a-z]+)+
+    let mut s = s;
+    let orig = s;
+    let mut d: int64 = 0;
+    let mut neg = false;
+
+    // Consume [-+]?
+    if s != "" {
+        let c = s.as_bytes()[0];
+        if c == b'-' || c == b'+' {
+            neg = (c == b'-');
+            s = &s[1..];
+        }
+    }
+    // Special case: if all that is left is "0", this is zero.
+    if s == "0" {
+        return Ok(Duration::new(0));
+    }
+    if s == "" {
+        return Err("time: invalid duration ");
+    }
+    while s != "" {
+        let mut v: int64 = 0;
+        let mut f: int64 = 0;
+        let mut scale: float64 = 1.0;
+
+        let err: &str = "";
+
+        // The next character must be [0-9.]
+        if !(s.as_bytes()[0] == b'.' || b'0' <= s.as_bytes()[0] && s.as_bytes()[0] <= b'9') {
+            return Err("time: invalid duration ");
+        }
+        // Consume [0-9]*
+        let pl = len!(s);
+        let res = leadingInt(s);
+        if res.is_err() {
+            return Err("time: invalid duration ");
+        }
+
+        if res.is_ok() {
+            let r = res.ok().unwrap();
+            v = r.0;
+            s = r.1;
+        }
+
+        let mut pre = (pl != len!(s)); // whether we consumed anything before a period
+
+        // Consume (\.[0-9]*)?
+        let mut post = false;
+        if s != "" && s.as_bytes()[0] == b'.' {
+            s = &s[1..];
+            let pl = len!(s);
+            let res = leadingFraction(s);
+            f = res.0;
+            scale = res.1;
+            s = res.2;
+            post = (pl != len!(s));
+        }
+        if !pre && !post {
+            // no digits (e.g. ".s" or "-.s")
+            return Err("time: invalid duration ");
+        }
+
+        // Consume unit.
+        let mut index = 0;
+        for i in 0..len!(s) {
+            let c = s.bytes().nth(i).expect("time: nht index error");
+            if c == b'.' || (b'0' <= c && c <= b'9') {
+                break;
+            }
+            index += 1; // 这里rust for中的i不能使用循环外的变量，变通实现，只有不break返回的情况下才累计index加1。
+        }
+        if index == 0 {
+            return Err("time: missing unit in duration ");
+        }
+        let u = &s[..index];
+        s = &s[index..];
+        let res = unitToInt64(u);
+        if res.is_none() {
+            return Err("time: unknown unit ");
+        }
+        let mut unit = res.unwrap();
+        if v > int64::MAX / unit {
+            // overflow
+            return Err("time: invalid duration ");
+        }
+        v *= unit;
+        if f > 0 {
+            // float64 is needed to be nanosecond accurate for fractions of hours.
+            // v >= 0 && (f*unit/scale) <= 3.6e+12 (ns/h, h is the largest unit)
+            v += int64!(float64!(f) * (float64!(unit) / scale));
+            if v < 0 {
+                // overflow
+                return Err("time: invalid duration ");
+            }
+        }
+        d += v;
+        if d < 0 {
+            // overflow
+            return Err("time: invalid duration ");
+        }
+    }
+
+    if neg {
+        d = -d;
+    }
+    Ok(Duration::new(d))
+}
 /// Since returns the time elapsed since t. It is shorthand for time.Now().Sub(t).
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
