@@ -165,6 +165,14 @@ impl Duration {
     /// <summary class="docblock">zh-cn</summary>
     /// Nanoseconds以整数纳秒计数的形式返回持续时间。
     /// </details>
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let u = time::ParseDuration("1µs").ok().unwrap();
+    /// assert_eq!(u.Nanoseconds(),1000);
+    /// println!("One microsecond is {} nanoseconds.", u.Nanoseconds())
+    /// ```
     pub fn Nanoseconds(&self) -> int64 {
         self.0
     }
@@ -174,6 +182,15 @@ impl Duration {
     /// <summary class="docblock">zh-cn</summary>
     /// Microseconds 以整数微秒计数的形式返回持续时间。
     /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let u = time::ParseDuration("1s").ok().unwrap();
+    /// assert_eq!(u.Microseconds(),1000000);
+    /// println!("One second is {} microseconds.", u.Microseconds())
+    /// ```
     pub fn Microseconds(&self) -> int64 {
         self.0 / 1000
     }
@@ -183,6 +200,15 @@ impl Duration {
     /// <summary class="docblock">zh-cn</summary>
     /// Milliseconds以整数毫秒的形式返回持续时间。
     /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let u = time::ParseDuration("1s").ok().unwrap();
+    /// assert_eq!(u.Milliseconds(),1000);
+    /// println!("One second is {} milliseconds.", u.Milliseconds())
+    /// ```
     pub fn Milliseconds(&self) -> int64 {
         self.0 / 1000_000
     }
@@ -192,6 +218,15 @@ impl Duration {
     /// <summary class="docblock">zh-cn</summary>
     /// Seconds返回持续时间的浮点数为秒。
     /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let m = time::ParseDuration("1m30s").ok().unwrap();
+    /// assert_eq!(m.Seconds(),90.0);
+    /// println!("Take off in {} seconds.", m.Seconds())
+    /// ```
     pub fn Seconds(&self) -> float64 {
         let d = self.0;
         let sec = d / Second;
@@ -204,6 +239,15 @@ impl Duration {
     /// <summary class="docblock">zh-cn</summary>
     /// Minutes以分钟的浮点数返回持续时间。
     /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let m = time::ParseDuration("1h30m").ok().unwrap();
+    /// assert_eq!(m.Minutes(),90.0);
+    /// println!("The movie is {} minutes long.", m.Minutes())
+    /// ```
     pub fn Minutes(&self) -> float64 {
         let d = self.0;
         let min = d / Minute;
@@ -216,6 +260,15 @@ impl Duration {
     /// <summary class="docblock">zh-cn</summary>
     /// hours以浮点数的形式返回持续时间。
     /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let h = time::ParseDuration("4h30m").ok().unwrap();
+    /// assert_eq!(h.Hours(),4.5);
+    /// println!("I've got {} hours of work left.",h.Hours());
+    /// ```
     pub fn Hours(&self) -> float64 {
         let d = self.0;
         let hour = d / Hour;
@@ -925,6 +978,16 @@ impl Time {
     /// <summary class="docblock">zh-cn</summary>
     /// Unix将t作为Unix时间返回，即从1970年1月1日UTC开始经过的秒数。类似Unix的操作系统通常将时间记录为32位的秒数，但由于这里的方法返回的是64位的值，所以对过去或未来的数十亿年都有效。
     /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let t = time::Date(2001, 11, 9, 1, 46, 40, 0, time::UTC.clone());
+    /// println!("{}",t.Unix());     // seconds since 1970
+    /// println!("{}",t.UnixNano()); // nanoseconds since 1970
+    ///
+    /// ```
     pub fn Unix(&self) -> int64 {
         self.unixSec()
     }
