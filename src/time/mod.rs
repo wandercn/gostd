@@ -338,8 +338,11 @@ const absoluteZeroYear: int64 = -292277022399;
 // Assumed by the unixToInternal computation below.
 const internalYear: int64 = 1;
 // Offsets to convert between internal and absolute or Unix times.
-const absoluteToInternal: int64 =
-    int64!(float64!(absoluteZeroYear - internalYear) * 365.2425 * float64!(secondsPerDay));
+const absoluteToInternal: int64 = int64!(
+    (int64!(absoluteZeroYear - internalYear) * int64!(365)
+        + int64!(float64!(absoluteZeroYear - internalYear) * float64!(0.2425)))
+        * int64!(secondsPerDay)
+);
 const internalToAbsolute: int64 = -absoluteToInternal;
 const unixToInternal: int64 = (1969 * 365 + 1969 / 4 - 1969 / 100 + 1969 / 400) * secondsPerDay;
 const internalToUnix: int64 = -unixToInternal;
