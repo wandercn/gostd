@@ -986,9 +986,11 @@ impl Time {
     /// ```
     /// use gostd::time;
     ///
-    /// let t = time::Date(2001, 11, 9, 1, 46, 40, 0, time::UTC.clone());
+    /// let t = time::Date(2001, 9, 9, 1, 46, 40, 0, time::UTC.clone());
     /// println!("{}",t.Unix());     // seconds since 1970
     /// println!("{}",t.UnixNano()); // nanoseconds since 1970
+    /// assert_eq!(1000000000,t.Unix());
+    /// assert_eq!(1000000000000000000,t.UnixNano());
     ///
     /// ```
     pub fn Unix(&self) -> int64 {
