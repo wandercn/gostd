@@ -227,7 +227,7 @@ macro_rules! uint32 {
 #[macro_export]
 macro_rules! uint64 {
     ($x:ident) => {
-        $x as uint64;
+        ($x as uint64)
     };
     ($x:expr) => {
         ($x as uint64)
