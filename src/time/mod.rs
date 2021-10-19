@@ -166,13 +166,14 @@ impl Duration {
     /// Nanoseconds以整数纳秒计数的形式返回持续时间。
     /// </details>
     /// # Example
-    /// ```
+    /// ```rust
     /// use gostd::time;
     ///
     /// let u = time::ParseDuration("1µs").ok().unwrap();
     /// assert_eq!(u.Nanoseconds(),1000);
     /// println!("One microsecond is {} nanoseconds.", u.Nanoseconds())
     /// ```
+    ///
     pub fn Nanoseconds(&self) -> int64 {
         self.0
     }
@@ -377,7 +378,7 @@ const nsecShift: int32 = 30;
 /// Time零值代表时间点January 1, year 1, 00:00:00.000000000 UTC。因为本时间点一般不会出现在使用中，IsZero方法提供了检验时间是否显式初始化的一个简单途径。
 /// 每一个时间都具有一个地点信息（及对应地点的时区信息），当计算时间的表示格式时，如Format、Hour和Year等方法，都会考虑该信息。Local、UTC和In方法返回一个指定时区（但指向同一时间点）的Time。修改地点/时区信息只是会改变其表示；不会修改被表示的时间点，因此也不会影响其计算。
 /// </details>
-#[derive(Default, PartialEq, PartialOrd, Debug, Fmt)]
+#[derive(Default, PartialEq, PartialOrd, Debug, Clone, Fmt)]
 pub struct Time {
     wall: uint64,
     ext: int64,
@@ -562,7 +563,20 @@ impl Time {
     /// <summary class="docblock">zh-cn</summary>
     /// 如果self 代表的时间点在u之后，返回真；否则返回假。
     /// </details>
-    pub fn After(&self, u: Time) -> bool {
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let year2000 = time::Date(2000, 1, 1, 0, 0, 0, 0, time::UTC.clone());
+    ///	let year3000 = time::Date(3000, 1, 1, 0, 0, 0, 0, time::UTC.clone());
+    ///
+    ///	assert_eq!(true,year3000.After(&year2000));// True
+    ///	assert_eq!(false,year2000.After(&year3000)); // False
+    ///
+    /// ```
+    pub fn After(&self, u: &Time) -> bool {
         if self.wall & u.wall & uint64!(hasMonotonic) != 0 {
             return self.ext > u.ext;
         }
@@ -656,7 +670,7 @@ impl Time {
         } else {
             name = "UTC".to_string();
         }
-        let abs = uint64!(sec + (unixToInternal + internalToAbsolute));
+        let abs = uint64!(sec) + uint64!(unixToInternal + internalToAbsolute);
         (name, offset, abs)
     }
 
@@ -1032,6 +1046,23 @@ impl Time {
     ///
     /// AddDate以与Date相同的方式对其结果进行规范化处理，因此，例如，在10月31日的基础上增加一个月，得到12月1日，即11月31日的规范化形式。
     /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::time;
+    ///
+    /// let start = time::Date(2009, 1, 1, 0, 0, 0, 0, time::UTC.clone());
+    /// let oneDayLater = start.AddDate(0, 0, 1);
+    /// let oneMonthLater = start.AddDate(0, 1, 0);
+    /// let oneYearLater = start.AddDate(1, 0, 0);
+    /// assert_eq!(oneDayLater.String(), "2009-01-02 00:00:00 +0000 UTC");
+    /// assert_eq!(oneMonthLater.String(), "2009-02-01 00:00:00 +0000 UTC");
+    /// assert_eq!(oneYearLater.String(), "2010-01-01 00:00:00 +0000 UTC");
+    ///
+    /// println!("oneDayLater: start.AddDate(0, 0, 1) = {}", oneDayLater);
+    /// println!("oneMonthLater: start.AddDate(0, 1, 0) = {}", oneMonthLater);
+    /// println!("oneYearLater: start.AddDate(1, 0, 0) = {}", oneYearLater);
+    /// ```
     pub fn AddDate(&self, years: int, months: int, days: int) -> Time {
         let (year, month, day) = self.Date();
         let (hour, min, sec) = self.Clock();
@@ -1177,12 +1208,12 @@ pub fn Date(
 
     d += uint64!(day - 1);
 
-    let mut abs = d * uint64!(secondsPerDay);
+    let mut abs: uint64 = d * uint64!(secondsPerDay);
     abs += uint64!(hour) * uint64!(secondsPerHour)
         + uint64!(min) * uint64!(secondsPerMinute)
         + uint64!(sec);
 
-    let mut unix = int64!(abs) + (absoluteToInternal + internalToUnix);
+    let mut unix: int64 = int64!(abs - uint64!((absoluteToInternal + internalToUnix).abs()));
     let l = loc.unwrap();
     let (_, offset, start, end, _) = l.lookup(unix);
     if offset != 0 {
@@ -2462,6 +2493,7 @@ fn absDate(abs: uint64, full: bool) -> (int, Month, int, int) {
     }
 
     let mut m = uint!(day / 31);
+    println!("m:{}",m);
     let end = int!(daysBefore[m + 1]);
     let begin: int;
     if day >= end {
