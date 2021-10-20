@@ -2438,11 +2438,11 @@ fn unixTime(sec: int64, nsec: int32) -> Time {
 
 fn absDate(abs: uint64, full: bool) -> (int, Month, int, int) {
     let mut year: int = 0;
-    let mut month = Month::January;
+    let mut month = Month::Default;
     let mut day: int = 0;
     let mut yday: int = 0;
     // Split into time and day.
-    let mut d = abs as int64 / secondsPerDay;
+    let mut d = int64!(abs / uint64!(secondsPerDay.abs())); // rust需要人工提升到最高精度计算。go这里会自动转换成uint64最高精度记录
 
     // Account for 400 year cycles.
     let mut n = d / daysPer400Years;
@@ -2493,7 +2493,6 @@ fn absDate(abs: uint64, full: bool) -> (int, Month, int, int) {
     }
 
     let mut m = uint!(day / 31);
-    println!("m:{}",m);
     let end = int!(daysBefore[m + 1]);
     let begin: int;
     if day >= end {
