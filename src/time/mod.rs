@@ -924,6 +924,32 @@ impl Time {
         int!(self.nsec())
     }
 
+    /// Round returns the result of rounding t to the nearest multiple of d (since the zero time).
+    /// The rounding behavior for halfway values is to round up.
+    /// If d <= 0, Round returns self stripped of any monotonic clock reading but otherwise unchanged.
+    ///
+    /// Round operates on the time as an absolute duration since the
+    /// zero time; it does not operate on the presentation form of the
+    /// time. Thus, Round(Hour) may return a time with a non-zero
+    /// minute, depending on the time's Location.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 返回距离self最近的时间点，该时间点应该满足从Time零值到该时间点的时间段能整除d；如果有两个满足要求的时间点，距离self相同，会向上舍入；如果d <= 0，会返回self的拷贝。
+    /// </details>
+    pub fn Round(&self, d: Duration) -> Time {
+        let mut t = self.to_owned();
+        t.stripMono();
+        let d1 = d.0;
+        if d1 <= 0 {
+            return t;
+        }
+        let (_, r) = div(t.to_owned(), d);
+        if lessThanHalf(r.0, d1) {
+            return t.Add(&Duration::new(-(r.0)));
+        }
+        return t.Add(&Duration::new(d1 - r.0));
+    }
+
     /// YearDay returns the day of the year specified by t, in the range `[1, 365]` for non-leap years, and `[1, 366]` in leap years.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
