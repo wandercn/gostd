@@ -777,6 +777,19 @@ impl Time {
     /// <summary class="docblock">zh-cn</summary>
     /// 返回时间点self对应的年、月、日。
     /// </details>
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use gostd::time;
+    ///
+    ///     let d = time::Date(2000, 2, 1, 12, 30, 0, 0, time::UTC.clone());
+    ///     let (year, month, day) = d.Date();
+    ///     assert_eq!((2000, time::Month::February, 1), d.Date());
+    ///     println!("year = {}", year);
+    ///     println!("month = {}", month);
+    ///     println!("day = {}", day);
+    /// ```
     pub fn Date(&self) -> (int, Month, int) {
         let (year, month, day, _) = self.date(true);
         (year, month, day)
