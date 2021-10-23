@@ -615,6 +615,34 @@ impl Time {
     /// <summary class="docblock">zh-cn</summary>
     /// 判断两个时间是否相同，会考虑时区的影响，因此不同时区标准的时间也可以正确比较。本方法和用t==u不同，这种方法还会比较地点和时区信息。
     /// </details>
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use gostd::builtin::*;
+    /// use gostd::time;
+    ///
+    ///    let secondsEastOfUTC = int!(time::Duration::new(8 * time::Hour).Seconds());
+    ///    let beijing = time::FixedZone("Beijing Time", secondsEastOfUTC);///
+    ///
+    ///    // Unlike the equal operator, Equal is aware that d1 and d2 are the
+    ///    // same instant but in different time zones.
+    ///    let d1 = time::Date(2000, 2, 1, 12, 30, 0, 0, time::UTC.clone());
+    ///    let d2 = time::Date(2000, 2, 1, 20, 30, 0, 0, beijing);///
+    ///
+    ///    let datesEqualUsingEqualOperator = d1 == d2;
+    ///    let datesEqualUsingFunction = d1.Equal(&d2);
+    ///
+    ///    assert_eq!(false,datesEqualUsingEqualOperator);
+    ///    assert_eq!(true,datesEqualUsingFunction);
+    ///
+    ///    println!("datesEqualUsingEqualOperator = {}",datesEqualUsingEqualOperator);
+    ///    println!("datesEqualUsingFunction = {}", datesEqualUsingFunction);
+    ///
+    /// // output:
+    /// // datesEqualUsingEqualOperator = false
+    /// // datesEqualUsingFunction = true
+    /// ```
     pub fn Equal(&self, u: &Time) -> bool {
         if self.wall & u.wall & uint64!(hasMonotonic) != 0 {
             return self.ext == u.ext;
@@ -789,6 +817,10 @@ impl Time {
     ///     println!("year = {}", year);
     ///     println!("month = {}", month);
     ///     println!("day = {}", day);
+    /// // output:
+    /// // year = 2000
+    /// // month = February
+    /// // day = 1
     /// ```
     pub fn Date(&self) -> (int, Month, int) {
         let (year, month, day, _) = self.date(true);
@@ -845,8 +877,11 @@ impl Time {
     /// ```rust
     /// use gostd::time;
     /// let t = time::Date(2009, 11, 1, 1, 1, 1, 1, time::UTC.clone());
-    ///
-    /// assert_eq!(1,t.Day());
+    /// let day = t.Day();
+    /// assert_eq!(1,day);
+    /// println!("day = {}",day);
+    /// // output:
+    /// // day = 1
     /// ```
     pub fn Day(&self) -> int {
         let (_, _, day, _) = self.date(true);
@@ -3138,6 +3173,8 @@ impl Time {
     ///     text = t.AppendFormat(text, time::Kitchen);
     ///     assert_eq!("Time: 11:00AM", string(&text));
     ///     println!("{}", string(&text))
+    /// // output:
+    /// // Time: 11:00AM
     ///
     /// ```
     pub fn AppendFormat(&self, b: Vec<byte>, layout: &str) -> Vec<byte> {
