@@ -165,6 +165,7 @@ impl Duration {
     /// <summary class="docblock">zh-cn</summary>
     /// Nanoseconds以整数纳秒计数的形式返回持续时间。
     /// </details>
+    ///
     /// # Example
     /// ```rust
     /// use gostd::time;
@@ -173,7 +174,6 @@ impl Duration {
     /// assert_eq!(u.Nanoseconds(),1000);
     /// println!("One microsecond is {} nanoseconds.", u.Nanoseconds())
     /// ```
-    ///
     pub fn Nanoseconds(&self) -> int64 {
         self.0
     }
@@ -3114,6 +3114,19 @@ impl Time {
     /// <summary class="docblock">zh-cn</summary>
     /// AppendFormat与Format类似，但将文本表示法追加到b，并返回扩展的缓冲区。
     /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::builtin::*;
+    /// use gostd::time;
+    ///
+    ///     let t = time::Date(2017, 11, 4, 11, 0, 0, 0, time::UTC.clone());
+    ///     let mut text: Vec<byte> = "Time: ".as_bytes().to_vec();
+    ///     text = t.AppendFormat(text, time::Kitchen);
+    ///     assert_eq!("Time: 11:00AM", string(&text));
+    ///     println!("{}", string(&text))
+    ///
+    /// ```
     pub fn AppendFormat(&self, b: Vec<byte>, layout: &str) -> Vec<byte> {
         let (mut name, mut offset, mut abs) = self.locabs();
         let mut year: int = -1;
