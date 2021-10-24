@@ -64,7 +64,7 @@ pub const Hour: int64 = 60 * Minute;
 /// <summary class="docblock">zh-cn</summary>
 /// Duration类型代表两个时间点之间经过的时间，以纳秒为单位。可表示的最长时间段大约290年。
 /// </details>
-#[derive(PartialEq, PartialOrd, Debug, Fmt)]
+#[derive(PartialEq, PartialOrd, Debug, Copy, Clone, Fmt)]
 pub struct Duration(int64); // 由于类型别名不能绑定方法通过元组类型结构体实现,访问元组内容用d.0数字下标访问，go源码是 type Duration int64
 
 const minDuration: int64 = int64!(-1) << 63;
@@ -698,7 +698,7 @@ impl Time {
         } else {
             name = "UTC".to_string();
         }
-        let abs = uint64!(sec) + uint64!(unixToInternal + internalToAbsolute);
+        let abs = uint64!(sec + int64!(unixToInternal + internalToAbsolute));
         (name, offset, abs)
     }
 
@@ -1263,7 +1263,7 @@ pub fn Date(
         panic!("time: missing Location in call to Date")
     }
 
-    let mut m = month - 1;
+    let mut m: int = int!(month) - 1;
     let (year, m) = norm(year, int!(m), 12);
     let month = Month::IndexOf(uint!(m + 1));
 
@@ -1280,14 +1280,19 @@ pub fn Date(
         d += 1;
     }
 
-    d += uint64!(day - 1);
+    d += uint64!((day - 1).abs());
 
     let mut abs: uint64 = d * uint64!(secondsPerDay);
     abs += uint64!(hour) * uint64!(secondsPerHour)
         + uint64!(min) * uint64!(secondsPerMinute)
         + uint64!(sec);
 
-    let mut unix: int64 = int64!(abs - uint64!((absoluteToInternal + internalToUnix).abs()));
+    let mut unix: int64 = 0;
+    if uint64!((absoluteToInternal + internalToUnix).abs()) > abs {
+        unix = -int64!(uint64!((absoluteToInternal + internalToUnix).abs()) - abs)
+    } else {
+        unix = int64!(abs - uint64!((absoluteToInternal + internalToUnix).abs()));
+    }
     let l = loc.unwrap();
     let (_, offset, start, end, _) = l.lookup(unix);
     if offset != 0 {
@@ -3067,14 +3072,12 @@ fn div(t: Time, d: Duration) -> (int, Duration) {
     if d.0 < Second && Second % (d.0 + d.0) == 0 {
         qmod2 = int!(nsec / (int32!(d.0))) & 1;
         r = Duration::new(int64!(nsec % int32!(d.0)));
-        return (qmod2, r);
     } else if d.0 % Second == 0 {
         let d1 = int64!(d.0 / Second);
         qmod2 = int!((sec / d1) & 1);
         r = Duration::new((sec % d1) * Second + int64!(nsec));
-        return (qmod2, r);
     } else {
-        let sec = uint64!(sec);
+        let sec = uint64!(sec.abs());
         let mut tmp = (sec >> 32) * 1000_0000_000;
         let mut u1 = tmp >> 32;
         let u0 = tmp << 32;
@@ -3088,12 +3091,12 @@ fn div(t: Time, d: Duration) -> (int, Duration) {
         }
 
         u0x = u0;
-        u0 = uint64!(nsec);
+        u0 = uint64!(nsec.abs());
         if u0 < u0x {
             u1 += 1;
         }
 
-        let mut d1 = uint64!(d.0);
+        let mut d1 = uint64!(d.0.abs());
         while ((d1 >> 63) != 1) {
             d1 <<= 1
         }
@@ -3119,7 +3122,6 @@ fn div(t: Time, d: Duration) -> (int, Duration) {
         }
 
         r = Duration::new(int64!(u0));
-        return (qmod2, r);
     }
 
     if neg && r.0 != 0 {
