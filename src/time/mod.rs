@@ -936,6 +936,54 @@ impl Time {
     /// <summary class="docblock">zh-cn</summary>
     /// 返回距离self最近的时间点，该时间点应该满足从Time零值到该时间点的时间段能整除d；如果有两个满足要求的时间点，距离self相同，会向上舍入；如果d <= 0，会返回self的拷贝。
     /// </details>
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use gostd::builtin::*;
+    /// use gostd::time;
+    ///
+    ///    let t = time::Date(0, 0, 0, 12, 15, 30, 918273645, time::UTC.clone());///
+    ///    let round: Vec<int64> = vec![
+    ///        time::Nanosecond,
+    ///        time::Microsecond,
+    ///        time::Millisecond,
+    ///        time::Second,
+    ///        2 * time::Second,
+    ///        time::Minute,
+    ///        10 * time::Minute,
+    ///        time::Hour,
+    ///    ];
+    ///   
+    ///    for i in round {
+    ///        let d = time::Duration::new(i);
+    ///        println!(
+    ///            "t.Round({}) = {}",
+    ///            d,
+    ///            t.Round(d).Format("15:04:05.999999999")
+    ///        )
+    ///    }
+    /// ```
+    ///
+    /// ## Output:
+    ///
+    ///```text
+    ///     t.Round(1ns) = 12:15:30.918273645
+    ///
+    ///     t.Round(1µs) = 12:15:30.918274
+    ///
+    ///     t.Round(1ms) = 12:15:30.918
+    ///
+    ///     t.Round(1s) = 12:15:31
+    ///
+    ///     t.Round(2s) = 12:15:30
+    ///
+    ///     t.Round(1m0s) = 12:16:00
+    ///
+    ///     t.Round(10m0s) = 12:20:00
+    ///
+    ///     t.Round(1h0m0s) = 12:00:00
+    ///```
     pub fn Round(&self, d: Duration) -> Time {
         let mut t = self.to_owned();
         t.stripMono();
