@@ -698,7 +698,12 @@ impl Time {
         } else {
             name = "UTC".to_string();
         }
-        let abs = uint64!(sec + int64!(unixToInternal + internalToAbsolute));
+        let mut abs: uint64 = 0;
+        if sec < 0 {
+            abs = uint64!(unixToInternal + internalToAbsolute) - uint64!(sec.abs());
+        } else {
+            abs = uint64!(sec) + uint64!(unixToInternal + internalToAbsolute);
+        }
         (name, offset, abs)
     }
 
