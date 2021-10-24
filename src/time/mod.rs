@@ -415,10 +415,13 @@ impl Time {
     /// println!("default: {}", t);
     /// println!("RFC822: {}", t.Format(time::RFC822));
     /// println!("RFC1123: {}", t.Format(time::RFC1123));
-    /// // output:
-    /// // default: 2009-11-10 14:30:12.000000013 +0000 UTC
-    /// // RFC822: 11/10 02:30:12PM '09 +0000
-    /// // RFC1123: Tue, 10 Nov 2009 14:30:12 UTC
+    /// ```
+    /// ## Output:
+    ///
+    /// ```text
+    /// default: 2009-11-10 14:30:12.000000013 +0000 UTC
+    /// RFC822: 11/10 02:30:12PM '09 +0000
+    /// RFC1123: Tue, 10 Nov 2009 14:30:12 UTC
     /// ```
     pub fn Format(&self, layout: &str) -> string {
         const bufSize: uint = 64;
@@ -638,10 +641,12 @@ impl Time {
     ///
     ///    println!("datesEqualUsingEqualOperator = {}",datesEqualUsingEqualOperator);
     ///    println!("datesEqualUsingFunction = {}", datesEqualUsingFunction);
+    /// ```
+    /// ## Output:
     ///
-    /// // output:
-    /// // datesEqualUsingEqualOperator = false
-    /// // datesEqualUsingFunction = true
+    /// ```text
+    ///  datesEqualUsingEqualOperator = false
+    ///  datesEqualUsingFunction = true
     /// ```
     pub fn Equal(&self, u: &Time) -> bool {
         if self.wall & u.wall & uint64!(hasMonotonic) != 0 {
@@ -822,10 +827,13 @@ impl Time {
     ///     println!("year = {}", year);
     ///     println!("month = {}", month);
     ///     println!("day = {}", day);
-    /// // output:
-    /// // year = 2000
-    /// // month = February
-    /// // day = 1
+    /// ```
+    /// ## Output:
+    ///
+    /// ```text
+    ///  year = 2000
+    ///  month = February
+    ///  day = 1
     /// ```
     pub fn Date(&self) -> (int, Month, int) {
         let (year, month, day, _) = self.date(true);
@@ -885,8 +893,11 @@ impl Time {
     /// let day = t.Day();
     /// assert_eq!(1,day);
     /// println!("day = {}",day);
-    /// // output:
-    /// // day = 1
+    /// ```
+    /// ## Output:
+    ///
+    /// ```text
+    ///  day = 1
     /// ```
     pub fn Day(&self) -> int {
         let (_, _, day, _) = self.date(true);
@@ -1201,6 +1212,12 @@ impl Time {
     /// assert_eq!(1000000000000000000,t.UnixNano());
     ///
     /// ```
+    /// ## Output:
+    ///
+    /// ```text
+    /// 1000000000
+    /// 1000000000000000000
+    /// ```
     pub fn Unix(&self) -> int64 {
         self.unixSec()
     }
@@ -1351,6 +1368,7 @@ pub fn UnixMicro(usec: int64) -> Time {
 ///
 /// ```rust
 /// use gostd::time;
+///
 /// let d = time::Date(2009, 11, 10, 14, 30, 12, 13, time::UTC.clone());
 /// let (year, month, day) = d.Date();
 /// assert_eq!(year, 2009);
@@ -1362,11 +1380,15 @@ pub fn UnixMicro(usec: int64) -> Time {
 /// println!("day = {}",day);
 /// println!("{}",d);
 ///
-///  //  output:
-///  //  year = 2009
-///  //  month = November
-///  //  day = 10
-///  //  2009-11-10 14:30:12.000000013 +0000 UTC
+/// ```
+///
+/// ## Output:
+///
+/// ```text
+///    year = 2009
+///    month = November
+///    day = 10
+///    2009-11-10 14:30:12.000000013 +0000 UTC
 /// ```
 pub fn Date(
     year: int,
@@ -1447,7 +1469,7 @@ pub fn Date(
 /// </details>
 ///
 /// # Example:
-///```
+/// ```
 /// use gostd::time;
 ///
 /// let layout = "Jan 2, 2006 at 3:04pm (MST)";
@@ -1456,9 +1478,12 @@ pub fn Date(
 ///     .expect("Parse faile:");
 /// assert_eq!( t.String() ,"2013-02-03 19:54:00 +0000 PST".to_string());
 /// println!("{}", t);
-/// // output:
-/// // 2013-02-03 19:54:00 +0000 PST
-///```
+/// ```
+/// ## Output:
+///
+/// ```text
+/// 2013-02-03 19:54:00 +0000 PST
+/// ```
 pub fn Parse(layout: &str, value: &str) -> Result<Time, string> {
     parse(layout, value, UTC.clone(), Local.clone())
 }
@@ -2541,9 +2566,11 @@ const omega: int64 = int64!((uint64!(1) << 63) - 1); // math.MaxInt64
 /// t.In(cst_zone);
 /// assert_eq!(t.String(),"2009-11-10 22:30:12.000000013 +0800 CST".to_string());
 /// println!("CST: {}", t);
-/// // output:
-/// // UTC: 2009-11-10 14:30:12.000000013 +0000 UTC
-/// // CST: 2009-11-10 22:30:12.000000013 +0800 CST
+/// ```
+/// ## Output:
+/// ```text
+/// UTC: 2009-11-10 14:30:12.000000013 +0000 UTC
+/// CST: 2009-11-10 22:30:12.000000013 +0800 CST
 /// ```
 pub fn FixedZone(name: &str, offset: int) -> Location {
     let zo = vec![zone {
@@ -2985,12 +3012,16 @@ fn unitToInt64(unit: &str) -> Option<int64> {
 ///	println!("There are {} seconds in {}.", complex.Seconds(), complex);
 ///	println!("There are {} nanoseconds in {}.", micro.Nanoseconds(), micro);
 ///	println!("There are {} seconds in {}.", micro2.Seconds(), micro2);
-///	// output:
-///	// 10h0m0s
-/// // 1h10m10s
-/// // There are 4210 seconds in 1h10m10s.
-/// // There are 1000 nanoseconds in 1µs.
-/// // There are 0.000001 seconds in 1µs.
+///	```
+///	## Output:
+///
+///	```text
+///
+///	 10h0m0s
+///  1h10m10s
+///  There are 4210 seconds in 1h10m10s.
+///  There are 1000 nanoseconds in 1µs.
+///  There are 0.000001 seconds in 1µs.
 /// ```
 pub fn ParseDuration(s: &str) -> Result<Duration, &str> {
     // [-+]?([0-9]*(\.[0-9]*)?[a-z]+)+
@@ -3321,8 +3352,11 @@ impl Time {
     ///     text = t.AppendFormat(text, time::Kitchen);
     ///     assert_eq!("Time: 11:00AM", string(&text));
     ///     println!("{}", string(&text))
-    /// // output:
-    /// // Time: 11:00AM
+    /// ```
+    /// ## Output:
+    ///
+    /// ```text
+    ///  Time: 11:00AM
     ///
     /// ```
     pub fn AppendFormat(&self, b: Vec<byte>, layout: &str) -> Vec<byte> {
