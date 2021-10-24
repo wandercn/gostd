@@ -1333,7 +1333,7 @@ pub fn Date(
         d += 1;
     }
 
-    d += uint64!((day - 1).abs());
+    d = uint64!((int64!(d) + int64!(day) - 1).abs());
 
     let mut abs: uint64 = d * uint64!(secondsPerDay);
     abs += uint64!(hour) * uint64!(secondsPerHour)
