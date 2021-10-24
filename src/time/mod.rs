@@ -929,6 +929,73 @@ impl Time {
         int!(self.nsec())
     }
 
+    /// Truncate returns the result of rounding t down to a multiple of d (since the zero time).
+    /// If d <= 0, Truncate returns t stripped of any monotonic clock reading but otherwise unchanged.
+    ///
+    /// Truncate operates on the time as an absolute duration since the
+    /// zero time; it does not operate on the presentation form of the
+    /// time. Thus, Truncate(Hour) may return a time with a non-zero
+    /// minute, depending on the time's Location.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Truncate返回将t四舍五入到d的倍数的结果（从零开始）。如果d<=0，Truncate返回t，去除任何单调时钟读数，但在其他方面保持不变。
+    ///
+    /// Truncate将时间作为自零时间起的绝对持续时间进行操作；它在当时的表现形式上不起作用。因此，Truncate（Hour）可能返回非零分钟的时间，具体取决于时间的位置。
+    /// </details>
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use gostd::builtin::*;
+    /// use gostd::time;
+    ///
+    /// let t = time::Parse("2006 Jan 02 15:04:05", "2012 Dec 07 12:15:30.918273645")
+    ///     .ok()
+    ///     .expect("Parse failed");
+    ///
+    /// let round: Vec<int64> = vec![
+    ///     time::Nanosecond,
+    ///     time::Microsecond,
+    ///     time::Millisecond,
+    ///     time::Second,
+    ///     2 * time::Second,
+    ///     time::Minute,
+    ///     10 * time::Minute,
+    ///     time::Hour,
+    /// ];
+    ///
+    ///  for i in round {
+    ///     let d = time::Duration::new(i);
+    ///     println!(
+    ///         "t.Truncate({}) = {}",
+    ///         d,
+    ///         t.Truncate(d).Format("15:04:05.999999999")
+    ///     )
+    /// }
+    ///
+    /// ```
+    /// ## Output:
+    ///
+    /// ```text
+    /// t.Truncate(1ns) = 12:15:30.918273645
+    /// t.Truncate(1µs) = 12:15:30.918273
+    /// t.Truncate(1ms) = 12:15:30.918
+    /// t.Truncate(1s) = 12:15:30
+    /// t.Truncate(2s) = 12:15:30
+    /// t.Truncate(1m0s) = 12:15:00
+    /// t.Truncate(10m0s) = 12:10:00
+    /// t.Truncate(1h0m0s) = 12:00:00
+    /// ```
+    pub fn Truncate(&self, d: Duration) -> Time {
+        let mut t = self.to_owned();
+        t.stripMono();
+        if d.0 <= 0 {
+            return t;
+        }
+        let (_, r) = div(t.to_owned(), d);
+        t.Add(&Duration::new(-r.0))
+    }
+
     /// Round returns the result of rounding t to the nearest multiple of d (since the zero time).
     /// The rounding behavior for halfway values is to round up.
     /// If d <= 0, Round returns self stripped of any monotonic clock reading but otherwise unchanged.
