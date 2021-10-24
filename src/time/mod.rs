@@ -64,7 +64,7 @@ pub const Hour: int64 = 60 * Minute;
 /// <summary class="docblock">zh-cn</summary>
 /// Duration类型代表两个时间点之间经过的时间，以纳秒为单位。可表示的最长时间段大约290年。
 /// </details>
-#[derive(PartialEq, PartialOrd, Debug, Fmt)]
+#[derive(PartialEq, PartialOrd, Debug, Copy, Clone, Fmt)]
 pub struct Duration(int64); // 由于类型别名不能绑定方法通过元组类型结构体实现,访问元组内容用d.0数字下标访问，go源码是 type Duration int64
 
 const minDuration: int64 = int64!(-1) << 63;
@@ -165,6 +165,7 @@ impl Duration {
     /// <summary class="docblock">zh-cn</summary>
     /// Nanoseconds以整数纳秒计数的形式返回持续时间。
     /// </details>
+    ///
     /// # Example
     /// ```rust
     /// use gostd::time;
@@ -173,7 +174,6 @@ impl Duration {
     /// assert_eq!(u.Nanoseconds(),1000);
     /// println!("One microsecond is {} nanoseconds.", u.Nanoseconds())
     /// ```
-    ///
     pub fn Nanoseconds(&self) -> int64 {
         self.0
     }
@@ -415,10 +415,13 @@ impl Time {
     /// println!("default: {}", t);
     /// println!("RFC822: {}", t.Format(time::RFC822));
     /// println!("RFC1123: {}", t.Format(time::RFC1123));
-    /// // output:
-    /// // default: 2009-11-10 14:30:12.000000013 +0000 UTC
-    /// // RFC822: 11/10 02:30:12PM '09 +0000
-    /// // RFC1123: Tue, 10 Nov 2009 14:30:12 UTC
+    /// ```
+    /// ## Output:
+    ///
+    /// ```text
+    /// default: 2009-11-10 14:30:12.000000013 +0000 UTC
+    /// RFC822: 11/10 02:30:12PM '09 +0000
+    /// RFC1123: Tue, 10 Nov 2009 14:30:12 UTC
     /// ```
     pub fn Format(&self, layout: &str) -> string {
         const bufSize: uint = 64;
@@ -615,6 +618,36 @@ impl Time {
     /// <summary class="docblock">zh-cn</summary>
     /// 判断两个时间是否相同，会考虑时区的影响，因此不同时区标准的时间也可以正确比较。本方法和用t==u不同，这种方法还会比较地点和时区信息。
     /// </details>
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use gostd::builtin::*;
+    /// use gostd::time;
+    ///
+    ///    let secondsEastOfUTC = int!(time::Duration::new(8 * time::Hour).Seconds());
+    ///    let beijing = time::FixedZone("Beijing Time", secondsEastOfUTC);///
+    ///
+    ///    // Unlike the equal operator, Equal is aware that d1 and d2 are the
+    ///    // same instant but in different time zones.
+    ///    let d1 = time::Date(2000, 2, 1, 12, 30, 0, 0, time::UTC.clone());
+    ///    let d2 = time::Date(2000, 2, 1, 20, 30, 0, 0, beijing);///
+    ///
+    ///    let datesEqualUsingEqualOperator = d1 == d2;
+    ///    let datesEqualUsingFunction = d1.Equal(&d2);
+    ///
+    ///    assert_eq!(false,datesEqualUsingEqualOperator);
+    ///    assert_eq!(true,datesEqualUsingFunction);
+    ///
+    ///    println!("datesEqualUsingEqualOperator = {}",datesEqualUsingEqualOperator);
+    ///    println!("datesEqualUsingFunction = {}", datesEqualUsingFunction);
+    /// ```
+    /// ## Output:
+    ///
+    /// ```text
+    ///  datesEqualUsingEqualOperator = false
+    ///  datesEqualUsingFunction = true
+    /// ```
     pub fn Equal(&self, u: &Time) -> bool {
         if self.wall & u.wall & uint64!(hasMonotonic) != 0 {
             return self.ext == u.ext;
@@ -670,7 +703,12 @@ impl Time {
         } else {
             name = "UTC".to_string();
         }
-        let abs = uint64!(sec) + uint64!(unixToInternal + internalToAbsolute);
+        let mut abs: uint64 = 0;
+        if sec < 0 {
+            abs = uint64!(unixToInternal + internalToAbsolute) - uint64!(sec.abs());
+        } else {
+            abs = uint64!(sec) + uint64!(unixToInternal + internalToAbsolute);
+        }
         (name, offset, abs)
     }
 
@@ -777,6 +815,26 @@ impl Time {
     /// <summary class="docblock">zh-cn</summary>
     /// 返回时间点self对应的年、月、日。
     /// </details>
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use gostd::time;
+    ///
+    ///     let d = time::Date(2000, 2, 1, 12, 30, 0, 0, time::UTC.clone());
+    ///     let (year, month, day) = d.Date();
+    ///     assert_eq!((2000, time::Month::February, 1), d.Date());
+    ///     println!("year = {}", year);
+    ///     println!("month = {}", month);
+    ///     println!("day = {}", day);
+    /// ```
+    /// ## Output:
+    ///
+    /// ```text
+    ///  year = 2000
+    ///  month = February
+    ///  day = 1
+    /// ```
     pub fn Date(&self) -> (int, Month, int) {
         let (year, month, day, _) = self.date(true);
         (year, month, day)
@@ -832,8 +890,14 @@ impl Time {
     /// ```rust
     /// use gostd::time;
     /// let t = time::Date(2009, 11, 1, 1, 1, 1, 1, time::UTC.clone());
+    /// let day = t.Day();
+    /// assert_eq!(1,day);
+    /// println!("day = {}",day);
+    /// ```
+    /// ## Output:
     ///
-    /// assert_eq!(1,t.Day());
+    /// ```text
+    ///  day = 1
     /// ```
     pub fn Day(&self) -> int {
         let (_, _, day, _) = self.date(true);
@@ -874,6 +938,147 @@ impl Time {
     /// </details>
     pub fn Nanosecond(&self) -> int {
         int!(self.nsec())
+    }
+
+    /// Truncate returns the result of rounding t down to a multiple of d (since the zero time).
+    /// If d <= 0, Truncate returns t stripped of any monotonic clock reading but otherwise unchanged.
+    ///
+    /// Truncate operates on the time as an absolute duration since the
+    /// zero time; it does not operate on the presentation form of the
+    /// time. Thus, Truncate(Hour) may return a time with a non-zero
+    /// minute, depending on the time's Location.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Truncate返回将t四舍五入到d的倍数的结果（从零开始）。如果d<=0，Truncate返回t，去除任何单调时钟读数，但在其他方面保持不变。
+    ///
+    /// Truncate将时间作为自零时间起的绝对持续时间进行操作；它在当时的表现形式上不起作用。因此，Truncate（Hour）可能返回非零分钟的时间，具体取决于时间的位置。
+    /// </details>
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use gostd::builtin::*;
+    /// use gostd::time;
+    ///
+    /// let t = time::Parse("2006 Jan 02 15:04:05", "2012 Dec 07 12:15:30.918273645")
+    ///     .ok()
+    ///     .expect("Parse failed");
+    ///
+    /// let round: Vec<int64> = vec![
+    ///     time::Nanosecond,
+    ///     time::Microsecond,
+    ///     time::Millisecond,
+    ///     time::Second,
+    ///     2 * time::Second,
+    ///     time::Minute,
+    ///     10 * time::Minute,
+    ///     time::Hour,
+    /// ];
+    ///
+    ///  for i in round {
+    ///     let d = time::Duration::new(i);
+    ///     println!(
+    ///         "t.Truncate({}) = {}",
+    ///         d,
+    ///         t.Truncate(d).Format("15:04:05.999999999")
+    ///     )
+    /// }
+    ///
+    /// ```
+    /// ## Output:
+    ///
+    /// ```text
+    /// t.Truncate(1ns) = 12:15:30.918273645
+    /// t.Truncate(1µs) = 12:15:30.918273
+    /// t.Truncate(1ms) = 12:15:30.918
+    /// t.Truncate(1s) = 12:15:30
+    /// t.Truncate(2s) = 12:15:30
+    /// t.Truncate(1m0s) = 12:15:00
+    /// t.Truncate(10m0s) = 12:10:00
+    /// t.Truncate(1h0m0s) = 12:00:00
+    /// ```
+    pub fn Truncate(&self, d: Duration) -> Time {
+        let mut t = self.to_owned();
+        t.stripMono();
+        if d.0 <= 0 {
+            return t;
+        }
+        let (_, r) = div(t.to_owned(), d);
+        t.Add(&Duration::new(-r.0))
+    }
+
+    /// Round returns the result of rounding t to the nearest multiple of d (since the zero time).
+    /// The rounding behavior for halfway values is to round up.
+    /// If d <= 0, Round returns self stripped of any monotonic clock reading but otherwise unchanged.
+    ///
+    /// Round operates on the time as an absolute duration since the
+    /// zero time; it does not operate on the presentation form of the
+    /// time. Thus, Round(Hour) may return a time with a non-zero
+    /// minute, depending on the time's Location.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 返回距离self最近的时间点，该时间点应该满足从Time零值到该时间点的时间段能整除d；如果有两个满足要求的时间点，距离self相同，会向上舍入；如果d <= 0，会返回self的拷贝。
+    /// </details>
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use gostd::builtin::*;
+    /// use gostd::time;
+    ///
+    ///    let t = time::Date(0, 0, 0, 12, 15, 30, 918273645, time::UTC.clone());///
+    ///    let round: Vec<int64> = vec![
+    ///        time::Nanosecond,
+    ///        time::Microsecond,
+    ///        time::Millisecond,
+    ///        time::Second,
+    ///        2 * time::Second,
+    ///        time::Minute,
+    ///        10 * time::Minute,
+    ///        time::Hour,
+    ///    ];
+    ///   
+    ///    for i in round {
+    ///        let d = time::Duration::new(i);
+    ///        println!(
+    ///            "t.Round({}) = {}",
+    ///            d,
+    ///            t.Round(d).Format("15:04:05.999999999")
+    ///        )
+    ///    }
+    /// ```
+    ///
+    /// ## Output:
+    ///
+    ///```text
+    ///     t.Round(1ns) = 12:15:30.918273645
+    ///
+    ///     t.Round(1µs) = 12:15:30.918274
+    ///
+    ///     t.Round(1ms) = 12:15:30.918
+    ///
+    ///     t.Round(1s) = 12:15:31
+    ///
+    ///     t.Round(2s) = 12:15:30
+    ///
+    ///     t.Round(1m0s) = 12:16:00
+    ///
+    ///     t.Round(10m0s) = 12:20:00
+    ///
+    ///     t.Round(1h0m0s) = 12:00:00
+    ///```
+    pub fn Round(&self, d: Duration) -> Time {
+        let mut t = self.to_owned();
+        t.stripMono();
+        let d1 = d.0;
+        if d1 <= 0 {
+            return t;
+        }
+        let (_, r) = div(t.to_owned(), d);
+        if lessThanHalf(r.0, d1) {
+            return t.Add(&Duration::new(-(r.0)));
+        }
+        return t.Add(&Duration::new(d1 - r.0));
     }
 
     /// YearDay returns the day of the year specified by t, in the range `[1, 365]` for non-leap years, and `[1, 366]` in leap years.
@@ -1006,6 +1211,12 @@ impl Time {
     /// assert_eq!(1000000000,t.Unix());
     /// assert_eq!(1000000000000000000,t.UnixNano());
     ///
+    /// ```
+    /// ## Output:
+    ///
+    /// ```text
+    /// 1000000000
+    /// 1000000000000000000
     /// ```
     pub fn Unix(&self) -> int64 {
         self.unixSec()
@@ -1157,6 +1368,7 @@ pub fn UnixMicro(usec: int64) -> Time {
 ///
 /// ```rust
 /// use gostd::time;
+///
 /// let d = time::Date(2009, 11, 10, 14, 30, 12, 13, time::UTC.clone());
 /// let (year, month, day) = d.Date();
 /// assert_eq!(year, 2009);
@@ -1168,11 +1380,15 @@ pub fn UnixMicro(usec: int64) -> Time {
 /// println!("day = {}",day);
 /// println!("{}",d);
 ///
-///  //  output:
-///  //  year = 2009
-///  //  month = November
-///  //  day = 10
-///  //  2009-11-10 14:30:12.000000013 +0000 UTC
+/// ```
+///
+/// ## Output:
+///
+/// ```text
+///    year = 2009
+///    month = November
+///    day = 10
+///    2009-11-10 14:30:12.000000013 +0000 UTC
 /// ```
 pub fn Date(
     year: int,
@@ -1189,7 +1405,7 @@ pub fn Date(
         panic!("time: missing Location in call to Date")
     }
 
-    let mut m = month - 1;
+    let mut m: int = int!(month) - 1;
     let (year, m) = norm(year, int!(m), 12);
     let month = Month::IndexOf(uint!(m + 1));
 
@@ -1206,14 +1422,19 @@ pub fn Date(
         d += 1;
     }
 
-    d += uint64!(day - 1);
+    d = uint64!((int64!(d) + int64!(day) - 1).abs());
 
     let mut abs: uint64 = d * uint64!(secondsPerDay);
     abs += uint64!(hour) * uint64!(secondsPerHour)
         + uint64!(min) * uint64!(secondsPerMinute)
         + uint64!(sec);
 
-    let mut unix: int64 = int64!(abs - uint64!((absoluteToInternal + internalToUnix).abs()));
+    let mut unix: int64 = 0;
+    if uint64!((absoluteToInternal + internalToUnix).abs()) > abs {
+        unix = -int64!(uint64!((absoluteToInternal + internalToUnix).abs()) - abs)
+    } else {
+        unix = int64!(abs - uint64!((absoluteToInternal + internalToUnix).abs()));
+    }
     let l = loc.unwrap();
     let (_, offset, start, end, _) = l.lookup(unix);
     if offset != 0 {
@@ -1248,7 +1469,7 @@ pub fn Date(
 /// </details>
 ///
 /// # Example:
-///```
+/// ```
 /// use gostd::time;
 ///
 /// let layout = "Jan 2, 2006 at 3:04pm (MST)";
@@ -1257,9 +1478,12 @@ pub fn Date(
 ///     .expect("Parse faile:");
 /// assert_eq!( t.String() ,"2013-02-03 19:54:00 +0000 PST".to_string());
 /// println!("{}", t);
-/// // output:
-/// // 2013-02-03 19:54:00 +0000 PST
-///```
+/// ```
+/// ## Output:
+///
+/// ```text
+/// 2013-02-03 19:54:00 +0000 PST
+/// ```
 pub fn Parse(layout: &str, value: &str) -> Result<Time, string> {
     parse(layout, value, UTC.clone(), Local.clone())
 }
@@ -2342,9 +2566,11 @@ const omega: int64 = int64!((uint64!(1) << 63) - 1); // math.MaxInt64
 /// t.In(cst_zone);
 /// assert_eq!(t.String(),"2009-11-10 22:30:12.000000013 +0800 CST".to_string());
 /// println!("CST: {}", t);
-/// // output:
-/// // UTC: 2009-11-10 14:30:12.000000013 +0000 UTC
-/// // CST: 2009-11-10 22:30:12.000000013 +0800 CST
+/// ```
+/// ## Output:
+/// ```text
+/// UTC: 2009-11-10 14:30:12.000000013 +0000 UTC
+/// CST: 2009-11-10 22:30:12.000000013 +0800 CST
 /// ```
 pub fn FixedZone(name: &str, offset: int) -> Location {
     let zo = vec![zone {
@@ -2786,12 +3012,16 @@ fn unitToInt64(unit: &str) -> Option<int64> {
 ///	println!("There are {} seconds in {}.", complex.Seconds(), complex);
 ///	println!("There are {} nanoseconds in {}.", micro.Nanoseconds(), micro);
 ///	println!("There are {} seconds in {}.", micro2.Seconds(), micro2);
-///	// output:
-///	// 10h0m0s
-/// // 1h10m10s
-/// // There are 4210 seconds in 1h10m10s.
-/// // There are 1000 nanoseconds in 1µs.
-/// // There are 0.000001 seconds in 1µs.
+///	```
+///	## Output:
+///
+///	```text
+///
+///	 10h0m0s
+///  1h10m10s
+///  There are 4210 seconds in 1h10m10s.
+///  There are 1000 nanoseconds in 1µs.
+///  There are 0.000001 seconds in 1µs.
 /// ```
 pub fn ParseDuration(s: &str) -> Result<Duration, &str> {
     // [-+]?([0-9]*(\.[0-9]*)?[a-z]+)+
@@ -2993,14 +3223,12 @@ fn div(t: Time, d: Duration) -> (int, Duration) {
     if d.0 < Second && Second % (d.0 + d.0) == 0 {
         qmod2 = int!(nsec / (int32!(d.0))) & 1;
         r = Duration::new(int64!(nsec % int32!(d.0)));
-        return (qmod2, r);
     } else if d.0 % Second == 0 {
         let d1 = int64!(d.0 / Second);
         qmod2 = int!((sec / d1) & 1);
         r = Duration::new((sec % d1) * Second + int64!(nsec));
-        return (qmod2, r);
     } else {
-        let sec = uint64!(sec);
+        let sec = uint64!(sec.abs());
         let mut tmp = (sec >> 32) * 1000_0000_000;
         let mut u1 = tmp >> 32;
         let u0 = tmp << 32;
@@ -3014,12 +3242,12 @@ fn div(t: Time, d: Duration) -> (int, Duration) {
         }
 
         u0x = u0;
-        u0 = uint64!(nsec);
+        u0 = uint64!(nsec.abs());
         if u0 < u0x {
             u1 += 1;
         }
 
-        let mut d1 = uint64!(d.0);
+        let mut d1 = uint64!(d.0.abs());
         while ((d1 >> 63) != 1) {
             d1 <<= 1
         }
@@ -3045,7 +3273,6 @@ fn div(t: Time, d: Duration) -> (int, Duration) {
         }
 
         r = Duration::new(int64!(u0));
-        return (qmod2, r);
     }
 
     if neg && r.0 != 0 {
@@ -3114,6 +3341,24 @@ impl Time {
     /// <summary class="docblock">zh-cn</summary>
     /// AppendFormat与Format类似，但将文本表示法追加到b，并返回扩展的缓冲区。
     /// </details>
+    ///
+    /// # Example
+    /// ```
+    /// use gostd::builtin::*;
+    /// use gostd::time;
+    ///
+    ///     let t = time::Date(2017, 11, 4, 11, 0, 0, 0, time::UTC.clone());
+    ///     let mut text: Vec<byte> = "Time: ".as_bytes().to_vec();
+    ///     text = t.AppendFormat(text, time::Kitchen);
+    ///     assert_eq!("Time: 11:00AM", string(&text));
+    ///     println!("{}", string(&text))
+    /// ```
+    /// ## Output:
+    ///
+    /// ```text
+    ///  Time: 11:00AM
+    ///
+    /// ```
     pub fn AppendFormat(&self, b: Vec<byte>, layout: &str) -> Vec<byte> {
         let (mut name, mut offset, mut abs) = self.locabs();
         let mut year: int = -1;
