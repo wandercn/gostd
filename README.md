@@ -140,5 +140,5 @@ use gostd::vendor
 - [x] time库支持macOSX 和linux平台，通过libc库调用C函数实现 time::Now()
 - [x] time，支持各种格式显示时间。
 - [x] docs.rs文档增加例子程序"RUN"按钮,但是要复制代码本地运行,在rust play运行不了(因为下载量没到前100)。
-- [ ] time，支持local时区自动从系统获取。
+- [ ] time，支持local时区自动从系统获取(暂时没实现，可以用gostd::time::FixedZone转换时区时间，默认可以用time::Now()获取UTC时间)。
 
