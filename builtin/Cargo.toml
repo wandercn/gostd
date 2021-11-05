@@ -1,0 +1,21 @@
+[package]
+name = "gostd_builtin"
+license = "MIT"
+version = "1.0.1"
+edition = "2018"
+authors = ["wandercn<wander@ffactory.org>"]
+description = "Package builtin binds the basic type in go through the type alias, and implements the basic type cast macro function.builtin 包通过类型别名绑定Go中的基础类型，并实现了基础类型强制转换宏函数。"
+homepage = "https://github.com/wandercn/gostd"
+repository = "https://github.com/wandercn/gostd"
+keywords = ["gobind","go-api","gostd","go-to-rust","go-standard-library"]
+categories= ["api-bindings","accessibility","development-tools","compilers"]
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3
+
+[dependencies]
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
