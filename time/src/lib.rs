@@ -1,3 +1,4 @@
+#![doc(html_playground_url = "https://play.rust-lang.org/")]
 //! Package time provides functionality for measuring and displaying time.
 //! The calendrical calculations always assume a Gregorian calendar, with no leap seconds.
 //!
@@ -11,8 +12,8 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
-#[macro_use]
-use crate::builtin::*;
+
+use gostd_builtin::*;
 use gostd_derive::Fmt;
 /// Time Format - Layout
 pub const Layout: &str = "01/02 03:04:05PM '06 -0700"; // The reference time, in numerical order.
@@ -87,7 +88,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use gostd::time;
+    /// use gostd_time as time;
     ///
     /// let t0 = time::Duration::new(1 * time::Hour + 2 * time::Minute + 300 * time::Millisecond);
     /// let t1 = time::Duration::new(300 * time::Millisecond);
@@ -168,7 +169,7 @@ impl Duration {
     ///
     /// # Example
     /// ```rust
-    /// use gostd::time;
+    /// use gostd_time as time;
     ///
     /// let u = time::ParseDuration("1µs").ok().unwrap();
     /// assert_eq!(u.Nanoseconds(),1000);
@@ -186,7 +187,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use gostd::time;
+    /// use gostd_time as time;
     ///
     /// let u = time::ParseDuration("1s").ok().unwrap();
     /// assert_eq!(u.Microseconds(),1000000);
@@ -204,7 +205,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use gostd::time;
+    /// use gostd_time as time;
     ///
     /// let u = time::ParseDuration("1s").ok().unwrap();
     /// assert_eq!(u.Milliseconds(),1000);
@@ -222,7 +223,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use gostd::time;
+    /// use gostd_time as time;
     ///
     /// let m = time::ParseDuration("1m30s").ok().unwrap();
     /// assert_eq!(m.Seconds(),90.0);
@@ -243,7 +244,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use gostd::time;
+    /// use gostd_time as time;
     ///
     /// let m = time::ParseDuration("1h30m").ok().unwrap();
     /// assert_eq!(m.Minutes(),90.0);
@@ -264,7 +265,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use gostd::time;
+    /// use gostd_time as time;
     ///
     /// let h = time::ParseDuration("4h30m").ok().unwrap();
     /// assert_eq!(h.Hours(),4.5);
@@ -406,7 +407,7 @@ impl Time {
     ///
     /// # Example
     /// ```
-    /// use gostd::time;
+    /// use gostd_time as time;
     ///
     /// let t = time::Date(2009, 11, 10, 14, 30, 12, 13, time::UTC.clone());
     /// assert_eq!(t.String(),"2009-11-10 14:30:12.000000013 +0000 UTC".to_string());
@@ -570,7 +571,7 @@ impl Time {
     /// # Example
     ///
     /// ```
-    /// use gostd::time;
+    /// use gostd_time as time;
     ///
     /// let year2000 = time::Date(2000, 1, 1, 0, 0, 0, 0, time::UTC.clone());
     ///	let year3000 = time::Date(3000, 1, 1, 0, 0, 0, 0, time::UTC.clone());
@@ -596,7 +597,7 @@ impl Time {
     /// # Example
     ///
     /// ```rust
-    /// use gostd::time;
+    /// use gostd_time as time;
     /// let first = time::Now();
     /// let second = time::Now();
     /// let is_befor = first.Before(&second);
@@ -622,8 +623,8 @@ impl Time {
     /// # Example
     ///
     /// ```
-    /// use gostd::builtin::*;
-    /// use gostd::time;
+    /// use gostd_builtin::*;
+    /// use gostd_time as time;
     ///
     ///    let secondsEastOfUTC = int!(time::Duration::new(8 * time::Hour).Seconds());
     ///    let beijing = time::FixedZone("Beijing Time", secondsEastOfUTC);///
@@ -725,8 +726,8 @@ impl Time {
     /// # Example
     ///
     /// ```rust
-    /// use gostd::time;
-    /// use gostd::time::Duration;
+    /// use gostd_time as time;
+    /// use time::Duration;
     ///
     /// let mut start = time::Date(2009, 1, 1, 12, 0, 0, 0, time::UTC.clone());
     ///
@@ -778,7 +779,7 @@ impl Time {
     /// # Example
     ///
     /// ```rust
-    /// use gostd::time;
+    /// use gostd_time as time;
     /// let loc = time::UTC.clone();
     /// let mut start = time::Date(2000, 1, 1, 0, 0, 0, 0, loc.clone());
     /// let end = time::Date(2000, 1, 1, 12, 0, 0, 0, loc.clone());
@@ -819,7 +820,7 @@ impl Time {
     /// # Example
     ///
     /// ```
-    /// use gostd::time;
+    /// use gostd_time as time;
     ///
     ///     let d = time::Date(2000, 2, 1, 12, 30, 0, 0, time::UTC.clone());
     ///     let (year, month, day) = d.Date();
@@ -859,7 +860,7 @@ impl Time {
     /// # Example
     ///
     /// ```rust
-    /// use gostd::time;
+    /// use gostd_time as time;
     /// let t = time::Date(2009, 11, 1, 1, 1, 1, 1, time::UTC.clone());
     ///
     /// assert_eq!(time::Month::November,t.Month());
@@ -888,7 +889,7 @@ impl Time {
     /// # Example
     ///
     /// ```rust
-    /// use gostd::time;
+    /// use gostd_time as time;
     /// let t = time::Date(2009, 11, 1, 1, 1, 1, 1, time::UTC.clone());
     /// let day = t.Day();
     /// assert_eq!(1,day);
@@ -957,8 +958,8 @@ impl Time {
     /// # Example
     ///
     /// ```rust
-    /// use gostd::builtin::*;
-    /// use gostd::time;
+    /// use gostd_builtin::*;
+    /// use gostd_time as time;
     ///
     /// let t = time::Parse("2006 Jan 02 15:04:05", "2012 Dec 07 12:15:30.918273645")
     ///     .ok()
@@ -1023,8 +1024,8 @@ impl Time {
     /// # Example
     ///
     /// ```
-    /// use gostd::builtin::*;
-    /// use gostd::time;
+    /// use gostd_builtin::*;
+    /// use gostd_time as time;
     ///
     ///    let t = time::Date(0, 0, 0, 12, 15, 30, 918273645, time::UTC.clone());///
     ///    let round: Vec<int64> = vec![
@@ -1100,7 +1101,7 @@ impl Time {
     /// # Example
     ///
     /// ```rust
-    /// use gostd::time;
+    /// use gostd_time as time;
     /// let t = time::Date(2009, 11, 1, 1, 1, 1, 1, time::UTC.clone());
     ///
     /// assert_eq!(time::Weekday::Sunday,t.Weekday());
@@ -1203,7 +1204,7 @@ impl Time {
     ///
     /// # Example
     /// ```
-    /// use gostd::time;
+    /// use gostd_time as time;
     ///
     /// let t = time::Date(2001, 9, 9, 1, 46, 40, 0, time::UTC.clone());
     /// println!("{}",t.Unix());     // seconds since 1970
@@ -1260,7 +1261,7 @@ impl Time {
     ///
     /// # Example
     /// ```
-    /// use gostd::time;
+    /// use gostd_time as time;
     ///
     /// let start = time::Date(2009, 1, 1, 0, 0, 0, 0, time::UTC.clone());
     /// let oneDayLater = start.AddDate(0, 0, 1);
@@ -1367,7 +1368,7 @@ pub fn UnixMicro(usec: int64) -> Time {
 /// # Example
 ///
 /// ```rust
-/// use gostd::time;
+/// use gostd_time as time;
 ///
 /// let d = time::Date(2009, 11, 10, 14, 30, 12, 13, time::UTC.clone());
 /// let (year, month, day) = d.Date();
@@ -1470,7 +1471,7 @@ pub fn Date(
 ///
 /// # Example:
 /// ```
-/// use gostd::time;
+/// use gostd_time as time;
 ///
 /// let layout = "Jan 2, 2006 at 3:04pm (MST)";
 /// let t = time::Parse(layout, "Feb 3, 2013 at 7:54pm (PST)")
@@ -2557,7 +2558,7 @@ const omega: int64 = int64!((uint64!(1) << 63) - 1); // math.MaxInt64
 /// # Example
 ///
 /// ```
-/// use gostd::time;
+/// use gostd_time as time;
 ///
 /// let mut t = time::Date(2009, 11, 10, 14, 30, 12, 13, time::UTC.clone());
 /// assert_eq!(t.String(),"2009-11-10 14:30:12.000000013 +0000 UTC".to_string());
@@ -2996,7 +2997,7 @@ fn unitToInt64(unit: &str) -> Option<int64> {
 ///
 /// # Example
 /// ```
-/// use gostd::time;
+/// use gostd_time as time;
 ///
 /// let hours = time::ParseDuration("10h").ok().unwrap();
 ///	let complex = time::ParseDuration("1h10m10s").ok().unwrap();
@@ -3344,8 +3345,8 @@ impl Time {
     ///
     /// # Example
     /// ```
-    /// use gostd::builtin::*;
-    /// use gostd::time;
+    /// use gostd_builtin::*;
+    /// use gostd_time as time;
     ///
     ///     let t = time::Date(2017, 11, 4, 11, 0, 0, 0, time::UTC.clone());
     ///     let mut text: Vec<byte> = "Time: ".as_bytes().to_vec();

@@ -1,0 +1,25 @@
+[package]
+name = "gostd_time"
+license = "MIT"
+version = "1.0.1"
+edition = "2018"
+authors = ["wandercn<wander@ffactory.org>"]
+description = "Package time provides functionality for measuring and displaying time.time包提供了时间的显示和测量用的函数。日历的计算采用的是公历。"
+homepage = "https://github.com/wandercn/gostd"
+repository = "https://github.com/wandercn/gostd"
+keywords = ["time","gostd_time","gostd","go-to-rust","go-standard-library"]
+categories= ["api-bindings","accessibility","development-tools","compilers"]
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+
+opt-level = 3
+[dependencies]
+gostd_builtin = "1.0"
+gostd_derive = "0.0.3"
+libc = "0.2"
+cvt = "0.1.1"
+lazy_static = "1.4.0"
+

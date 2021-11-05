@@ -1,8 +1,8 @@
 #![doc(html_playground_url = "https://play.rust-lang.org/")]
+extern crate gostd_builtin as builtin;
+extern crate gostd_time as time;
 pub mod archive;
 pub mod bufio;
-#[macro_use]
-pub mod builtin;
 extern crate lazy_static;
 pub mod bytes;
 pub mod cmd;
@@ -44,7 +44,6 @@ pub mod syscall;
 pub mod testdata;
 pub mod testing;
 pub mod text;
-pub mod time;
 pub mod unicode;
 #[cfg(test)]
 mod tests {

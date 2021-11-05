@@ -1,4 +1,4 @@
-use crate::builtin::*;
+use gostd_builtin::*;
 pub fn monotonic_now() -> uint64 {
     inner::monotonic_now()
 }

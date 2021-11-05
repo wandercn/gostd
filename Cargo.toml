@@ -10,12 +10,19 @@ repository = "https://github.com/wandercn/gostd"
 keywords = ["gobind","go-api","gostd","go-to-rust","go-standard-library"]
 categories= ["api-bindings","accessibility","development-tools","compilers"]
 
+[workspace]
+members = [
+ "builtin","time"
+]
 [profile.dev]
 opt-level = 0
 
 [profile.release]
+
 opt-level = 3
 [dependencies]
+gostd_builtin = { version = "=1.0.1", optional = false, path = "./builtin"}
+gostd_time = { version = "=1.0.1", optional = false, path = "./time"}
 gostd_derive = "0.0.3"
 libc = "0.2"
 cvt = "0.1.1"
