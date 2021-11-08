@@ -142,3 +142,8 @@ use gostd::vendor
 - [x] docs.rs文档增加例子程序"RUN"按钮,但是要复制代码本地运行,在rust play运行不了(因为下载量没到前100)。
 - [ ] time，支持local时区自动从系统获取(暂时没实现，可以用gostd::time::FixedZone转换时区时间，默认可以用time::Now()获取UTC时间)。
 
+# 独立发布包
+ 
+独立发布gostd_time，代码等价于 use gostd::time 。 
+
+独立发布gostd_builtin, 代码等价于 use gostd::builtin 。 

@@ -1,9 +1,10 @@
 #![doc(html_playground_url = "https://play.rust-lang.org/")]
-extern crate gostd_builtin as builtin;
-extern crate gostd_time as time;
+/// 保持兼容性: use gostd::builtin 等同于 use gostd_builtin
+pub use gostd_builtin as builtin;
+/// 保存兼容性: use gostd::time 等同于 use gostd_time;
+pub use gostd_time as time;
 pub mod archive;
 pub mod bufio;
-extern crate lazy_static;
 pub mod bytes;
 pub mod cmd;
 pub mod compress;

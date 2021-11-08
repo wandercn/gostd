@@ -1,10 +1,10 @@
 [package]
-name = "gostd_builtin"
+name = "gostd"
 license = "MIT"
-version = "1.0.1"
+version = "0.1.9"
 edition = "2018"
 authors = ["wandercn<wander@ffactory.org>"]
-description = "Package builtin binds the basic type in go through the type alias, and implements the basic type cast macro function.builtin 包通过类型别名绑定Go中的基础类型，并实现了基础类型强制转换宏函数。"
+description = "gostd is the go standard library implementation in rust. gostd 是Go标准库的rust实现"
 homepage = "https://github.com/wandercn/gostd"
 repository = "https://github.com/wandercn/gostd"
 keywords = ["gobind","go-api","gostd","go-to-rust","go-standard-library"]
@@ -14,10 +14,13 @@ categories= ["api-bindings","accessibility","development-tools","compilers"]
 opt-level = 0
 
 [profile.release]
+
 opt-level = 3
-
 [dependencies]
+gostd_builtin = { version = "=1.0.1", optional = false, path = "../builtin"}
+gostd_time = { version = "=1.0.1", optional = false, path = "../time"}
+gostd_derive = "0.0.3"
+libc = "0.2"
+cvt = "0.1.1"
+lazy_static = "1.4.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[lib]
-name = "gostd_builtin"
