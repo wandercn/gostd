@@ -4029,9 +4029,7 @@ fn loadTzinfo(name: &str, source: &str) -> Result<Vec<byte>, Error> {
     loadTzinfoFromDirOrZip(source, name)
 }
 
-fn LoadLocationFromTZData(name: &str, data: Vec<byte>) -> Result<Location, Error> {
-    todo!()
-}
+fn LoadLocationFromTZData(name: &str, data: Vec<byte>) -> Result<Location, Error> {}
 
 fn loadFromEmbeddedTZData(zipname: &str) -> Result<string, Error> {
     todo!()
@@ -4055,6 +4053,15 @@ fn loadTzinfoFromDirOrZip(dir: &str, name: &str) -> Result<Vec<byte>, Error> {
     let mut f = File::open(name)?;
     f.read_to_end(&mut buf)?;
     Ok(buf)
+}
+
+fn findZone(zones: Vec<zone>, name: String, offset: int, isDST: bool) -> int {
+    for (i, z) in zones.iter().enumerate() {
+        if z.name == name && z.offset == offset && z.isDST == isDST {
+            return int!(i);
+        }
+    }
+    return -1;
 }
 
 // zoneinfo.go -end
