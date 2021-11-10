@@ -2390,6 +2390,7 @@ impl Location {
 
         if self.name.as_str() == "Local" {
             return UTC.clone(); //待完善
+                                // return Local.clone();
         }
         self.clone()
     }
@@ -3960,3 +3961,178 @@ fn separator(std: int) -> byte {
     b','
 }
 // format.go -end
+
+// zoneinfo.go -begin
+
+fn initLocal() -> Location {
+    let zoneSources = vec![
+        "/usr/share/zoneinfo/",
+        "/usr/share/lib/zoneinfo/",
+        "/usr/lib/locale/TZ/",
+    ];
+    // consult $TZ to find the time zone to use.
+    // no $TZ means use the system default /etc/localtime.
+    // $TZ="" means use UTC.
+    // $TZ="foo" or $TZ=":foo" if foo is an absolute path, then the file pointed
+    // by foo will be used to initialize timezone; otherwise, file
+    // /usr/share/zoneinfo/foo will be used.
+    if let Some(mut tz) = option_env!("TZ") {
+        let mut tz = tz.as_bytes();
+        if tz[0] == b':' {
+            tz = &tz[1..];
+        }
+        if tz[0] == b'/' {
+            match loadLocation(std::str::from_utf8(tz).unwrap(), vec![""]) {
+                Ok(mut z) => {
+                    if tz == "/etc/localtime".as_bytes() {
+                        z.name = "Local".to_string();
+                    } else {
+                        z.name = String::from_utf8(tz.to_vec()).unwrap();
+                    }
+                    return z;
+                }
+                Err(err) => return UTC.clone(),
+            }
+        } else if tz != "UTC".as_bytes() {
+            match loadLocation(std::str::from_utf8(tz).unwrap(), zoneSources) {
+                Ok(z) => return z,
+                Err(err) => return UTC.clone(),
+            }
+        } else {
+            return UTC.clone();
+        }
+    } else {
+        match loadLocation("localtime", vec!["/etc"]) {
+            Ok(mut z) => {
+                z.name = "Local".to_string();
+                return z;
+            }
+            Err(err) => return UTC.clone(),
+        }
+    }
+}
+
+use std::io::{Error, ErrorKind};
+fn loadLocation(name: &str, sources: Vec<&str>) -> Result<Location, Error> {
+    for source in sources {
+        let zoneData = loadTzinfo(name, source)?;
+        let z = LoadLocationFromTZData(name, zoneData)?;
+        return Ok(z);
+    }
+
+    Err(Error::new(ErrorKind::Other, "unknown time zone"))
+
+    // loadFromEmbeddedTZData
+}
+
+fn loadTzinfo(name: &str, source: &str) -> Result<Vec<byte>, Error> {
+    loadTzinfoFromDirOrZip(source, name)
+}
+
+fn LoadLocationFromTZData(name: &str, data: Vec<byte>) -> Result<Location, Error> {
+    todo!()
+}
+
+fn loadFromEmbeddedTZData(zipname: &str) -> Result<string, Error> {
+    todo!()
+}
+use std::fs::File;
+use std::io;
+use std::io::prelude::*;
+
+fn loadTzinfoFromDirOrZip(dir: &str, name: &str) -> Result<Vec<byte>, Error> {
+    /* if len(dir) > 4 && dir[len(dir)-4:] == ".zip" {
+        return loadTzinfoFromZip(dir, name)
+    } */
+    let mut name = name.to_string();
+    if dir != "" {
+        let mut temp = dir.to_string();
+        temp.push_str("/");
+        temp.push_str(name.as_str());
+        name = temp
+    }
+    let mut buf = Vec::new();
+    let mut f = File::open(name)?;
+    f.read_to_end(&mut buf)?;
+    Ok(buf)
+}
+
+// zoneinfo.go -end
+
+// dataIO -bengin
+// Copies of io.Seek* constants to avoid importing "io":
+const seekStart: int = 0;
+const seekCurrent: int = 1;
+const seekEnd: int = 2;
+
+// Simple I/O interface to binary blob of data.
+struct dataIO {
+    p: Option<Vec<byte>>,
+    error: bool,
+}
+
+impl dataIO {
+    fn read(&mut self, n: uint) -> Option<Vec<byte>> {
+        if let Some(dp) = self.p.clone() {
+            let dp = dp.as_slice();
+            let p = dp[0..n].to_vec();
+            self.p = Some(dp[n..].to_vec());
+            return Some(p);
+        } else {
+            self.p = None;
+            self.error = true;
+            return None;
+        }
+    }
+
+    fn big4(&mut self) -> (uint32, bool) {
+        if let Some(p) = self.read(4) {
+            return (
+                uint32!(p[3]) | uint32!(p[2]) << 8 | uint32!(p[1]) << 16 | uint32!(p[0]) << 24,
+                true,
+            );
+        } else {
+            self.error = true;
+            (0, false)
+        }
+    }
+
+    fn big8(&mut self) -> (uint64, bool) {
+        let (n1, ok1) = self.big4();
+        let (n2, ok2) = self.big4();
+        if !ok1 || !ok2 {
+            self.error = true;
+            return (0, false);
+        }
+        (((uint64!(n1) << 32) | uint64!(n2)), true)
+    }
+
+    fn byte(&mut self) -> (byte, bool) {
+        if let Some(p) = self.read(1) {
+            return (p[0], true);
+        } else {
+            self.error = true;
+            (0, false)
+        }
+    }
+    // read returns the read of the data in the buffer.
+    fn rest(&mut self) -> Option<Vec<byte>> {
+        if let Some(r) = self.p.clone() {
+            self.p = None;
+            return Some(r);
+        } else {
+            None
+        }
+    }
+
+    // Make a string by stopping at the first NUL
+    fn byteString(p: Vec<byte>) -> String {
+        for i in 0..len!(p) {
+            if p[i] == 0 {
+                return String::from_utf8(p.as_slice()[0..i].to_vec()).unwrap();
+            }
+        }
+        return String::from_utf8(p).unwrap();
+    }
+}
+// dataIO -end
