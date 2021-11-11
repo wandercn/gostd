@@ -2389,8 +2389,8 @@ impl Location {
         }
 
         if self.name.as_str() == "Local" {
-            return UTC.clone(); //待完善
-                                // return Local.clone();
+            // return UTC.clone(); //待完善
+            return Local.clone();
         }
         self.clone()
     }
@@ -2605,8 +2605,9 @@ lazy_static::lazy_static! {
 /// <summary class="docblock">zh-cn</summary>
 /// Local代表系统本地，对应本地时区。
 /// </details>
-     pub static ref Local:Location = Location::new();
-     static ref utcLoc:Location = {
+     // pub static ref Local:Location = Location::new();
+    pub static ref Local:Location = initLocal();
+    static ref utcLoc:Location = {
     let mut l = Location::new();
     l.name="UTC".to_string();
      l
@@ -4013,6 +4014,7 @@ fn initLocal() -> Location {
 }
 
 use std::io::{Error, ErrorKind};
+
 fn loadLocation(name: &str, sources: Vec<&str>) -> Result<Location, Error> {
     for source in sources {
         let zoneData = loadTzinfo(name, source)?;
@@ -4029,7 +4031,246 @@ fn loadTzinfo(name: &str, source: &str) -> Result<Vec<byte>, Error> {
     loadTzinfoFromDirOrZip(source, name)
 }
 
-fn LoadLocationFromTZData(name: &str, data: Vec<byte>) -> Result<Location, Error> {}
+const badData: &str = "malformed time zone information";
+fn LoadLocationFromTZData(name: &str, data: Vec<byte>) -> Result<Location, Error> {
+    let badDataErr = Err(Error::new(ErrorKind::Other, badData));
+    let mut d = dataIO {
+        p: Some(data),
+        error: false,
+    };
+    let mut version: int = 0;
+
+    if let Some(magic) = d.read(4) {
+        if String::from_utf8(magic).unwrap() != "TZif" {
+            return badDataErr;
+        }
+
+        if let Some(p) = d.read(16) {
+            if len!(p) != 16 {
+                return badDataErr;
+            } else {
+                match p[0] {
+                    0 => version = 1,
+                    b'2' => version = 2,
+                    b'3' => version = 3,
+                    _ => {
+                        return badDataErr;
+                    }
+                }
+            }
+        }
+    }
+
+    // six big-endian 32-bit integers:
+    //	number of UTC/local indicators
+    //	number of standard/wall indicators
+    //	number of leap seconds
+    //	number of transition times
+    //	number of local time zones
+    //	number of characters of time zone abbrev strings
+    const NUTCLocal: uint = 0;
+    const NStdWall: uint = 1;
+    const NLeap: uint = 2;
+    const NTime: uint = 3;
+    const NZone: uint = 4;
+    const NChar: uint = 5;
+
+    let mut n: [int; 6] = [0; 6];
+    for i in 0..6 {
+        let (nn, ok) = d.big4();
+        if !ok {
+            return badDataErr;
+        }
+        if uint32!(int!(nn).abs()) != nn {
+            return badDataErr;
+        }
+        n[i] = int!(nn);
+    }
+
+    // If we have version 2 or 3, then the data is first written out
+    // in a 32-bit format, then written out again in a 64-bit format.
+    // Skip the 32-bit format and read the 64-bit one, as it can
+    // describe a broader range of dates.
+
+    let mut is64 = false;
+    if version > 1 {
+        let mut skip = n[NTime] * 4
+            + n[NTime]
+            + n[NZone] * 6
+            + n[NChar]
+            + n[NLeap] * 8
+            + n[NStdWall]
+            + n[NUTCLocal];
+        // Skip the version 2 header that we just read.
+        skip += 4 + 16;
+        d.read(skip);
+
+        is64 = true;
+
+        // Read the counts again, they can differ.
+        for i in 0..6 {
+            let (nn, ok) = d.big4();
+            if !ok {
+                return badDataErr;
+            }
+            if uint32!(int!(nn).abs()) != nn {
+                return badDataErr;
+            }
+            n[i] = int!(nn);
+        }
+    }
+
+    let mut size = 4;
+    if is64 {
+        size = 8;
+    }
+
+    // Transition times.
+    let mut txtimes = dataIO {
+        p: d.read(n[NTime] * size),
+        error: false,
+    };
+
+    // Time zone indices for transition times.
+    let txzones = d.read(n[NTime]).unwrap();
+
+    // Zone info structures
+    let mut zonedata = dataIO {
+        p: d.read(n[NZone] * 6),
+        error: false,
+    };
+
+    // Time zone abbreviations.
+    let abbrev = d.read(n[NChar]);
+
+    // Leap-second time pairs
+    d.read(n[NLeap] * (size + 4));
+
+    // Whether tx times associated with local time types
+    // are specified as standard time or wall time.
+    let isstd = d.read(n[NStdWall]).unwrap();
+
+    // Whether tx times associated with local time types
+    // are specified as UTC or local time.
+    let isutc = d.read(n[NUTCLocal]).unwrap();
+
+    if d.error {
+        return badDataErr; // ran out of data
+    }
+
+    let mut extend: &str = "";
+    let rest = d.rest().unwrap();
+    if len!(rest) > 2 && rest[0] == b'\n' && rest[len!(rest) - 1] == b'\n' {
+        extend = std::str::from_utf8(&rest[1..len!(rest) - 1]).unwrap();
+    }
+
+    // Now we can build up a useful data structure.
+    // First the zone information.
+    //	utcoff[4] isdst[1] nameindex[1]
+
+    let nzone = n[NZone];
+    if nzone == 0 {
+        return badDataErr;
+    }
+
+    let mut zones: Vec<zone> = Vec::with_capacity(uint!(nzone.abs()));
+    for i in 0..len!(zones) {
+        let (n, ok) = zonedata.big4();
+        if !ok {
+            return badDataErr;
+        }
+
+        if uint32!(int!(n).abs()) != n {
+            return badDataErr;
+        }
+
+        zones[i].offset = int!(int32!(n));
+
+        let (b, ok) = zonedata.byte();
+        if !ok {
+            return badDataErr;
+        }
+
+        zones[i].isDST = b != 0;
+
+        let (b, ok) = zonedata.byte();
+        let mut abbrev_len = 0;
+        let mut abbr = vec![];
+        if let Some(ref abb) = abbrev {
+            abbrev_len = len!(abb);
+            abbr = abb.to_owned();
+        }
+        if !ok || uint!(b) >= abbrev_len {
+            return badDataErr;
+        }
+
+        zones[i].name = byteString(abbr[uint!(b)..].to_vec());
+
+        if cfg!(aix) && len!(name) > 8 && (&name[..8] == "Etc/GMT+" || &name[..8] == "Etc/GMT-") {
+            // There is a bug with AIX 7.2 TL 0 with files in Etc,
+            // GMT+1 will return GMT-1 instead of GMT+1 or -01.
+            if name != "Etc/GMT+0" {
+                // GMT+0 is OK
+                zones[i].name = name[4..].to_string();
+            }
+        }
+    }
+
+    // Now the transition time info.
+
+    let mut tx: Vec<zoneTrans> = Vec::with_capacity(uint!(n[NTime]));
+
+    for i in 0..len!(tx) {
+        let mut n: int64 = 0;
+
+        if !is64 {
+            let (n4, ok) = txtimes.big4();
+            if !ok {
+                return badDataErr;
+            } else {
+                n = int64!(int32!(n4));
+            }
+        } else {
+            let (n8, ok) = txtimes.big8();
+
+            if !ok {
+                return badDataErr;
+            } else {
+                n = int64!(n8);
+            }
+        }
+
+        tx[i].when = n;
+        if uint!(txzones[i]) >= len!(zones) {
+            return badDataErr;
+        }
+
+        tx[i].index = txzones[i];
+        if i < len!(isstd) {
+            tx[i].isstd = isstd[i] != 0;
+        }
+
+        if i < len!(isutc) {
+            tx[i].isutc = isutc[i] != 0;
+        }
+    }
+
+    if len!(tx) == 0 {
+        tx.push(zoneTrans {
+            when: alpha,
+            index: 0,
+            isstd: false,
+            isutc: false,
+        })
+    }
+    let mut l = Location::new();
+    l.tx = tx;
+    l.zone = zones;
+    l.name = name.to_string();
+    l.extend = extend.to_string();
+
+    Ok(l)
+}
 
 fn loadFromEmbeddedTZData(zipname: &str) -> Result<string, Error> {
     todo!()
@@ -4039,6 +4280,7 @@ use std::io;
 use std::io::prelude::*;
 
 fn loadTzinfoFromDirOrZip(dir: &str, name: &str) -> Result<Vec<byte>, Error> {
+    // 从zip文件读取时区信息，暂时不实现，大部分情况系统目录都有时区文件
     /* if len(dir) > 4 && dir[len(dir)-4:] == ".zip" {
         return loadTzinfoFromZip(dir, name)
     } */
@@ -4079,7 +4321,8 @@ struct dataIO {
 }
 
 impl dataIO {
-    fn read(&mut self, n: uint) -> Option<Vec<byte>> {
+    fn read(&mut self, n: int) -> Option<Vec<byte>> {
+        let n = uint!(n.abs());
         if let Some(dp) = self.p.clone() {
             let dp = dp.as_slice();
             let p = dp[0..n].to_vec();
@@ -4131,15 +4374,14 @@ impl dataIO {
             None
         }
     }
-
-    // Make a string by stopping at the first NUL
-    fn byteString(p: Vec<byte>) -> String {
-        for i in 0..len!(p) {
-            if p[i] == 0 {
-                return String::from_utf8(p.as_slice()[0..i].to_vec()).unwrap();
-            }
+}
+// Make a string by stopping at the first NUL
+fn byteString(p: Vec<byte>) -> String {
+    for i in 0..len!(p) {
+        if p[i] == 0 {
+            return String::from_utf8(p.as_slice()[0..i].to_vec()).unwrap();
         }
-        return String::from_utf8(p).unwrap();
     }
+    return String::from_utf8(p).unwrap();
 }
 // dataIO -end
