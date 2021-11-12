@@ -5,6 +5,12 @@ The calendrical calculations always assume a Gregorian calendar, with no leap se
 
 time包提供了时间的显示和测量用的函数。日历的计算采用的是公历。
 
+- [x] time库在rust实现 gostd::time
+- [x] time库支持macOSX 和linux平台，通过libc库调用C函数实现 time::Now()
+- [x] time，支持各种格式显示时间。
+- [x] docs.rs文档增加例子程序"RUN"按钮,但是要复制代码本地运行,在rust play运行不了(因为下载量没到前100)。
+- [x] v1.0.3,开始time支持local时区信息自动从系统读取，可以用time::Now()获取本地时间。
+
 # Example
 
 ```
