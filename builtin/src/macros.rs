@@ -511,9 +511,8 @@ macro_rules! rune {
 /// assert_eq!("💖", sparkle_heart);
 /// ```
 pub fn string(b: &[byte]) -> String {
-    // String::from_utf8_lossy(b).to_string()
     use std::str;
-    let s = unsafe { str::from_utf8_unchecked(b) };
+    let s = str::from_utf8(b).expect("Illegal utf8 conversion string failed");
     s.to_string()
 }
 
