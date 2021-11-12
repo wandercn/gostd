@@ -698,7 +698,9 @@ impl Time {
                 name = l.cacheZone.name;
                 offset = l.cacheZone.offset;
             } else {
-                let (name, offset, _, _, _) = l.lookup(sec);
+                let tuple = l.lookup(sec);
+                name = tuple.0;
+                offset = tuple.1;
             }
             sec += int64!(offset);
         } else {
