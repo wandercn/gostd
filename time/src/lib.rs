@@ -698,7 +698,9 @@ impl Time {
                 name = l.cacheZone.name;
                 offset = l.cacheZone.offset;
             } else {
-                let (name, offset, _, _, _) = l.lookup(sec);
+                let tuple = l.lookup(sec);
+                name = tuple.0;
+                offset = tuple.1;
             }
             sec += int64!(offset);
         } else {
@@ -2389,7 +2391,9 @@ impl Location {
         }
 
         if self.name.as_str() == "Local" {
-            return UTC.clone(); //待完善
+            // return UTC.clone(); //待完善
+            // return Local.clone();
+            return initLocal();
         }
         self.clone()
     }
@@ -2463,12 +2467,12 @@ impl Location {
         start = tx[lo].when;
         isDST = zone.isDST;
 
-        //        if lo == tx.len() - 1 && l.extend != "" {
-        // let (ename, eoffset, estart, eend, eisDST, ok) = tzset(l.extend, end, sec);
-        // if ok {
-        //     return (ename, eoffset, estart, eend, eisDST);
-        // }
-        // }
+        if lo == tx.len() - 1 && l.extend != "" {
+            let (ename, eoffset, estart, eend, eisDST, ok) = tzset(l.extend.as_str(), end, sec);
+            if ok {
+                return (ename, eoffset, estart, eend, eisDST);
+            }
+        }
 
         (name, offset, start, end, isDST)
     }
@@ -2604,8 +2608,9 @@ lazy_static::lazy_static! {
 /// <summary class="docblock">zh-cn</summary>
 /// Local代表系统本地，对应本地时区。
 /// </details>
-     pub static ref Local:Location = Location::new();
-     static ref utcLoc:Location = {
+     // pub static ref Local:Location = Location::new();
+    pub static ref Local:Location = initLocal();
+    static ref utcLoc:Location = {
     let mut l = Location::new();
     l.name="UTC".to_string();
      l
@@ -3960,3 +3965,860 @@ fn separator(std: int) -> byte {
     b','
 }
 // format.go -end
+
+// zoneinfo.go -begin
+
+fn initLocal() -> Location {
+    let zoneSources = vec![
+        "/usr/share/zoneinfo/",
+        "/usr/share/lib/zoneinfo/",
+        "/usr/lib/locale/TZ/",
+    ];
+    // consult $TZ to find the time zone to use.
+    // no $TZ means use the system default /etc/localtime.
+    // $TZ="" means use UTC.
+    // $TZ="foo" or $TZ=":foo" if foo is an absolute path, then the file pointed
+    // by foo will be used to initialize timezone; otherwise, file
+    // /usr/share/zoneinfo/foo will be used.
+    if let Some(mut tz) = option_env!("TZ") {
+        let mut tz = tz.as_bytes();
+        if tz[0] == b':' {
+            tz = &tz[1..];
+        }
+        if tz[0] == b'/' {
+            match loadLocation(std::str::from_utf8(tz).unwrap(), vec![""]) {
+                Ok(mut z) => {
+                    if tz == "/etc/localtime".as_bytes() {
+                        z.name = "Local".to_string();
+                    } else {
+                        z.name = String::from_utf8(tz.to_vec()).unwrap();
+                    }
+                    return z;
+                }
+                Err(err) => return UTC.clone(),
+            }
+        } else if tz != "UTC".as_bytes() {
+            match loadLocation(std::str::from_utf8(tz).unwrap(), zoneSources) {
+                Ok(z) => return z,
+                Err(err) => return UTC.clone(),
+            }
+        } else {
+            return UTC.clone();
+        }
+    } else {
+        match loadLocation("localtime", vec!["/etc"]) {
+            Ok(mut z) => {
+                z.name = "Local".to_string();
+                return z;
+            }
+            Err(err) => return UTC.clone(),
+        }
+    }
+}
+
+use std::io::{Error, ErrorKind};
+
+fn loadLocation(name: &str, sources: Vec<&str>) -> Result<Location, Error> {
+    for source in sources {
+        let zoneData = loadTzinfo(name, source)?;
+        let z = LoadLocationFromTZData(name, zoneData)?;
+        return Ok(z);
+    }
+
+    Err(Error::new(ErrorKind::Other, "unknown time zone"))
+
+    // loadFromEmbeddedTZData
+}
+
+fn loadTzinfo(name: &str, source: &str) -> Result<Vec<byte>, Error> {
+    loadTzinfoFromDirOrZip(source, name)
+}
+
+const badData: &str = "malformed time zone information";
+fn LoadLocationFromTZData(name: &str, data: Vec<byte>) -> Result<Location, Error> {
+    let badDataErr = Err(Error::new(ErrorKind::Other, badData));
+    let mut d = dataIO {
+        p: Some(data),
+        error: false,
+    };
+    let mut version: int = 0;
+
+    if let Some(magic) = d.read(4) {
+        if String::from_utf8(magic).unwrap() != "TZif" {
+            return badDataErr;
+        }
+
+        if let Some(p) = d.read(16) {
+            if len!(p) != 16 {
+                return badDataErr;
+            } else {
+                match p[0] {
+                    0 => version = 1,
+                    b'2' => version = 2,
+                    b'3' => version = 3,
+                    _ => {
+                        return badDataErr;
+                    }
+                }
+            }
+        }
+    }
+
+    // six big-endian 32-bit integers:
+    //	number of UTC/local indicators
+    //	number of standard/wall indicators
+    //	number of leap seconds
+    //	number of transition times
+    //	number of local time zones
+    //	number of characters of time zone abbrev strings
+    const NUTCLocal: uint = 0;
+    const NStdWall: uint = 1;
+    const NLeap: uint = 2;
+    const NTime: uint = 3;
+    const NZone: uint = 4;
+    const NChar: uint = 5;
+
+    let mut n: [int; 6] = [0; 6];
+    for i in 0..6 {
+        let (nn, ok) = d.big4();
+        if !ok {
+            return badDataErr;
+        }
+        if uint32!(int!(nn).abs()) != nn {
+            return badDataErr;
+        }
+        n[i] = int!(nn);
+    }
+
+    // If we have version 2 or 3, then the data is first written out
+    // in a 32-bit format, then written out again in a 64-bit format.
+    // Skip the 32-bit format and read the 64-bit one, as it can
+    // describe a broader range of dates.
+
+    let mut is64 = false;
+    if version > 1 {
+        let mut skip = n[NTime] * 4
+            + n[NTime]
+            + n[NZone] * 6
+            + n[NChar]
+            + n[NLeap] * 8
+            + n[NStdWall]
+            + n[NUTCLocal];
+        // Skip the version 2 header that we just read.
+        skip += 4 + 16;
+        d.read(skip);
+
+        is64 = true;
+
+        // Read the counts again, they can differ.
+        for i in 0..6 {
+            let (nn, ok) = d.big4();
+            if !ok {
+                return badDataErr;
+            }
+            if uint32!(int!(nn).abs()) != nn {
+                return badDataErr;
+            }
+            n[i] = int!(nn);
+        }
+    }
+
+    let mut size = 4;
+    if is64 {
+        size = 8;
+    }
+
+    // Transition times.
+    let mut txtimes = dataIO {
+        p: d.read(n[NTime] * size),
+        error: false,
+    };
+
+    // Time zone indices for transition times.
+    let txzones = d.read(n[NTime]).unwrap();
+
+    // Zone info structures
+    let mut zonedata = dataIO {
+        p: d.read(n[NZone] * 6),
+        error: false,
+    };
+
+    // Time zone abbreviations.
+    let abbrev = d.read(n[NChar]);
+
+    // Leap-second time pairs
+    d.read(n[NLeap] * (size + 4));
+
+    // Whether tx times associated with local time types
+    // are specified as standard time or wall time.
+    let isstd = d.read(n[NStdWall]).unwrap();
+
+    // Whether tx times associated with local time types
+    // are specified as UTC or local time.
+    let isutc = d.read(n[NUTCLocal]).unwrap();
+
+    if d.error {
+        return badDataErr; // ran out of data
+    }
+
+    let mut extend: &str = "";
+    let rest = d.rest().unwrap();
+    if len!(rest) > 2 && rest[0] == b'\n' && rest[len!(rest) - 1] == b'\n' {
+        extend = std::str::from_utf8(&rest[1..len!(rest) - 1]).unwrap();
+    }
+
+    // Now we can build up a useful data structure.
+    // First the zone information.
+    //	utcoff[4] isdst[1] nameindex[1]
+
+    let nzone = n[NZone];
+    if nzone == 0 {
+        return badDataErr;
+    }
+
+    let mut zones: Vec<zone> = Vec::with_capacity(uint!(nzone.abs()));
+    for i in 0..uint!(nzone.abs()) {
+        zones.push(zone::default());
+    }
+    for i in 0..len!(zones) {
+        let (n, ok) = zonedata.big4();
+        if !ok {
+            return badDataErr;
+        }
+
+        if uint32!(int!(n).abs()) != n {
+            return badDataErr;
+        }
+
+        zones[i].offset = int!(int32!(n));
+
+        let (b, ok) = zonedata.byte();
+        if !ok {
+            return badDataErr;
+        }
+
+        zones[i].isDST = b != 0;
+
+        let (b, ok) = zonedata.byte();
+        let mut abbrev_len = 0;
+        let mut abbr = vec![];
+        if let Some(ref abb) = abbrev {
+            abbrev_len = len!(abb);
+            abbr = abb.to_owned();
+        }
+        if !ok || uint!(b) >= abbrev_len {
+            return badDataErr;
+        }
+
+        zones[i].name = byteString(abbr[uint!(b)..].to_vec());
+
+        if cfg!(aix) && len!(name) > 8 && (&name[..8] == "Etc/GMT+" || &name[..8] == "Etc/GMT-") {
+            // There is a bug with AIX 7.2 TL 0 with files in Etc,
+            // GMT+1 will return GMT-1 instead of GMT+1 or -01.
+            if name != "Etc/GMT+0" {
+                // GMT+0 is OK
+                zones[i].name = name[4..].to_string();
+            }
+        }
+    }
+
+    // Now the transition time info.
+
+    let mut tx: Vec<zoneTrans> = Vec::with_capacity(uint!(n[NTime]));
+    for i in 0..uint!(n[NTime]) {
+        tx.push(zoneTrans::default());
+    }
+
+    for i in 0..len!(tx) {
+        let mut n: int64 = 0;
+
+        if !is64 {
+            let (n4, ok) = txtimes.big4();
+            if !ok {
+                return badDataErr;
+            } else {
+                n = int64!(int32!(n4));
+            }
+        } else {
+            let (n8, ok) = txtimes.big8();
+
+            if !ok {
+                return badDataErr;
+            } else {
+                n = int64!(n8);
+            }
+        }
+
+        tx[i].when = n;
+        if uint!(txzones[i]) >= len!(zones) {
+            return badDataErr;
+        }
+
+        tx[i].index = txzones[i];
+        if i < len!(isstd) {
+            tx[i].isstd = isstd[i] != 0;
+        }
+
+        if i < len!(isutc) {
+            tx[i].isutc = isutc[i] != 0;
+        }
+    }
+
+    if len!(tx) == 0 {
+        tx.push(zoneTrans {
+            when: alpha,
+            index: 0,
+            isstd: false,
+            isutc: false,
+        })
+    }
+    let mut l = Location::new();
+    l.tx = tx.clone();
+    l.zone = zones;
+    l.name = name.to_string();
+    l.extend = extend.to_string();
+
+    // Fill in the cache with information about right now,
+    // since that will be the most common lookup.
+    let (sec, _, _) = now();
+    for i in 0..len!(tx) {
+        if tx[i].when <= sec && (i + 1 == len!(tx) || sec < tx[i + 1].when) {
+            l.cacheStart = tx[i].when;
+            l.cacheEnd = omega;
+            l.cacheZone = l.clone().zone[tx[i].index as usize].clone();
+
+            if i + 1 < len!(tx) {
+                l.cacheEnd = tx[i + 1].when;
+            } else if l.extend != "" {
+                // If we're at the end of the known zone transitions,
+                // try the extend string.
+                let (name, offset, estart, eend, isDST, ok) =
+                    tzset(l.extend.as_str(), l.cacheEnd, sec);
+                if ok {
+                    l.cacheStart = estart;
+                    l.cacheEnd = eend;
+                    // Find the zone that is returned by tzset to avoid allocation if possible.
+                    let zoneIdx = findZone(l.zone.clone(), name.clone(), offset, isDST);
+                    if zoneIdx != -1 {
+                        l.cacheZone = l.zone[zoneIdx as usize].clone();
+                    } else {
+                        l.cacheZone.name = name;
+                        l.cacheZone.offset = offset;
+                        l.cacheZone.isDST = isDST;
+                    }
+                }
+            }
+            break;
+        }
+    }
+
+    Ok(l)
+}
+
+fn tzset(s: &str, initEnd: int64, sec: int64) -> (String, int, int64, int64, bool, bool) {
+    let mut stdName: &str = "";
+    let mut dstName: &str = "";
+    let mut stdOffset: int = 0;
+    let mut dstOffset: int = 0;
+    let (mut name, mut offset, mut start, mut end, mut isDST, mut ok) =
+        ("".to_string(), 0_isize, 0_i64, 0_i64, false, false);
+    let mut s = s;
+    let tuple = tzsetName(s);
+    stdName = tuple.0;
+    s = tuple.1;
+    ok = tuple.2;
+
+    if ok {
+        let tuple = tzsetOffset(s);
+        stdOffset = tuple.0;
+        s = tuple.1;
+        ok = tuple.2;
+    }
+
+    if !ok {
+        return (name, 0, 0, 0, false, false);
+    }
+
+    // The numbers in the tzset string are added to local time to get UTC,
+    // but our offsets are added to UTC to get local time,
+    // so we negate the number we see here.
+    stdOffset = -stdOffset;
+
+    if len!(s) == 0 || s.as_bytes()[0] == b',' {
+        // No daylight savings time.
+        return (stdName.to_string(), stdOffset, initEnd, omega, false, true);
+    }
+
+    let tuple = tzsetName(s);
+
+    dstName = tuple.0;
+    s = tuple.1;
+    ok = tuple.2;
+    if ok {
+        if len!(s) == 0 || s.as_bytes()[0] == b',' {
+            dstOffset = stdOffset + int!(secondsPerHour);
+        } else {
+            let tuple = tzsetOffset(s);
+            dstOffset = tuple.0;
+            s = tuple.1;
+            ok = tuple.2;
+            dstOffset = -dstOffset;
+        }
+    }
+
+    if !ok {
+        return ("".to_string(), 0, 0, 0, false, false);
+    }
+
+    if len!(s) == 0 {
+        // Default DST rules per tzcode.
+        s = ",M3.2.0,M11.1.0"
+    }
+
+    // The TZ definition does not mention ';' here but tzcode accepts it.
+    if s.as_bytes()[0] != b',' && s.as_bytes()[0] != b';' {
+        return ("".to_string(), 0, 0, 0, false, false);
+    }
+
+    s = s.get(1..).unwrap();
+
+    let mut startRule = rule::default();
+    let mut endRule = rule::default();
+    let tuple = tzsetRule(s);
+    startRule = tuple.0;
+    s = tuple.1;
+    ok = tuple.2;
+    if !ok || len!(s) == 0 || s.as_bytes()[0] != b',' {
+        return ("".to_string(), 0, 0, 0, false, false);
+    }
+
+    s = s.get(1..).unwrap();
+
+    let tuple = tzsetRule(s);
+    endRule = tuple.0;
+    s = tuple.1;
+    ok = tuple.2;
+    if !ok || len!(s) > 0 {
+        return ("".to_string(), 0, 0, 0, false, false);
+    }
+
+    let (year, _, _, yday) = absDate(
+        uint64!((sec + unixToInternal + internalToAbsolute).abs()),
+        false,
+    );
+
+    let ysec = int64!(int64!(yday) * secondsPerDay) + sec % secondsPerDay;
+    // Compute start of year in seconds since Unix epoch.
+
+    let d = daySinceEpoch(year);
+    let mut abs = int64!(d * uint64!(secondsPerDay));
+    abs += absoluteToInternal + internalToUnix;
+    let mut startSec = int64!(tzruleTime(year, startRule, stdOffset));
+    let mut endSec = int64!(tzruleTime(year, endRule, dstOffset));
+    let mut dstIsDST = true;
+    let mut stdIsDST = false;
+    // Note: this is a flipping of "DST" and "STD" while retaining the labels
+    // This happens in southern hemispheres. The labelling here thus is a little
+    // inconsistent with the goal.
+    use std::mem::swap;
+    if endSec < startSec {
+        swap(&mut startSec, &mut endSec);
+        swap(&mut stdName, &mut dstName);
+        swap(&mut stdOffset, &mut dstOffset);
+        swap(&mut stdIsDST, &mut dstIsDST);
+    }
+
+    // The start and end values that we return are accurate
+    // close to a daylight savings transition, but are otherwise
+    // just the start and end of the year. That suffices for
+    // the only caller that cares, which is Date.
+    if ysec < startSec {
+        return (
+            stdName.to_string(),
+            stdOffset,
+            abs,
+            startSec + abs,
+            stdIsDST,
+            true,
+        );
+    } else if ysec >= endSec {
+        return (
+            stdName.to_string(),
+            stdOffset,
+            endSec + abs,
+            abs + 365 * secondsPerDay,
+            stdIsDST,
+            true,
+        );
+    } else {
+        return (
+            dstName.to_string(),
+            dstOffset,
+            startSec + abs,
+            endSec + abs,
+            dstIsDST,
+            true,
+        );
+    }
+}
+
+fn tzsetName(s: &str) -> (&str, &str, bool) {
+    if len!(s) == 0 {
+        return ("", "", false);
+    }
+    if s.as_bytes()[0] != b'<' {
+        for (i, r) in s.bytes().enumerate() {
+            match r {
+                b'0' | b'1' | b'2' | b'3' | b'4' | b'5' | b'6' | b'7' | b'8' | b'9' | b','
+                | b'-' | b'+' => {
+                    if i < 3 {
+                        return ("", "", false);
+                    }
+                    return (&s[..i], s.get(i..).unwrap(), true);
+                }
+                _ => (),
+            }
+        }
+        if len!(s) < 3 {
+            return ("", "", false);
+        }
+        return (s, "", true);
+    } else {
+        for (i, r) in s.bytes().enumerate() {
+            if r == b'>' {
+                return (s.get(1..i).unwrap(), s.get(i + 1..).unwrap(), true);
+            }
+        }
+        ("", "", false)
+    }
+}
+
+fn tzsetOffset(mut s: &str) -> (int, &str, bool) {
+    if len!(s) == 0 {
+        return (0, "", false);
+    }
+    let mut neg = false;
+    if s.bytes().nth(0) == Some(b'+') {
+        s = &s[1..];
+    } else if s.bytes().nth(0) == Some(b'-') {
+        s = &s[1..];
+        neg = true
+    }
+
+    // The tzdata code permits values up to 24 * 7 here,
+    // although POSIX does not.
+    let (hours, s, ok) = tzsetNum(s, 0, 24 * 7);
+    if !ok {
+        return (0, "", false);
+    }
+    let mut off = hours * int!(secondsPerHour);
+    if len!(s) == 0 || s.bytes().nth(0) != Some(b':') {
+        if neg {
+            off = -off
+        }
+        return (off, s, true);
+    }
+
+    let (mins, s, ok) = tzsetNum(&s[1..], 0, 59);
+    if !ok {
+        return (0, "", false);
+    }
+    off += mins * int!(secondsPerMinute);
+    if len!(s) == 0 || s.bytes().nth(0) != Some(b':') {
+        if neg {
+            off = -off
+        }
+        return (off, s, true);
+    }
+
+    let (secs, s, ok) = tzsetNum(&s[1..], 0, 59);
+    if !ok {
+        return (0, "", false);
+    }
+    off += secs;
+
+    if neg {
+        off = -off
+    }
+    return (off, s, true);
+}
+
+fn tzsetNum(s: &str, min: int, max: int) -> (int, &str, bool) {
+    if len!(s) == 0 {
+        return (0, "", false);
+    }
+    let mut num = 0;
+    for (i, r) in s.bytes().enumerate() {
+        if r < b'0' || r > b'9' {
+            if i == 0 || num < min {
+                return (0, "", false);
+            }
+            return (num, &s[i..], true);
+        }
+        num *= 10;
+        num += int!(r - b'0');
+        if num > max {
+            return (0, "", false);
+        }
+    }
+    if num < min {
+        return (0, "", false);
+    }
+    (num, "", true)
+}
+
+const ruleJulian: ruleKind = 0;
+const ruleDOY: ruleKind = 1;
+const ruleMonthWeekDay: ruleKind = 2;
+
+type ruleKind = int;
+// rule is a rule read from a tzset string.
+#[derive(Default, PartialEq, PartialOrd, Debug, Clone, Copy)]
+struct rule {
+    kind: ruleKind,
+    day: int,
+    week: int,
+    mon: int,
+    time: int, // transition time
+}
+
+impl rule {
+    fn new() -> rule {
+        rule::default()
+    }
+}
+
+fn tzsetRule(mut s: &str) -> (rule, &str, bool) {
+    let mut r = rule::new();
+    if len!(s) == 0 {
+        return (rule::new(), "", false);
+    }
+    let mut ok = false;
+    if s.bytes().nth(0) == Some(b'J') {
+        let jday: int;
+        let tuple = tzsetNum(&s[1..], 1, 365);
+        jday = tuple.0;
+        s = tuple.1;
+        ok = tuple.2;
+
+        if !ok {
+            return (rule::new(), "", false);
+        }
+        r.kind = ruleJulian;
+        r.day = jday;
+    } else if s.bytes().nth(0) == Some(b'M') {
+        let mon: int;
+        let tuple = tzsetNum(&s[1..], 1, 12);
+        mon = tuple.0;
+        s = tuple.1;
+        ok = tuple.2;
+        if !ok || len!(s) == 0 || s.bytes().nth(0) != Some(b'.') {
+            return (rule::new(), "", false);
+        }
+        let week: int;
+        let tuple = tzsetNum(&s[1..], 1, 5);
+        week = tuple.0;
+        s = tuple.1;
+        ok = tuple.2;
+        if !ok || len!(s) == 0 || s.bytes().nth(0) != Some(b'.') {
+            return (rule::new(), "", false);
+        }
+        let day: int;
+        let tuple = tzsetNum(&s[1..], 0, 6);
+        day = tuple.0;
+        s = tuple.1;
+        ok = tuple.2;
+        if !ok {
+            return (rule::new(), "", false);
+        }
+        r.kind = ruleMonthWeekDay;
+        r.day = day;
+        r.week = week;
+        r.mon = mon;
+    } else {
+        let day: int;
+        let tuple = tzsetNum(s, 0, 365);
+        day = tuple.0;
+        s = tuple.1;
+        ok = tuple.2;
+        if !ok {
+            return (rule::new(), "", false);
+        }
+        r.kind = ruleDOY;
+        r.day = day;
+    }
+
+    if len!(s) == 0 || s.bytes().nth(0) != Some(b'/') {
+        r.time = 2 * int!(secondsPerHour); // 2am is the default
+        return (r, s, true);
+    }
+
+    let (offset, s, ok) = tzsetOffset(&s[1..]);
+    if !ok {
+        return (rule::new(), "", false);
+    }
+    r.time = offset;
+    (r, s, true)
+}
+
+fn tzruleTime(year: int, r: rule, off: int) -> int {
+    let mut s: int = 0;
+    match r.kind {
+        ruleJulian => {
+            s = (r.day - 1) * int!(secondsPerDay);
+            if isLeap(year) && r.day >= 60 {
+                s += int!(secondsPerDay);
+            }
+        }
+        ruleDOY => {
+            s = r.day * int!(secondsPerDay);
+        }
+        ruleMonthWeekDay => {
+            // Zeller's Congruence.
+            let m1 = (r.mon + 9) % 12 + 1;
+            let mut yy0 = year;
+            if r.mon <= 2 {
+                yy0 -= 1;
+            }
+            let yy1 = yy0 / 100;
+            let yy2 = yy0 % 100;
+            let mut dow = ((26 * m1 - 2) / 10 + 1 + yy2 + yy2 / 4 + yy1 / 4 - 2 * yy1) % 7;
+            if dow < 0 {
+                dow += 7;
+            }
+            // Now dow is the day-of-week of the first day of r.mon.
+            // Get the day-of-month of the first "dow" day.
+            let mut d = r.day - dow;
+            if d < 0 {
+                d += 7;
+            }
+            for i in 1..r.week {
+                if d + 7 >= daysIn(Month::IndexOf(uint!(r.mon.abs())), year) {
+                    break;
+                }
+                d += 7;
+            }
+            d += int!(daysBefore[uint!(r.mon - 1)]);
+            if isLeap(year) && r.mon > 2 {
+                d += 1;
+            }
+            s = d * int!(secondsPerDay);
+        }
+        _ => (),
+    }
+    s + r.time - off
+}
+
+fn loadFromEmbeddedTZData(zipname: &str) -> Result<string, Error> {
+    todo!()
+}
+use std::fs::File;
+use std::io;
+use std::io::prelude::*;
+
+fn loadTzinfoFromDirOrZip(dir: &str, name: &str) -> Result<Vec<byte>, Error> {
+    // 从zip文件读取时区信息，暂时不实现，大部分情况系统目录都有时区文件
+    /* if len(dir) > 4 && dir[len(dir)-4:] == ".zip" {
+        return loadTzinfoFromZip(dir, name)
+    } */
+    let mut name = name.to_string();
+    if dir != "" {
+        let mut temp = dir.to_string();
+        temp.push_str("/");
+        temp.push_str(name.as_str());
+        name = temp
+    }
+    let mut buf = Vec::new();
+    let mut f = File::open(name)?;
+    f.read_to_end(&mut buf)?;
+    Ok(buf)
+}
+
+fn findZone(zones: Vec<zone>, name: String, offset: int, isDST: bool) -> int {
+    for (i, z) in zones.iter().enumerate() {
+        if z.name == name && z.offset == offset && z.isDST == isDST {
+            return int!(i);
+        }
+    }
+    return -1;
+}
+
+// zoneinfo.go -end
+
+// dataIO -bengin
+// Copies of io.Seek* constants to avoid importing "io":
+const seekStart: int = 0;
+const seekCurrent: int = 1;
+const seekEnd: int = 2;
+
+// Simple I/O interface to binary blob of data.
+struct dataIO {
+    p: Option<Vec<byte>>,
+    error: bool,
+}
+
+impl dataIO {
+    fn read(&mut self, n: int) -> Option<Vec<byte>> {
+        let n = uint!(n.abs());
+        if let Some(dp) = self.p.clone() {
+            let dp = dp.as_slice();
+            let p = dp[0..n].to_vec();
+            self.p = Some(dp[n..].to_vec());
+            return Some(p);
+        } else {
+            self.p = None;
+            self.error = true;
+            return None;
+        }
+    }
+
+    fn big4(&mut self) -> (uint32, bool) {
+        if let Some(p) = self.read(4) {
+            return (
+                uint32!(p[3]) | uint32!(p[2]) << 8 | uint32!(p[1]) << 16 | uint32!(p[0]) << 24,
+                true,
+            );
+        } else {
+            self.error = true;
+            (0, false)
+        }
+    }
+
+    fn big8(&mut self) -> (uint64, bool) {
+        let (n1, ok1) = self.big4();
+        let (n2, ok2) = self.big4();
+        if !ok1 || !ok2 {
+            self.error = true;
+            return (0, false);
+        }
+        (((uint64!(n1) << 32) | uint64!(n2)), true)
+    }
+
+    fn byte(&mut self) -> (byte, bool) {
+        if let Some(p) = self.read(1) {
+            return (p[0], true);
+        } else {
+            self.error = true;
+            (0, false)
+        }
+    }
+    // read returns the read of the data in the buffer.
+    fn rest(&mut self) -> Option<Vec<byte>> {
+        if let Some(r) = self.p.clone() {
+            self.p = None;
+            return Some(r);
+        } else {
+            None
+        }
+    }
+}
+// Make a string by stopping at the first NUL
+fn byteString(p: Vec<byte>) -> String {
+    for i in 0..len!(p) {
+        if p[i] == 0 {
+            return String::from_utf8(p.as_slice()[0..i].to_vec()).unwrap();
+        }
+    }
+    return String::from_utf8(p).unwrap();
+}
+// dataIO -end

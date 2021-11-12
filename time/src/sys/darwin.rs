@@ -17,5 +17,5 @@ pub fn real_time_now() -> (uint64, uint64) {
     };
     cvt(unsafe { libc::clock_gettime(libc::CLOCK_REALTIME, &mut t) }).unwrap();
 
-    (uint64!(t.tv_sec), uint64!(t.tv_nsec))
+    (uint64!(t.tv_sec.abs()), uint64!(t.tv_nsec.abs()))
 }
