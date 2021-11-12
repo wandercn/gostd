@@ -1,7 +1,7 @@
 [package]
 name = "gostd_builtin"
 license = "MIT"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2018"
 authors = ["wandercn<wander@ffactory.org>"]
 description = "Package builtin binds the basic type in go through the type alias, and implements the basic type cast macro function.builtin 包通过类型别名绑定Go中的基础类型，并实现了基础类型强制转换宏函数。"
