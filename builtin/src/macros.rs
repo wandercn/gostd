@@ -535,4 +535,7 @@ macro_rules! len {
     ($x:ident) => {
         $x.len()
     };
+    ($x:expr) => {
+        $x.len()
+    };
 }
