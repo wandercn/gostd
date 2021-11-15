@@ -1,4 +1,4 @@
-struct List<'a> {
+struct S<'a> {
     a: &'a str,
     b: &'a str,
     i: isize,
@@ -7,63 +7,63 @@ struct List<'a> {
 #[test]
 fn test_compare() {
     let compareTests = vec![
-        List { a: "", b: "", i: 0 },
-        List {
+        S { a: "", b: "", i: 0 },
+        S {
             a: "a",
             b: "",
             i: 1,
         },
-        List {
+        S {
             a: "",
             b: "a",
             i: -1,
         },
-        List {
+        S {
             a: "abc",
             b: "abc",
             i: 0,
         },
-        List {
+        S {
             a: "ab",
             b: "abc",
             i: -1,
         },
-        List {
+        S {
             a: "abc",
             b: "ab",
             i: 1,
         },
-        List {
+        S {
             a: "x",
             b: "ab",
             i: 1,
         },
-        List {
+        S {
             a: "ab",
             b: "x",
             i: -1,
         },
-        List {
+        S {
             a: "x",
             b: "a",
             i: 1,
         },
-        List {
+        S {
             a: "b",
             b: "x",
             i: -1,
         },
-        List {
+        S {
             a: "abcdefgh",
             b: "abcdefgh",
             i: 0,
         },
-        List {
+        S {
             a: "abcdefghi",
             b: "abcdefghi",
             i: 0,
         },
-        List {
+        S {
             a: "abcdefghi",
             b: "abcdefghj",
             i: -1,
