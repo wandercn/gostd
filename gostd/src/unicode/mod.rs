@@ -1,2 +1,2 @@
 //! This module is waiting to be developed.
-mod utf8;
+pub mod utf8;
