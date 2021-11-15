@@ -1487,8 +1487,47 @@ pub fn Date(
 /// ```text
 /// 2013-02-03 19:54:00 +0000 PST
 /// ```
-pub fn Parse(layout: &str, value: &str) -> Result<Time, string> {
+pub fn Parse(layout: &str, value: &str) -> Result<Time, Error> {
     parse(layout, value, UTC.clone(), Local.clone())
+}
+
+/// ParseInLocation is like Parse but differs in two important ways.
+/// First, in the absence of time zone information, Parse interprets a time as UTC;
+/// ParseInLocation interprets the time as in the given location.
+/// Second, when given a zone offset or abbreviation, Parse tries to match it
+/// against the Local location; ParseInLocation uses the given location.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// ParseInLocation类似于Parse，但在两个重要方面有所不同。
+/// 首先，在没有时区信息的情况下，Parse将时间解释为UTC；
+/// ParseInLocation将时间解释为在给定位置。
+/// 其次，当给定区域偏移量或缩写时，Parse会尝试匹配它
+/// 针对当地位置；ParseInLocation使用给定的位置。
+/// </details>
+///
+/// # Example
+///
+/// ```
+///    use gostd_time as time;
+///
+///    let loc = time::LoadLocation("Asia/Shanghai").ok().unwrap();
+///    
+///       // This will look for the name CEST in the Europe/Berlin time zone.
+///       const LONG_LAYOUT: &str = "Jan 2, 2006 at 3:04pm (MST)";
+///       let t = time::ParseInLocation(LONG_LAYOUT, "Jul 9, 2012 at 5:02am (CEST)", &loc)
+///           .ok()
+///           .unwrap();
+///       assert_eq!("2012-07-09 05:02:00 +0000 CEST", t.String());
+///    
+///       // Note: without explicit zone, returns time in given location.
+///       const SHORT_LAYOUT: &str = "2006-Jan-02";
+///       let t = time::ParseInLocation(SHORT_LAYOUT, "2012-Jul-09", &loc)
+///           .ok()
+///           .unwrap();
+///       assert_eq!("2012-07-09 00:00:00 +0800 CST", t.String());
+///```
+pub fn ParseInLocation(layout: &str, value: &str, loc: &Location) -> Result<Time, Error> {
+    parse(layout, value, loc.clone(), loc.clone())
 }
 
 fn parse(
@@ -1496,7 +1535,7 @@ fn parse(
     value: &str,
     defaultLocation: Location,
     local: Location,
-) -> Result<Time, string> {
+) -> Result<Time, Error> {
     let mut layout = layout;
     let mut value = value;
     let mut alayout = layout;
@@ -1527,7 +1566,10 @@ fn parse(
 
         if std == 0 {
             if len!(value) != 0 {
-                return Err(format!("{} {}", "extra text:", value));
+                return Err(Error::new(
+                    ErrorKind::Other,
+                    format!("{} {}", "extra text:", value),
+                ));
             }
             break;
         }
@@ -1960,10 +2002,16 @@ fn parse(
             _ => (),
         }
         if rangeErrString != "" {
-            return Err(format!("{} {}", rangeErrString, " out of range"));
+            return Err(Error::new(
+                ErrorKind::Other,
+                format!("{} {}", rangeErrString, " out of range"),
+            ));
         }
         if err != "" {
-            return Err(format!("{} {}", "ParseError:", err));
+            return Err(Error::new(
+                ErrorKind::Other,
+                format!("{} {}", "ParseError:", err),
+            ));
         }
     }
     if pmSet && hour < 12 {
@@ -1985,9 +2033,12 @@ fn parse(
             }
         }
         if yday < 1 || yday > 365 {
-            return Err(format!(
-                "{} {} {} {} {}",
-                alayout, avalue, "", value, ": day-of-year out of range"
+            return Err(Error::new(
+                ErrorKind::Other,
+                format!(
+                    "{} {} {} {} {}",
+                    alayout, avalue, "", value, ": day-of-year out of range"
+                ),
             ));
         }
         if m == 0 {
@@ -2000,16 +2051,22 @@ fn parse(
         // If month, day already seen, yday's m, d must match.
         // Otherwise, set them from m, d.
         if month >= 0 && month != m {
-            return Err(format!(
-                "{} {} {} {} {}",
-                alayout, avalue, "", value, ": day-of-year does not match month"
+            return Err(Error::new(
+                ErrorKind::Other,
+                format!(
+                    "{} {} {} {} {}",
+                    alayout, avalue, "", value, ": day-of-year does not match month"
+                ),
             ));
         }
         month = m;
         if day >= 0 && day != d {
-            return Err(format!(
-                "{} {} {} {} {}",
-                alayout, avalue, "", value, ": day-of-year does not match day"
+            return Err(Error::new(
+                ErrorKind::Other,
+                format!(
+                    "{} {} {} {} {}",
+                    alayout, avalue, "", value, ": day-of-year does not match day"
+                ),
             ));
         }
         day = d;
@@ -2024,9 +2081,12 @@ fn parse(
 
     // Validate the day of the month.
     if day < 1 || day > daysIn(Month::IndexOf(uint!(month)), year) {
-        return Err(format!(
-            "{} {} {} {} {}",
-            alayout, avalue, "", value, ": day out of range"
+        return Err(Error::new(
+            ErrorKind::Other,
+            format!(
+                "{} {} {} {} {}",
+                alayout, avalue, "", value, ": day out of range"
+            ),
         ));
     }
 
@@ -2313,20 +2373,20 @@ fn leadingFraction(s: &str) -> (int64, float64, &str) {
     (x, scale, &s[index..])
 }
 
-fn skip<'a>(value: &'a str, prefix: &'a str) -> Result<&'a str, &'a str> {
+fn skip<'a>(value: &'a str, prefix: &'a str) -> Result<&'a str, Error> {
     let mut value = value;
     let mut prefix = prefix;
     while (len!(prefix) > 0) {
         if prefix.bytes().nth(0) == Some(b' ') {
             if len!(value) > 0 && value.bytes().nth(0) != Some(b' ') {
-                return Err("skip err1");
+                return Err(Error::new(ErrorKind::Other, "skip err1"));
             }
             prefix = cutspace(prefix);
             value = cutspace(value);
             continue;
         }
         if len!(value) == 0 || (value.bytes().nth(0) != prefix.bytes().nth(0)) {
-            return Err("skip err2");
+            return Err(Error::new(ErrorKind::Other, "skip err2"));
         }
         prefix = &prefix[1..];
         value = &value[1..];
@@ -4313,6 +4373,79 @@ fn LoadLocationFromTZData(name: &str, data: Vec<byte>) -> Result<Location, Error
     }
 
     Ok(l)
+}
+
+/// LoadLocation returns the Location with the given name.
+///
+/// If the name is "" or "UTC", LoadLocation returns UTC. If the name is "Local", LoadLocation returns Local.
+///
+/// Otherwise, the name is taken to be a location name corresponding to a file in the IANA Time Zone database, such as "America/New_York".
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// LoadLocation返回使用给定的名字创建的Location。
+///
+/// 如果name是""或"UTC"，返回UTC；如果name是"Local"，返回Local；否则name应该是IANA时区数据库里有记录的地点名（该数据库记录了地点和对应的时区），如"America/New_York"。
+/// </details>
+///
+/// # Example
+/// ```
+/// use gostd_time as time;
+///
+/// let loc = time::LoadLocation("America/New_York").ok().unwrap();
+/// let mut time_in_utc = time::Date(2018, 8, 30, 12, 0, 0, 0, time::UTC.clone());
+/// let t = time_in_utc.In(loc);
+/// assert_eq!("2018-08-30 08:00:00 -0400 EDT", t.String());
+/// ```
+pub fn LoadLocation(name: &str) -> Result<Location, Error> {
+    const errLocation: &str = "time: invalid location name";
+    use std::sync::Once;
+    let zoneSources = vec![
+        "/usr/share/zoneinfo/",
+        "/usr/share/lib/zoneinfo/",
+        "/usr/lib/locale/TZ/",
+    ];
+    let zoneinfoOnce = Once::new();
+    if name == "" || name == "UTC" {
+        return Ok(UTC.clone());
+    }
+    if name == "Local" {
+        return Ok(Local.clone());
+    }
+    if containsDotDot(name)
+        || name.bytes().nth(0) == Some(b'/')
+        || name.bytes().nth(0) == Some(b'\\')
+    {
+        // No valid IANA Time Zone name contains a single dot,
+        // much less dot dot. Likewise, none begin with a slash.
+        return Err(Error::new(ErrorKind::Other, errLocation));
+    }
+    let mut zoneinfo: &str = "";
+    zoneinfoOnce.call_once(|| {
+        if let Some(env) = option_env!("ZONEINFO") {
+            zoneinfo = env;
+        }
+    });
+    if zoneinfo != "" {
+        let zoneData = loadTzinfoFromDirOrZip(zoneinfo, name)?;
+        let z = LoadLocationFromTZData(name, zoneData)?;
+        return Ok(z);
+    } else {
+        let z = loadLocation(name, zoneSources)?;
+        return Ok(z);
+    }
+}
+
+// containsDotDot reports whether s contains "..".
+fn containsDotDot(s: &str) -> bool {
+    if len!(s) < 2 {
+        return false;
+    }
+    for i in 0..len!(s) {
+        if s.bytes().nth(i) == Some(b'.') && s.bytes().nth(i + 1) == Some(b'.') {
+            return true;
+        }
+    }
+    return false;
 }
 
 fn tzset(s: &str, initEnd: int64, sec: int64) -> (String, int, int64, int64, bool, bool) {
