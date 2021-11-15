@@ -1504,6 +1504,28 @@ pub fn Parse(layout: &str, value: &str) -> Result<Time, Error> {
 /// 其次，当给定区域偏移量或缩写时，Parse会尝试匹配它
 /// 针对当地位置；ParseInLocation使用给定的位置。
 /// </details>
+///
+/// # Example
+///
+/// ```
+///    use gostd_time as time;
+///
+///    let loc = time::LoadLocation("Asia/Shanghai").ok().unwrap();
+///    
+///       // This will look for the name CEST in the Europe/Berlin time zone.
+///       const LONG_LAYOUT: &str = "Jan 2, 2006 at 3:04pm (MST)";
+///       let t = time::ParseInLocation(LONG_LAYOUT, "Jul 9, 2012 at 5:02am (CEST)", &loc)
+///           .ok()
+///           .unwrap();
+///       assert_eq!("2012-07-09 05:02:00 +0000 CEST", t.String());
+///    
+///       // Note: without explicit zone, returns time in given location.
+///       const SHORT_LAYOUT: &str = "2006-Jan-02";
+///       let t = time::ParseInLocation(SHORT_LAYOUT, "2012-Jul-09", &loc)
+///           .ok()
+///           .unwrap();
+///       assert_eq!("2012-07-09 00:00:00 +0800 CST", t.String());
+///```
 pub fn ParseInLocation(layout: &str, value: &str, loc: &Location) -> Result<Time, Error> {
     parse(layout, value, loc.clone(), loc.clone())
 }
@@ -4369,8 +4391,9 @@ fn LoadLocationFromTZData(name: &str, data: Vec<byte>) -> Result<Location, Error
 /// ```
 /// use gostd_time as time;
 ///
+/// let loc = time::LoadLocation("America/New_York").ok().unwrap();
 /// let mut time_in_utc = time::Date(2018, 8, 30, 12, 0, 0, 0, time::UTC.clone());
-/// let t = time_in_utc.In(location);
+/// let t = time_in_utc.In(loc);
 /// assert_eq!("2018-08-30 08:00:00 -0400 EDT", t.String());
 /// ```
 pub fn LoadLocation(name: &str) -> Result<Location, Error> {
