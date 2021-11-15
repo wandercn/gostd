@@ -720,7 +720,7 @@ pub fn TrimSuffix<'a>(s: &'a str, suffix: &str) -> &'a str {
 /// ```
 #[derive(Default, PartialEq, PartialOrd, Debug, Clone, Fmt)]
 pub struct Builder {
-    addr: Box<Builder>,
+    addr: Box<Option<Builder>>,
     buf: Vec<byte>,
 }
 
@@ -760,7 +760,7 @@ impl Builder {
         if n < 0 {
             panic!("strings.Builder.Grow: negative count")
         }
-        if (self.buf.capacity() - len!(self.buf)) < uint!(n.abs()) {
+        if self.buf.capacity() - len!(self.buf) < uint!(n.abs()) {
             self.grow(n)
         }
     }
@@ -779,8 +779,9 @@ impl Builder {
     /// <summary class="docblock">zh-cn</summary>
     ///
     /// </details>
-    pub fn Reset(&self) {
-        todo!()
+    pub fn Reset(&mut self) {
+        self.addr = Box::new(None);
+        self.buf = Vec::new();
     }
 
     /// String returns the accumulated string.
@@ -823,10 +824,12 @@ impl Builder {
         }
 
         let l = len!(self.buf);
-        if self.buf.capacity() - l < utf8.UTFMax {
-            self.grow(utf8::UTFMax);
+        if self.buf.capacity() - l < utf8::UTFMax {
+            self.grow(utf8::UTFMax as int);
         }
-        todo!()
+        let n = utf8::EncodeRune(self.buf.get(l..l + utf8::UTFMax).unwrap().to_vec(), r);
+        self.buf = self.buf.get(..l + (n.abs() as uint)).unwrap().to_vec();
+        return Ok(n);
     }
 
     /// WriteString appends the contents of s to b's buffer. It returns the length of s and a nil error.
@@ -834,8 +837,9 @@ impl Builder {
     /// <summary class="docblock">zh-cn</summary>
     ///
     /// </details>
-    pub fn WriteString(&self, s: &str) -> Result<int, &str> {
-        todo!()
+    pub fn WriteString(&mut self, s: &str) -> Result<int, &str> {
+        self.buf.append(s.as_bytes().to_vec().as_mut());
+        return Ok(len!(self.buf) as int);
     }
 }
 
