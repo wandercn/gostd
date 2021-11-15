@@ -731,7 +731,9 @@ impl Builder {
     ///
     /// </details>
     pub fn new() -> Builder {
-        Builder::default()
+        let mut b = Builder::default();
+        b.addr = Box::new(Some(b.clone()));
+        b
     }
 
     /// Cap returns the capacity of the builder's underlying byte slice. It is the total space allocated for the string being built and includes any bytes already written.
