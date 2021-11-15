@@ -11,6 +11,8 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
+#[cfg(test)]
+mod tests;
 #[macro_use]
 use crate::builtin::*;
 use crate::io;
@@ -29,7 +31,13 @@ use gostd_derive::Fmt;
 ///
 /// ```
 pub fn Compare(a: &str, b: &str) -> int {
-    todo!()
+    if a == b {
+        return 0;
+    }
+    if a < b {
+        return -1;
+    }
+    1
 }
 /// Contains reports whether substr is within s.
 /// <details class="rustdoc-toggle top-doc">
