@@ -312,8 +312,27 @@ pub fn IndexRune(s: &str, r: rune) -> int {
 /// ```
 ///
 /// ```
-pub fn Join<'a>(elems: Vec<&'a str>, sep: &'a str) -> &'a str {
-    todo!()
+pub fn Join<'a>(elems: Vec<&'a str>, sep: &'a str) -> String {
+    match len!(elems) {
+        0 => return "".to_owned(),
+        1 => return elems[0].to_string(),
+        _ => (),
+    }
+
+    let mut n = len!(sep) * (len!(elems) - 1);
+    for i in 0..len!(elems) {
+        n += len!(elems[i]);
+    }
+
+    let mut b = Builder::new();
+
+    b.Grow(int!(n));
+    b.WriteString(elems[0]);
+    for s in elems.get(1..).unwrap() {
+        b.WriteString(sep);
+        b.WriteString(s);
+    }
+    b.String()
 }
 
 /// LastIndex returns the index of the last instance of substr in s, or -1 if substr is not present in s.
@@ -421,8 +440,27 @@ pub fn Map(mapping: fn(rune) -> rune, s: &str) -> &str {
 /// ```
 ///
 /// ```
-pub fn Repeat(s: &str, count: int) -> &str {
-    todo!()
+pub fn Repeat(s: &str, count: uint) -> String {
+    if count == 0 {
+        return "".to_owned();
+    }
+
+    if len!(s) * count / count != len!(s) {
+        panic!("strings: Repeat count causes overflow")
+    }
+    let mut n = len!(s) * count;
+    let mut b = Builder::new();
+    b.Grow(int!(n));
+    b.WriteString(s);
+    while (b.Len() <= int!(n)) {
+        if b.Len() <= int!(n) / 2 {
+            b.WriteString(b.String().as_str());
+        } else {
+            b.WriteString(b.String().as_str());
+            break;
+        }
+    }
+    b.String()
 }
 
 /// Replace returns a copy of the string s with the first n non-overlapping instances of old replaced by new. If old is empty, it matches at the beginning of the string and after each UTF-8 sequence, yielding up to k+1 replacements for a k-rune string. If n < 0, there is no limit on the number of replacements.
@@ -866,7 +904,7 @@ impl Builder {
     /// <summary class="docblock">zh-cn</summary>
     ///
     /// </details>
-    pub fn String<'a>(&self) -> string {
+    pub fn String<'a>(&self) -> String {
         String::from_utf8(self.buf.clone()).unwrap()
     }
 
