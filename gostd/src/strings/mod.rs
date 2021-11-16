@@ -51,7 +51,7 @@ pub fn Compare(a: &str, b: &str) -> int {
 ///
 /// ```
 pub fn Contains(s: &str, subStr: &str) -> bool {
-    todo!()
+    s.contains(subStr)
 }
 
 /// ContainsAny reports whether any Unicode code points in chars are within s.
@@ -66,7 +66,7 @@ pub fn Contains(s: &str, subStr: &str) -> bool {
 ///
 /// ```
 pub fn ContainsAny(s: &str, chars: &str) -> bool {
-    todo!()
+    s.contains(chars)
 }
 
 /// ContainsRune reports whether the Unicode code point r is within s.
@@ -81,7 +81,7 @@ pub fn ContainsAny(s: &str, chars: &str) -> bool {
 ///
 /// ```
 pub fn ContainsRune(s: &str, r: rune) -> bool {
-    todo!()
+    s.contains(char::from_u32(r).unwrap())
 }
 
 /// Count counts the number of non-overlapping instances of substr in s. If substr is an empty string, Count returns 1 + the number of Unicode code points in s.
@@ -95,8 +95,31 @@ pub fn ContainsRune(s: &str, r: rune) -> bool {
 /// ```
 ///
 /// ```
-pub fn Count(s: &str, substr: &str) -> int {
-    todo!()
+pub fn Count(mut s: &str, substr: &str) -> int {
+    if len!(substr) == 0 {
+        return int!(s.chars().count());
+    }
+
+    if len!(substr) == 1 {
+        let mut c: int = 0;
+        let s1 = substr.bytes().nth(0).unwrap();
+        for v in s.bytes() {
+            if v == s1 {
+                c += 1
+            }
+        }
+        return c;
+    }
+
+    let mut n: int = 0;
+    loop {
+        let i = Index(s, substr);
+        if i == -1 {
+            return n;
+        }
+        n += 1;
+        s = &s[uint!(i) + len!(substr)..];
+    }
 }
 
 /// EqualFold reports whether s and t, interpreted as UTF-8 strings, are equal under Unicode case-folding, which is a more general form of case-insensitivity.
@@ -158,7 +181,7 @@ pub fn FieldsFunc(s: &str, f: fn(rune) -> bool) -> Vec<&str> {
 ///
 /// ```
 pub fn HasPrefix(s: &str, prefix: &str) -> bool {
-    todo!()
+    s.starts_with(prefix)
 }
 
 /// HasSuffix tests whether the string s ends with suffix.
@@ -173,7 +196,7 @@ pub fn HasPrefix(s: &str, prefix: &str) -> bool {
 ///
 /// ```
 pub fn HasSuffix(s: &str, suffix: &str) -> bool {
-    todo!()
+    s.ends_with(suffix)
 }
 
 /// Index returns the index of the first instance of substr in s, or -1 if substr is not present in s.
@@ -188,7 +211,14 @@ pub fn HasSuffix(s: &str, suffix: &str) -> bool {
 ///
 /// ```
 pub fn Index(s: &str, substr: &str) -> int {
-    todo!()
+    if substr == "" {
+        return -1;
+    }
+    if let Some(i) = s.find(substr) {
+        return int!(i);
+    } else {
+        -1
+    }
 }
 
 /// IndexAny returns the index of the first instance of any Unicode code point from chars in s, or -1 if no Unicode code point from chars is present in s.
@@ -203,7 +233,14 @@ pub fn Index(s: &str, substr: &str) -> int {
 ///
 /// ```
 pub fn IndexAny(s: &str, chars: &str) -> int {
-    todo!()
+    if chars == "" {
+        return -1;
+    }
+
+    if let Some(i) = s.find(chars) {
+        return int!(i);
+    }
+    -1
 }
 
 /// IndexByte returns the index of the first instance of c in s, or -1 if c is not present in s.
@@ -218,7 +255,11 @@ pub fn IndexAny(s: &str, chars: &str) -> int {
 ///
 /// ```
 pub fn IndexByte(s: &str, c: byte) -> int {
-    todo!()
+    if let Some(i) = s.bytes().find(|&x| x == c) {
+        return int!(i);
+    } else {
+        return -1;
+    }
 }
 
 /// IndexFunc returns the index into s of the first Unicode code point satisfying f(c), or -1 if none do.
@@ -232,8 +273,14 @@ pub fn IndexByte(s: &str, c: byte) -> int {
 /// ```
 ///
 /// ```
+use std::ops::FnMut;
 pub fn IndexFunc(s: &str, f: fn(rune) -> bool) -> int {
-    todo!()
+    for (i, r) in s.chars().enumerate() {
+        if f(r as u32) == true {
+            return int!(i);
+        }
+    }
+    -1
 }
 
 /// IndexRune returns the index of the first instance of the Unicode code point r, or -1 if rune is not present in s. If r is utf8.RuneError, it returns the first instance of any invalid UTF-8 byte sequence.
@@ -248,7 +295,10 @@ pub fn IndexFunc(s: &str, f: fn(rune) -> bool) -> int {
 ///
 /// ```
 pub fn IndexRune(s: &str, r: rune) -> int {
-    todo!()
+    if let Some(i) = s.chars().find(|&x| x == char::from_u32(r).unwrap()) {
+        return int!(i);
+    }
+    -1
 }
 
 /// Join concatenates the elements of its first argument to create a single string. The separator string sep is placed between elements in the resulting string.
@@ -278,7 +328,13 @@ pub fn Join<'a>(elems: Vec<&'a str>, sep: &'a str) -> &'a str {
 ///
 /// ```
 pub fn LastIndex(s: &str, substr: &str) -> int {
-    todo!()
+    if substr == "" {
+        return -1;
+    }
+    if let Some(i) = s.rfind(substr) {
+        return int!(i);
+    }
+    -1
 }
 
 /// LastIndexAny returns the index of the last instance of any Unicode code point from chars in s, or -1 if no Unicode code point from chars is present in s.
@@ -293,7 +349,10 @@ pub fn LastIndex(s: &str, substr: &str) -> int {
 ///
 /// ```
 pub fn LastIndexAny(s: &str, chars: &str) -> int {
-    todo!()
+    if let Some(i) = s.rfind(chars) {
+        return int!(i);
+    }
+    -1
 }
 
 /// LastIndexByte returns the index of the last instance of c in s, or -1 if c is not present in s.
@@ -308,7 +367,10 @@ pub fn LastIndexAny(s: &str, chars: &str) -> int {
 ///
 /// ```
 pub fn LastIndexByte(s: &str, c: byte) -> int {
-    todo!()
+    if let Some(i) = s.bytes().rfind(|&x| x == c) {
+        return int!(i);
+    }
+    -1
 }
 
 /// LastIndexFunc returns the index into s of the last Unicode code point satisfying f(c), or -1 if none do.
@@ -323,7 +385,12 @@ pub fn LastIndexByte(s: &str, c: byte) -> int {
 ///
 /// ```
 pub fn LastIndexFunc(s: &str, f: fn(rune) -> bool) -> int {
-    todo!()
+    for (i, r) in s.chars().rev().enumerate() {
+        if f(r as u32) == true {
+            return int!(i);
+        }
+    }
+    -1
 }
 
 /// Map returns a copy of the string s with all its characters modified according to the mapping function. If mapping returns a negative value, the character is dropped from the string with no replacement.
