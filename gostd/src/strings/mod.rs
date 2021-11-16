@@ -42,43 +42,65 @@ pub fn Compare(a: &str, b: &str) -> int {
 /// Contains reports whether substr is within s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 判断字符串s是否包含子串substr。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!(true,strings::Contains("seafood", "foo"));
+/// assert_eq!(false,strings::Contains("seafood", "bar"));
+/// assert_eq!(true,strings::Contains("seafood", ""));
+/// assert_eq!(true,strings::Contains("", ""));
 /// ```
-pub fn Contains(s: &str, subStr: &str) -> bool {
-    s.contains(subStr)
+pub fn Contains(s: &str, substr: &str) -> bool {
+    s.contains(substr)
 }
 
 /// ContainsAny reports whether any Unicode code points in chars are within s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 判断字符串s是否包含字符串chars中的任一字符。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+///    assert_eq!(false, strings::ContainsAny("team", "i"));
+///    assert_eq!(true, strings::ContainsAny("failure", "u & i"));
+///    assert_eq!(false, strings::ContainsAny("foo", ""));
+///    assert_eq!(false, strings::ContainsAny("", ""));
+///    assert_eq!(true, strings::ContainsAny("你好,中国", "hello,好"));
 ///
 /// ```
 pub fn ContainsAny(s: &str, chars: &str) -> bool {
-    s.contains(chars)
+    for c in chars.chars() {
+        if s.contains(c) {
+            return true;
+        }
+    }
+    false
 }
 
 /// ContainsRune reports whether the Unicode code point r is within s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 判断字符串s是否包含utf-8码值r
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// // '中' as rune = 20013 or 0x4e2d
+/// assert_eq!(true, strings::ContainsRune("hello中国!", 20013));
+/// assert_eq!(true, strings::ContainsRune("hello中国!", 0x4e2d));
+/// assert_eq!(false, strings::ContainsRune("hello世界!", 0x4e2d));
 /// ```
 pub fn ContainsRune(s: &str, r: rune) -> bool {
     s.contains(char::from_u32(r).unwrap())
@@ -87,17 +109,20 @@ pub fn ContainsRune(s: &str, r: rune) -> bool {
 /// Count counts the number of non-overlapping instances of substr in s. If substr is an empty string, Count returns 1 + the number of Unicode code points in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回字符串s中有几个不重复的substr子串。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
-///
+/// use gostd::strings;
+///     assert_eq!(3, strings::Count("cheese", "e"));
+///     assert_eq!(5, strings::Count("five", ""));
+///     assert_eq!(4, strings::Count("台湾人香港人澳门人都是中国人", "人"));
 /// ```
 pub fn Count(mut s: &str, substr: &str) -> int {
     if len!(substr) == 0 {
-        return int!(s.chars().count());
+        return int!(s.chars().count() + 1);
     }
 
     if len!(substr) == 1 {
@@ -125,7 +150,7 @@ pub fn Count(mut s: &str, substr: &str) -> int {
 /// EqualFold reports whether s and t, interpreted as UTF-8 strings, are equal under Unicode case-folding, which is a more general form of case-insensitivity.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 判断两个utf-8编码字符串（将unicode大写、小写、标题三种格式字符视为相同）是否相同
 /// </details>
 ///
 /// # Example
@@ -172,7 +197,7 @@ pub fn FieldsFunc(s: &str, f: fn(rune) -> bool) -> Vec<&str> {
 /// HasPrefix tests whether the string s begins with prefix.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 判断s是否有前缀字符串prefix。
 /// </details>
 ///
 /// # Example
@@ -187,7 +212,7 @@ pub fn HasPrefix(s: &str, prefix: &str) -> bool {
 /// HasSuffix tests whether the string s ends with suffix.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 判断s是否有后缀字符串suffix。
 /// </details>
 ///
 /// # Example
@@ -224,22 +249,28 @@ pub fn Index(s: &str, substr: &str) -> int {
 /// IndexAny returns the index of the first instance of any Unicode code point from chars in s, or -1 if no Unicode code point from chars is present in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 字符串chars中的任一utf-8码值在s中第一次出现的位置，如果不存在或者chars为空字符串则返回-1。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!(strings::IndexAny("chicken", "aeiouy"),2);
+/// assert_eq!(strings::IndexAny("crwth", "aeiouy"),-1);
 ///
 /// ```
 pub fn IndexAny(s: &str, chars: &str) -> int {
-    if chars == "" {
+    if chars == "" || s == "" {
         return -1;
     }
-
-    if let Some(i) = s.find(chars) {
-        return int!(i);
+    for (idx, r) in s.chars().enumerate() {
+        if IndexRune(chars, r as u32) != -1 {
+            return int!(idx);
+        }
     }
+
     -1
 }
 
@@ -295,7 +326,7 @@ pub fn IndexFunc(s: &str, f: fn(rune) -> bool) -> int {
 ///
 /// ```
 pub fn IndexRune(s: &str, r: rune) -> int {
-    if let Some(i) = s.chars().find(|&x| x == char::from_u32(r).unwrap()) {
+    if let Some(i) = s.find(|c: char| c == char::from_u32(r).unwrap()) {
         return int!(i);
     }
     -1
