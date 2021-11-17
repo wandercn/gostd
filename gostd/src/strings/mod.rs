@@ -224,10 +224,60 @@ pub fn Fields(s: &str) -> Vec<String> {
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+///    /* fn f(c: u32) -> bool {
+///        let s = char::from_u32(c).unwrap();
+///        !s.is_numeric() && !s.is_alphabetic()
+///    } */
+///    // f 用函数或者匿名函数都可以
+///    let f = |c: u32| {
+///        let s = char::from_u32(c).unwrap();
+///        !s.is_numeric() && !s.is_alphabetic()
+///    };
+///    assert_eq!(
+///        vec!["foo1", "bar2", "baz3"],
+///        strings::FieldsFunc("  foo1;bar2,baz3...", f)
+///    )
 /// ```
-pub fn FieldsFunc(s: &str, f: fn(rune) -> bool) -> Vec<&str> {
-    todo!()
+pub fn FieldsFunc(s: &str, f: fn(rune) -> bool) -> Vec<String> {
+    #[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
+    struct span {
+        start: int,
+        end: int,
+    }
+    let mut spans = Vec::with_capacity(32);
+    let mut start = -1;
+    for (end, rune) in s.chars().enumerate() {
+        if f(rune as u32) {
+            if start >= 0 {
+                spans.push(span {
+                    start,
+                    end: end as int,
+                });
+
+                start = !start; // go中一元运算符^ ,在rust中对应的是!,都是按位取反。
+            }
+        } else {
+            if start < 0 {
+                start = end as int;
+            }
+        }
+    }
+
+    if start >= 0 {
+        spans.push(span {
+            start,
+            end: len!(s) as int,
+        });
+    }
+
+    let mut a = vec![];
+    a.resize(len!(spans), String::new());
+    for (i, span) in spans.iter().enumerate() {
+        a[i] = s[span.start as usize..span.end as usize].to_string();
+    }
+    a
 }
 
 /// HasPrefix tests whether the string s begins with prefix.
