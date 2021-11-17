@@ -162,25 +162,55 @@ pub fn Count(mut s: &str, substr: &str) -> int {
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+///    assert_eq!(true, strings::EqualFold("Hello, 世界", "heLLo, 世界"));
+///    assert_eq!(false, strings::EqualFold("hello,world", "hello, 世界"));
+///    assert_eq!(true, strings::EqualFold("RUST-LANG", "rust-lang"));
+///    assert_eq!(true, strings::EqualFold("Go", "go"));
 /// ```
 pub fn EqualFold(s: &str, t: &str) -> bool {
-    todo!()
+    s.to_lowercase() == t.to_lowercase()
 }
 
 /// Fields splits the string s around each instance of one or more consecutive white space characters, as defined by unicode.IsSpace, returning a slice of substrings of s or an empty slice if s contains only white space.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将字符串按照空白（unicode.IsSpace确定，可以是一到多个连续的空白字符）分割的多个字符串。如果字符串全部是空白或者是空字符串的话，会返回空切片。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
-///
+/// use gostd::strings;
+///  assert_eq!(vec!["foo","bar","baz"],strings::Fields("  foo bar  baz   "));
+///  assert_eq!(
+///     vec!["aaa", "bbb", "cccc", "ddd"],
+///     strings::Fields("  \taaa bbb\t  cccc\r ddd  \r"));
 /// ```
-pub fn Fields(s: &str) -> Vec<&str> {
-    todo!()
+pub fn Fields(s: &str) -> Vec<String> {
+    let mut list = vec![];
+    let mut wasSapce = false;
+    let mut s1 = "".to_string();
+    for (idx, v) in s.trim().chars().enumerate() {
+        if idx == s.trim().len() - 1 {
+            s1.push(v);
+            wasSapce = true;
+        }
+        if v.is_ascii_whitespace() || v.is_whitespace() {
+            wasSapce = true;
+        } else {
+            if wasSapce {
+                wasSapce = false;
+                list.push(s1.clone());
+                s1.clear();
+                s1.push(v);
+            } else {
+                s1.push(v);
+            }
+        }
+    }
+    list
 }
 
 /// FieldsFunc splits the string s at each run of Unicode code points c satisfying f(c) and returns an array of slices of s. If all code points in s satisfy f(c) or the string is empty, an empty slice is returned.
