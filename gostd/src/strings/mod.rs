@@ -383,6 +383,7 @@ pub fn IndexByte(s: &str, c: byte) -> int {
 /// <summary class="docblock">zh-cn</summary>
 /// IndexFunc将满足f（rune）的第一个Unicode代码点的索引返回到s，如果没有，则返回-1。
 /// </details>
+///
 /// # Example
 ///
 /// ```
@@ -624,13 +625,21 @@ pub fn Map(mapping: fn(rune) -> rune, mut s: &str) -> String {
 /// It panics if count is negative or if the result of (len!(s) * count) overflows.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回count个s串联的字符串。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+///  use gostd::strings;
 ///
+///  println!("{}",strings::Repeat("12",3));
+///
+/// ```
+/// # Output
+///
+/// ```text
+/// 121212
 /// ```
 pub fn Repeat(s: &str, count: uint) -> String {
     if count == 0 {
@@ -644,11 +653,11 @@ pub fn Repeat(s: &str, count: uint) -> String {
     let mut b = Builder::new();
     b.Grow(int!(n));
     b.WriteString(s);
-    while (b.Len() <= int!(n)) {
+    while (b.Len() < int!(n)) {
         if b.Len() <= int!(n) / 2 {
             b.WriteString(b.String().as_str());
         } else {
-            b.WriteString(b.String().as_str());
+            b.WriteString(b.String().get(..(n - b.Len() as usize)).unwrap());
             break;
         }
     }
