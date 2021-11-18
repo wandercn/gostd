@@ -668,31 +668,41 @@ pub fn Repeat(s: &str, count: uint) -> String {
 /// It panics if count is negative or if the result of (len!(s) * count) overflows.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将s中前n个不重叠old子串都替换为new的新字符串，如果n<0会替换所有old子串
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!("oinky oinky oink",strings::Replace("oink oink oink", "k", "ky", 2));
+/// assert_eq!("moo moo moo",strings::Replace("oink oink oink", "oink", "moo", -1));
 ///
 /// ```
-pub fn Replace<'a>(s: &'a str, old: &str, new: &str, n: int) -> &'a str {
-    todo!()
+pub fn Replace<'a>(s: &'a str, old: &str, new: &str, n: int) -> String {
+    if n < 0 {
+        return s.replace(old, new);
+    }
+    s.replacen(old, new, uint!(n))
 }
 
 /// ReplaceAll returns a copy of the string s with all non-overlapping instances of old replaced by new. If old is empty, it matches at the beginning of the string and after each UTF-8 sequence, yielding up to k+1 replacements for a k-rune string.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将s中不重叠old子串都替换为new的新字符串。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!("moo moo moo",strings::ReplaceAll("oink oink oink", "oink", "moo"));
 ///
 /// ```
-pub fn ReplaceAll<'a>(s: &'a str, old: &str, new: &str) -> &'a str {
-    todo!()
+pub fn ReplaceAll<'a>(s: &'a str, old: &str, new: &str) -> String {
+    s.replace(old, new)
 }
 
 /// Split slices s into all substrings separated by sep and returns a slice of the substrings between those separators.
