@@ -219,7 +219,7 @@ pub fn Fields(s: &str) -> Vec<&str> {
 ///        strings::FieldsFunc("  foo1;bar2,baz3...", f)
 ///    )
 /// ```
-pub fn FieldsFunc(s: &str, f: fn(rune) -> bool) -> Vec<String> {
+pub fn FieldsFunc(s: &str, f: fn(rune) -> bool) -> Vec<&str> {
     #[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
     struct span {
         start: int,
@@ -252,9 +252,9 @@ pub fn FieldsFunc(s: &str, f: fn(rune) -> bool) -> Vec<String> {
     }
 
     let mut a = vec![];
-    a.resize(len!(spans), String::new());
+    a.resize(len!(spans), "");
     for (i, span) in spans.iter().enumerate() {
-        a[i] = s[span.start as usize..span.end as usize].to_string();
+        a[i] = &s[span.start as usize..span.end as usize];
     }
     a
 }
@@ -268,6 +268,12 @@ pub fn FieldsFunc(s: &str, f: fn(rune) -> bool) -> Vec<String> {
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!(true,strings::HasPrefix("Rustacean","Rust"));
+/// assert_eq!(false,strings::HasPrefix("Rustacean","c"));
+/// assert_eq!(true,strings::HasPrefix("Rustacean",""));
+/// assert_eq!(true,strings::HasPrefix("Gopher","Go"));
 ///
 /// ```
 pub fn HasPrefix(s: &str, prefix: &str) -> bool {
@@ -283,7 +289,12 @@ pub fn HasPrefix(s: &str, prefix: &str) -> bool {
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!(true,strings::HasSuffix("Amirust","rust"));
+/// assert_eq!(false,strings::HasSuffix("Amirust","R"));
+/// assert_eq!(false,strings::HasSuffix("Amirust","Ami"));
+/// assert_eq!(true,strings::HasSuffix("Amirust",""));
 /// ```
 pub fn HasSuffix(s: &str, suffix: &str) -> bool {
     s.ends_with(suffix)
@@ -292,13 +303,16 @@ pub fn HasSuffix(s: &str, suffix: &str) -> bool {
 /// Index returns the index of the first instance of substr in s, or -1 if substr is not present in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 子串substr在字符串s中第一次出现的位置，不存在则返回-1
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!(4,strings::Index("chicken", "ken"));
+/// assert_eq!(-1,strings::Index("chicken", "dmr"));
 /// ```
 pub fn Index(s: &str, substr: &str) -> int {
     if substr == "" {
@@ -342,20 +356,26 @@ pub fn IndexAny(s: &str, chars: &str) -> int {
 /// IndexByte returns the index of the first instance of c in s, or -1 if c is not present in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 字符c在s中第一次出现的位置，不存在则返回-1。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!(0,strings::IndexByte("rustlang",b'r'));
+/// assert_eq!(3,strings::IndexByte("gophers",b'h'));
+/// assert_eq!(-1,strings::IndexByte("gophers",b'x'));
 ///
 /// ```
 pub fn IndexByte(s: &str, c: byte) -> int {
-    if let Some(i) = s.bytes().find(|&x| x == c) {
-        return int!(i);
-    } else {
-        return -1;
+    for (i, v) in s.bytes().enumerate() {
+        if v == c {
+            return int!(i);
+        }
     }
+    -1
 }
 
 /// IndexFunc returns the index into s of the first Unicode code point satisfying f(c), or -1 if none do.
