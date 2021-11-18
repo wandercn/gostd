@@ -188,29 +188,8 @@ pub fn EqualFold(s: &str, t: &str) -> bool {
 ///     vec!["aaa", "bbb", "cccc", "ddd"],
 ///     strings::Fields("  \taaa bbb\t  cccc\r ddd  \r"));
 /// ```
-pub fn Fields(s: &str) -> Vec<String> {
-    let mut list = vec![];
-    let mut wasSapce = false;
-    let mut s1 = "".to_string();
-    for (idx, v) in s.trim().chars().enumerate() {
-        if idx == s.trim().len() - 1 {
-            s1.push(v);
-            wasSapce = true;
-        }
-        if v.is_ascii_whitespace() || v.is_whitespace() {
-            wasSapce = true;
-        } else {
-            if wasSapce {
-                wasSapce = false;
-                list.push(s1.clone());
-                s1.clear();
-                s1.push(v);
-            } else {
-                s1.push(v);
-            }
-        }
-    }
-    list
+pub fn Fields(s: &str) -> Vec<&str> {
+    s.trim().split_whitespace().collect()
 }
 
 /// FieldsFunc splits the string s at each run of Unicode code points c satisfying f(c) and returns an array of slices of s. If all code points in s satisfy f(c) or the string is empty, an empty slice is returned.
@@ -388,6 +367,7 @@ pub fn IndexByte(s: &str, c: byte) -> int {
 /// # Example
 ///
 /// ```
+///
 ///
 /// ```
 use std::ops::FnMut;
