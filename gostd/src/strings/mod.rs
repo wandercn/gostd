@@ -22,12 +22,18 @@ use gostd_derive::Fmt;
 /// Compare is included only for symmetry with package bytes. It is usually clearer and always faster to use the built-in string comparison operators ==, <, >, and so on.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// Compare返回一个按字典顺序比较两个字符串的整数。如果a==b，结果为0；如果a<b，结果为-1；如果a>b，结果为+1
+/// 比较仅用于与包字节对称。使用内置的字符串比较运算符==、<、>，等等通常更清晰，而且总是更快。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+///    assert_eq!(-1, strings::Compare("a", "b"));
+///    assert_eq!(0, strings::Compare("a", "a"));
+///    assert_eq!(1, strings::Compare("b", "a"));
 ///
 /// ```
 pub fn Compare(a: &str, b: &str) -> int {
@@ -156,25 +162,34 @@ pub fn Count(mut s: &str, substr: &str) -> int {
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+///    assert_eq!(true, strings::EqualFold("Hello, 世界", "heLLo, 世界"));
+///    assert_eq!(false, strings::EqualFold("hello,world", "hello, 世界"));
+///    assert_eq!(true, strings::EqualFold("RUST-LANG", "rust-lang"));
+///    assert_eq!(true, strings::EqualFold("Go", "go"));
 /// ```
 pub fn EqualFold(s: &str, t: &str) -> bool {
-    todo!()
+    s.to_lowercase() == t.to_lowercase()
 }
 
 /// Fields splits the string s around each instance of one or more consecutive white space characters, as defined by unicode.IsSpace, returning a slice of substrings of s or an empty slice if s contains only white space.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将字符串按照空白（unicode.IsSpace确定，可以是一到多个连续的空白字符）分割的多个字符串。如果字符串全部是空白或者是空字符串的话，会返回空切片。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
-///
+/// use gostd::strings;
+///  assert_eq!(vec!["foo","bar","baz"],strings::Fields("  foo bar  baz   "));
+///  assert_eq!(
+///     vec!["aaa", "bbb", "cccc", "ddd"],
+///     strings::Fields("  \taaa bbb\t  cccc\r ddd  \r"));
 /// ```
 pub fn Fields(s: &str) -> Vec<&str> {
-    todo!()
+    s.trim().split_whitespace().collect()
 }
 
 /// FieldsFunc splits the string s at each run of Unicode code points c satisfying f(c) and returns an array of slices of s. If all code points in s satisfy f(c) or the string is empty, an empty slice is returned.
@@ -188,10 +203,60 @@ pub fn Fields(s: &str) -> Vec<&str> {
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+///    /* fn f(c: u32) -> bool {
+///        let s = char::from_u32(c).unwrap();
+///        !s.is_numeric() && !s.is_alphabetic()
+///    } */
+///    // f 用函数或者匿名函数都可以
+///    let f = |c: u32| {
+///        let s = char::from_u32(c).unwrap();
+///        !s.is_numeric() && !s.is_alphabetic()
+///    };
+///    assert_eq!(
+///        vec!["foo1", "bar2", "baz3"],
+///        strings::FieldsFunc("  foo1;bar2,baz3...", f)
+///    )
 /// ```
 pub fn FieldsFunc(s: &str, f: fn(rune) -> bool) -> Vec<&str> {
-    todo!()
+    #[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
+    struct span {
+        start: int,
+        end: int,
+    }
+    let mut spans = Vec::with_capacity(32);
+    let mut start = -1;
+    for (end, rune) in s.chars().enumerate() {
+        if f(rune as u32) {
+            if start >= 0 {
+                spans.push(span {
+                    start,
+                    end: end as int,
+                });
+
+                start = !start; // go中一元运算符^ ,在rust中对应的是!,都是按位取反。
+            }
+        } else {
+            if start < 0 {
+                start = end as int;
+            }
+        }
+    }
+
+    if start >= 0 {
+        spans.push(span {
+            start,
+            end: len!(s) as int,
+        });
+    }
+
+    let mut a = vec![];
+    a.resize(len!(spans), "");
+    for (i, span) in spans.iter().enumerate() {
+        a[i] = &s[span.start as usize..span.end as usize];
+    }
+    a
 }
 
 /// HasPrefix tests whether the string s begins with prefix.
@@ -203,6 +268,12 @@ pub fn FieldsFunc(s: &str, f: fn(rune) -> bool) -> Vec<&str> {
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!(true,strings::HasPrefix("Rustacean","Rust"));
+/// assert_eq!(false,strings::HasPrefix("Rustacean","c"));
+/// assert_eq!(true,strings::HasPrefix("Rustacean",""));
+/// assert_eq!(true,strings::HasPrefix("Gopher","Go"));
 ///
 /// ```
 pub fn HasPrefix(s: &str, prefix: &str) -> bool {
@@ -218,7 +289,12 @@ pub fn HasPrefix(s: &str, prefix: &str) -> bool {
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!(true,strings::HasSuffix("Amirust","rust"));
+/// assert_eq!(false,strings::HasSuffix("Amirust","R"));
+/// assert_eq!(false,strings::HasSuffix("Amirust","Ami"));
+/// assert_eq!(true,strings::HasSuffix("Amirust",""));
 /// ```
 pub fn HasSuffix(s: &str, suffix: &str) -> bool {
     s.ends_with(suffix)
@@ -227,13 +303,16 @@ pub fn HasSuffix(s: &str, suffix: &str) -> bool {
 /// Index returns the index of the first instance of substr in s, or -1 if substr is not present in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 子串substr在字符串s中第一次出现的位置，不存在则返回-1
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!(4,strings::Index("chicken", "ken"));
+/// assert_eq!(-1,strings::Index("chicken", "dmr"));
 /// ```
 pub fn Index(s: &str, substr: &str) -> int {
     if substr == "" {
@@ -277,34 +356,51 @@ pub fn IndexAny(s: &str, chars: &str) -> int {
 /// IndexByte returns the index of the first instance of c in s, or -1 if c is not present in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 字符c在s中第一次出现的位置，不存在则返回-1。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!(0,strings::IndexByte("rustlang",b'r'));
+/// assert_eq!(3,strings::IndexByte("gophers",b'h'));
+/// assert_eq!(-1,strings::IndexByte("gophers",b'x'));
 ///
 /// ```
 pub fn IndexByte(s: &str, c: byte) -> int {
-    if let Some(i) = s.bytes().find(|&x| x == c) {
-        return int!(i);
-    } else {
-        return -1;
+    for (i, v) in s.bytes().enumerate() {
+        if v == c {
+            return int!(i);
+        }
     }
+    -1
 }
 
 /// IndexFunc returns the index into s of the first Unicode code point satisfying f(c), or -1 if none do.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// IndexFunc将满足f（rune）的第一个Unicode代码点的索引返回到s，如果没有，则返回-1。
 /// </details>
-///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+///    /* fn f(c: u32) -> bool {
+///        let s = char::from_u32(c).unwrap();
+///        !s.is_ascii()
+///    } */
+///    // 用上面注释掉的函数也可以，用下面的匿名函数也可以。
+///    let f = |c: u32| {
+///        let s = char::from_u32(c).unwrap();
+///        !s.is_ascii()
+///    };
+///    assert_eq!(7, strings::IndexFunc("Hello, 世界", f));
+///    assert_eq!(-1, strings::IndexFunc("Hello, world", f));
 ///
 /// ```
-use std::ops::FnMut;
 pub fn IndexFunc(s: &str, f: fn(rune) -> bool) -> int {
     for (i, r) in s.chars().enumerate() {
         if f(r as u32) == true {
@@ -317,12 +413,20 @@ pub fn IndexFunc(s: &str, f: fn(rune) -> bool) -> int {
 /// IndexRune returns the index of the first instance of the Unicode code point r, or -1 if rune is not present in s. If r is utf8.RuneError, it returns the first instance of any invalid UTF-8 byte sequence.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// unicode码值r在s中第一次出现的位置，不存在则返回-1。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!(4,strings::IndexRune("chicken", 'k' as u32));
+/// assert_eq!(4,strings::IndexRune("chicken", 0x6b));
+/// assert_eq!(4,strings::IndexRune("chicken", 107_u32));
+/// assert_eq!(-1,strings::IndexRune("chicken", 'd' as u32));
+/// assert_eq!(-1,strings::IndexRune("chicken", 0x64));
+/// assert_eq!(-1,strings::IndexRune("chicken", 100_u32));
 ///
 /// ```
 pub fn IndexRune(s: &str, r: rune) -> int {
@@ -335,12 +439,17 @@ pub fn IndexRune(s: &str, r: rune) -> int {
 /// Join concatenates the elements of its first argument to create a single string. The separator string sep is placed between elements in the resulting string.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 将一系列字符串连接为一个字符串，之间用sep来分隔。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// let s = vec!["foo", "bar", "baz"];
+///
+/// assert_eq!("foo, bar, baz",strings::Join(s,", "));
 ///
 /// ```
 pub fn Join<'a>(elems: Vec<&'a str>, sep: &'a str) -> String {
@@ -369,12 +478,17 @@ pub fn Join<'a>(elems: Vec<&'a str>, sep: &'a str) -> String {
 /// LastIndex returns the index of the last instance of substr in s, or -1 if substr is not present in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 子串substr在字符串s中最后一次出现的位置，不存在则返回-1。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!(0,strings::Index("rust rustacean","rust"));
+/// assert_eq!(5,strings::LastIndex("rust rustacean","rust"));
+/// assert_eq!(-1,strings::LastIndex("rust rustacean","go"));
 ///
 /// ```
 pub fn LastIndex(s: &str, substr: &str) -> int {
@@ -390,17 +504,27 @@ pub fn LastIndex(s: &str, substr: &str) -> int {
 /// LastIndexAny returns the index of the last instance of any Unicode code point from chars in s, or -1 if no Unicode code point from chars is present in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 字符串chars中的任一utf-8码值在s中最后一次出现的位置，如不存在或者chars为空字符串则返回-1。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!(4,strings::LastIndexAny("go gopher", "go"));
+/// assert_eq!(8,strings::LastIndexAny("go gopher", "ordent"));
+/// assert_eq!(-1,strings::LastIndexAny("go gopher", "fail"));
 ///
 /// ```
 pub fn LastIndexAny(s: &str, chars: &str) -> int {
-    if let Some(i) = s.rfind(chars) {
-        return int!(i);
+    if chars == "" {
+        return -1;
+    }
+    for r in s.chars().rev() {
+        if chars.contains(r) {
+            return int!(s.rfind(r).unwrap());
+        }
     }
     -1
 }
@@ -408,16 +532,21 @@ pub fn LastIndexAny(s: &str, chars: &str) -> int {
 /// LastIndexByte returns the index of the last instance of c in s, or -1 if c is not present in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 字符c在s中最后一次出现的位置，如不存在返回-1。
+
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!(10,strings::LastIndexByte("Hello, world", b'l'));
+/// assert_eq!(8,strings::LastIndexByte("Hello, world", b'o'));
+/// assert_eq!(-1,strings::LastIndexByte("Hello, world", b'x'));
 /// ```
 pub fn LastIndexByte(s: &str, c: byte) -> int {
-    if let Some(i) = s.bytes().rfind(|&x| x == c) {
+    if let Some(i) = s.rfind(c as char) {
         return int!(i);
     }
     -1
@@ -426,18 +555,24 @@ pub fn LastIndexByte(s: &str, c: byte) -> int {
 /// LastIndexFunc returns the index into s of the last Unicode code point satisfying f(c), or -1 if none do.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// s中最后一个满足函数f的unicode码值的位置i，不存在则返回-1。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+///    let f = |x: u32| char::from_u32(x).unwrap().is_ascii_digit();
+///
+///    assert_eq!(5, strings::LastIndexFunc("go 123", f));
+///    assert_eq!(2, strings::LastIndexFunc("123 go", f));
+///    assert_eq!(-1, strings::LastIndexFunc("go", f));
 /// ```
 pub fn LastIndexFunc(s: &str, f: fn(rune) -> bool) -> int {
     for (i, r) in s.chars().rev().enumerate() {
         if f(r as u32) == true {
-            return int!(i);
+            return int!(s.rfind(r).unwrap());
         }
     }
     -1
@@ -446,16 +581,42 @@ pub fn LastIndexFunc(s: &str, f: fn(rune) -> bool) -> int {
 /// Map returns a copy of the string s with all its characters modified according to the mapping function. If mapping returns a negative value, the character is dropped from the string with no replacement.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 将s的每一个unicode码值r都替换为mapping(r)，返回这些新码值组成的字符串拷贝。如果mapping返回一个负值，将会丢弃该码值而不会被替换。（返回值中对应位置将没有码值）
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+///    let rot13 = |r: u32| -> u32 {
+///        if r >= 'A' as u32 && r < 'Z' as u32 {
+///            return 'A' as u32 + (r - 'A' as u32 + 13) % 26;
+///        }
+///        if r >= 'a' as u32 && r <= 'z' as u32 {
+///            return 'a' as u32 + (r - 'a' as u32 + 13) % 26;
+///        }
+///        r
+///    };
+///    let s = "'Twas brillig and the slithy gopher...";
+///    assert_eq!(
+///        "'Gjnf oevyyvt naq gur fyvgul tbcure...",
+///        strings::Map(rot13, s)
+///    );
 ///
 /// ```
-pub fn Map(mapping: fn(rune) -> rune, s: &str) -> &str {
-    todo!()
+pub fn Map(mapping: fn(rune) -> rune, mut s: &str) -> String {
+    let mut b = Builder::new();
+    b.Grow(int!(len!(s)));
+    for (idx, v) in s.chars().enumerate() {
+        let r = mapping(v as u32);
+        if r > 0 {
+            b.WriteRune(r);
+        } else {
+            b.WriteRune(v as u32);
+        }
+    }
+    b.String()
 }
 
 /// Repeat returns a new string consisting of count copies of the string s.
