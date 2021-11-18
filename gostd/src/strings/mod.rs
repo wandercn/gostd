@@ -381,16 +381,26 @@ pub fn IndexByte(s: &str, c: byte) -> int {
 /// IndexFunc returns the index into s of the first Unicode code point satisfying f(c), or -1 if none do.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// IndexFunc将满足f（rune）的第一个Unicode代码点的索引返回到s，如果没有，则返回-1。
 /// </details>
-///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+///    /* fn f(c: u32) -> bool {
+///        let s = char::from_u32(c).unwrap();
+///        !s.is_ascii()
+///    } */
+///    // 用上面注释掉的函数也可以，用下面的匿名函数也可以。
+///    let f = |c: u32| {
+///        let s = char::from_u32(c).unwrap();
+///        !s.is_ascii()
+///    };
+///    assert_eq!(7, strings::IndexFunc("Hello, 世界", f));
+///    assert_eq!(-1, strings::IndexFunc("Hello, world", f));
 ///
 /// ```
-use std::ops::FnMut;
 pub fn IndexFunc(s: &str, f: fn(rune) -> bool) -> int {
     for (i, r) in s.chars().enumerate() {
         if f(r as u32) == true {
@@ -403,12 +413,20 @@ pub fn IndexFunc(s: &str, f: fn(rune) -> bool) -> int {
 /// IndexRune returns the index of the first instance of the Unicode code point r, or -1 if rune is not present in s. If r is utf8.RuneError, it returns the first instance of any invalid UTF-8 byte sequence.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// unicode码值r在s中第一次出现的位置，不存在则返回-1。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!(4,strings::IndexRune("chicken", 'k' as u32));
+/// assert_eq!(4,strings::IndexRune("chicken", 0x6b));
+/// assert_eq!(4,strings::IndexRune("chicken", 107_u32));
+/// assert_eq!(-1,strings::IndexRune("chicken", 'd' as u32));
+/// assert_eq!(-1,strings::IndexRune("chicken", 0x64));
+/// assert_eq!(-1,strings::IndexRune("chicken", 100_u32));
 ///
 /// ```
 pub fn IndexRune(s: &str, r: rune) -> int {
@@ -421,12 +439,17 @@ pub fn IndexRune(s: &str, r: rune) -> int {
 /// Join concatenates the elements of its first argument to create a single string. The separator string sep is placed between elements in the resulting string.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 将一系列字符串连接为一个字符串，之间用sep来分隔。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// let s = vec!["foo", "bar", "baz"];
+///
+/// assert_eq!("foo, bar, baz",strings::Join(s,", "));
 ///
 /// ```
 pub fn Join<'a>(elems: Vec<&'a str>, sep: &'a str) -> String {
@@ -455,12 +478,17 @@ pub fn Join<'a>(elems: Vec<&'a str>, sep: &'a str) -> String {
 /// LastIndex returns the index of the last instance of substr in s, or -1 if substr is not present in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 子串substr在字符串s中最后一次出现的位置，不存在则返回-1。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!(0,strings::Index("rust rustacean","rust"));
+/// assert_eq!(5,strings::LastIndex("rust rustacean","rust"));
+/// assert_eq!(-1,strings::LastIndex("rust rustacean","go"));
 ///
 /// ```
 pub fn LastIndex(s: &str, substr: &str) -> int {
@@ -476,17 +504,27 @@ pub fn LastIndex(s: &str, substr: &str) -> int {
 /// LastIndexAny returns the index of the last instance of any Unicode code point from chars in s, or -1 if no Unicode code point from chars is present in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 字符串chars中的任一utf-8码值在s中最后一次出现的位置，如不存在或者chars为空字符串则返回-1
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!(4,strings::LastIndexAny("go gopher", "go"));
+/// assert_eq!(8,strings::LastIndexAny("go gopher", "ordent"));
+/// assert_eq!(-1,strings::LastIndexAny("go gopher", "fail"));
 ///
 /// ```
 pub fn LastIndexAny(s: &str, chars: &str) -> int {
-    if let Some(i) = s.rfind(chars) {
-        return int!(i);
+    if chars == "" {
+        return -1;
+    }
+    for r in s.chars().rev() {
+        if chars.contains(r) {
+            return int!(s.rfind(r).unwrap());
+        }
     }
     -1
 }
