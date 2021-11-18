@@ -714,16 +714,21 @@ pub fn ReplaceAll<'a>(s: &'a str, old: &str, new: &str) -> String {
 /// It is equivalent to SplitN with a count of -1.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 用去掉s中出现的sep的方式进行分割，会分割到结尾，并返回生成的所有片段组成的切片（每一个sep都会进行一次切割，即使两个sep相邻，也会进行两次切割）。如果sep为空字符，Split会将s切分成每一个unicode码值一个字符串。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!(vec!["a","b","c"],strings::Split("a,b,c", ","));
+/// assert_eq!(vec!["", "man ", "plan ", "canal panama"],strings::Split("a man a plan a canal panama", "a "));
+/// assert_eq!(vec![""," ", "x", "y", "z", " ",""],strings::Split(" xyz ", ""));
+/// assert_eq!(vec![""],strings::Split("", "Bernardo O'Higgins"));
 /// ```
 pub fn Split<'a>(s: &'a str, sep: &'a str) -> Vec<&'a str> {
-    todo!()
+    s.split(sep).collect()
 }
 
 /// SplitAfter slices s into all substrings after each instance of sep and returns a slice of those substrings.
@@ -735,7 +740,7 @@ pub fn Split<'a>(s: &'a str, sep: &'a str) -> Vec<&'a str> {
 /// It is equivalent to SplitAfterN with a count of -1.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 用从s中出现的sep后面切断的方式进行分割，会分割到结尾，并返回生成的所有片段组成的切片（每一个sep都会进行一次切割，即使两个sep相邻，也会进行两次切割）。如果sep为空字符，Split会将s切分成每一个unicode码值一个字符串。
 /// </details>
 ///
 /// # Example
@@ -744,7 +749,7 @@ pub fn Split<'a>(s: &'a str, sep: &'a str) -> Vec<&'a str> {
 ///
 /// ```
 pub fn SplitAfter<'a>(s: &'a str, sep: &str) -> Vec<&'a str> {
-    todo!()
+    s.rsplit(sep).collect()
 }
 
 /// SplitAfterN slices s into substrings after each instance of sep and returns a slice of those substrings.
