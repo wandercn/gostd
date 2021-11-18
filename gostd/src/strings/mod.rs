@@ -504,7 +504,7 @@ pub fn LastIndex(s: &str, substr: &str) -> int {
 /// LastIndexAny returns the index of the last instance of any Unicode code point from chars in s, or -1 if no Unicode code point from chars is present in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 字符串chars中的任一utf-8码值在s中最后一次出现的位置，如不存在或者chars为空字符串则返回-1
+/// 字符串chars中的任一utf-8码值在s中最后一次出现的位置，如不存在或者chars为空字符串则返回-1。
 /// </details>
 ///
 /// # Example
@@ -532,16 +532,21 @@ pub fn LastIndexAny(s: &str, chars: &str) -> int {
 /// LastIndexByte returns the index of the last instance of c in s, or -1 if c is not present in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 字符c在s中最后一次出现的位置，如不存在返回-1。
+
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!(10,strings::LastIndexByte("Hello, world", b'l'));
+/// assert_eq!(8,strings::LastIndexByte("Hello, world", b'o'));
+/// assert_eq!(-1,strings::LastIndexByte("Hello, world", b'x'));
 /// ```
 pub fn LastIndexByte(s: &str, c: byte) -> int {
-    if let Some(i) = s.bytes().rfind(|&x| x == c) {
+    if let Some(i) = s.rfind(c as char) {
         return int!(i);
     }
     -1
@@ -550,18 +555,24 @@ pub fn LastIndexByte(s: &str, c: byte) -> int {
 /// LastIndexFunc returns the index into s of the last Unicode code point satisfying f(c), or -1 if none do.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// s中最后一个满足函数f的unicode码值的位置i，不存在则返回-1。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+///    let f = |x: u32| char::from_u32(x).unwrap().is_ascii_digit();
+///
+///    assert_eq!(5, strings::LastIndexFunc("go 123", f));
+///    assert_eq!(2, strings::LastIndexFunc("123 go", f));
+///    assert_eq!(-1, strings::LastIndexFunc("go", f));
 /// ```
 pub fn LastIndexFunc(s: &str, f: fn(rune) -> bool) -> int {
     for (i, r) in s.chars().rev().enumerate() {
         if f(r as u32) == true {
-            return int!(i);
+            return int!(s.rfind(r).unwrap());
         }
     }
     -1
@@ -570,16 +581,42 @@ pub fn LastIndexFunc(s: &str, f: fn(rune) -> bool) -> int {
 /// Map returns a copy of the string s with all its characters modified according to the mapping function. If mapping returns a negative value, the character is dropped from the string with no replacement.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 将s的每一个unicode码值r都替换为mapping(r)，返回这些新码值组成的字符串拷贝。如果mapping返回一个负值，将会丢弃该码值而不会被替换。（返回值中对应位置将没有码值）
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+///    let rot13 = |r: u32| -> u32 {
+///        if r >= 'A' as u32 && r < 'Z' as u32 {
+///            return 'A' as u32 + (r - 'A' as u32 + 13) % 26;
+///        }
+///        if r >= 'a' as u32 && r <= 'z' as u32 {
+///            return 'a' as u32 + (r - 'a' as u32 + 13) % 26;
+///        }
+///        r
+///    };
+///    let s = "'Twas brillig and the slithy gopher...";
+///    assert_eq!(
+///        "'Gjnf oevyyvt naq gur fyvgul tbcure...",
+///        strings::Map(rot13, s)
+///    );
 ///
 /// ```
-pub fn Map(mapping: fn(rune) -> rune, s: &str) -> &str {
-    todo!()
+pub fn Map(mapping: fn(rune) -> rune, mut s: &str) -> String {
+    let mut b = Builder::new();
+    b.Grow(int!(len!(s)));
+    for (idx, v) in s.chars().enumerate() {
+        let r = mapping(v as u32);
+        if r > 0 {
+            b.WriteRune(r);
+        } else {
+            b.WriteRune(v as u32);
+        }
+    }
+    b.String()
 }
 
 /// Repeat returns a new string consisting of count copies of the string s.
