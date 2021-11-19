@@ -1039,16 +1039,18 @@ pub fn TrimFunc(s: &str, f: fn(rune) -> bool) -> &str {
 /// To remove a prefix, use TrimPrefix instead.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将s前端所有cutset包含的utf-8码值都去掉的字符串。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!("Hello, Gophers!!!",strings::TrimLeft("¡¡¡Hello, Gophers!!!", "!¡"))
 /// ```
 pub fn TrimLeft<'a>(s: &'a str, cutset: &str) -> &'a str {
-    todo!()
+    s.trim_start_matches(|x| cutset.contains(x))
 }
 
 /// TrimLeftFunc returns a slice of the string s with all leading Unicode code points c satisfying f(c) removed.
