@@ -746,10 +746,12 @@ pub fn Split<'a>(s: &'a str, sep: &'a str) -> Vec<&'a str> {
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!(vec!["a,", "b,", "c"],strings::SplitAfter("a,b,c", ","));
 /// ```
 pub fn SplitAfter<'a>(s: &'a str, sep: &str) -> Vec<&'a str> {
-    s.rsplit(sep).collect()
+    s.split_inclusive(sep).collect()
 }
 
 /// SplitAfterN slices s into substrings after each instance of sep and returns a slice of those substrings.
