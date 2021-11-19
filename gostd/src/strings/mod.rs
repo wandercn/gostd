@@ -897,23 +897,25 @@ pub fn SplitN<'a>(s: &'a str, sep: &str, n: int) -> Vec<&'a str> {
 /// ```
 ///
 /// ```
-pub fn Title(s: &str) -> &str {
+pub fn Title(s: &str) -> String {
     todo!()
 }
 
 /// ToLower returns s with all Unicode letters mapped to their lower case.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将所有字母都转为对应的小写版本的拷贝。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!("gopher",strings::ToLower("Gopher"));
 /// ```
-pub fn ToLower(s: &str) -> &str {
-    todo!()
+pub fn ToLower(s: &str) -> String {
+    s.to_lowercase()
 }
 
 /// ToLowerSpecial returns a copy of the string s with all Unicode letters mapped to their lower case using the case mapping specified by c.
@@ -934,16 +936,19 @@ todo!()
 /// ToTitle returns a copy of the string s with all Unicode letters mapped to their Unicode title case.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将所有字母都转为对应的标题版本的拷贝。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!("LOUD NOISES",strings::ToTitle("loud noises"));
+/// assert_eq!("ХЛЕБ",strings::ToTitle("хлеб"));
 /// ```
-pub fn ToTitle(s: &str) -> &str {
-    todo!()
+pub fn ToTitle(s: &str) -> String {
+    s.to_uppercase()
 }
 
 /// ToTitleSpecial returns a copy of the string s with all Unicode letters mapped to their Unicode title case, giving priority to the special casing rules.
@@ -964,16 +969,18 @@ pub fn ToTitle(s: &str) -> &str {
 /// ToUpper returns s with all Unicode letters mapped to their upper case.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将所有字母都转为对应的大写版本的拷贝。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!("GOPHER",strings::ToUpper("Gopher"));
 /// ```
-pub fn ToUpper(s: &str) -> &str {
-    todo!()
+pub fn ToUpper(s: &str) -> String {
+    s.to_uppercase()
 }
 
 /// ToValidUTF8 returns a copy of the string s with each run of invalid UTF-8 byte sequences replaced by the replacement string, which may be empty.
