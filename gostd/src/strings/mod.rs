@@ -1007,10 +1007,13 @@ pub fn ToValidUTF8<'a>(s: &'a str, replacement: &str) -> &'a str {
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!("Hello, 中国",strings::Trim("¡¡¡Hello, 中国!!!", "!¡"));
 ///
 /// ```
-pub fn Trim<'a>(s: &'a str, cutset: &str) -> &'a str {
-    todo!()
+pub fn Trim<'a>(mut s: &'a str, cutset: &str) -> &'a str {
+    s.trim_matches(|x| cutset.contains(x))
 }
 
 /// TrimFunc returns a slice of the string s with all leading and trailing Unicode code points c satisfying f(c) removed.
