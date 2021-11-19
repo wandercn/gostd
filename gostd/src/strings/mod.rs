@@ -831,16 +831,57 @@ pub fn SplitAfterN<'a>(s: &'a str, sep: &str, n: int) -> Vec<String> {
 /// Edge cases for s and sep (for example, empty strings) are handled as described in the documentation for Split.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
+/// 用去掉s中出现的sep的方式进行分割，会分割到结尾，并返回生成的所有片段组成的切片（每一个sep都会进行一次切割，即使两个sep相邻，也会进行两次切割）。如果sep为空字符，Split会将s切分成每一个unicode码值一个字符串。参数n决定返回的切片的数目：
 ///
+/// ```text
+/// n > 0 : 返回的切片最多n个子字符串；最后一个子字符串包含未进行切割的部分。
+/// n == 0: 返回[]
+/// n < 0 : 返回所有的子字符串组成的切片
+/// ```
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+///    assert_eq!(Vec::<String>::new(), strings::SplitN(",a,b2,c", ",", 0));
+///    assert_eq!(vec![",a,b2,c"], strings::SplitN(",a,b2,c", ",", 1));
+///    assert_eq!(
+///        vec!["", "a", "b2", "c"],
+///        strings::SplitN(",a,b2,c", ",", -1)
+///    );
+///    assert_eq!(vec!["", "a,b2,c"], strings::SplitN(",a,b2,c", ",", 2));
+///    assert_eq!(vec!["", "a", "b2,c"], strings::SplitN(",a,b2,c", ",", 3));
+///    assert_eq!(
+///        vec!["", "a", "b2", "c"],
+///        strings::SplitN(",a,b2,c", ",", 4)
+///    );
+///    assert_eq!(
+///        vec!["", "a", "b2", "c"],
+///        strings::SplitN(",a,b2,c", ",", 5)
+///    );
+///    assert_eq!(
+///        vec!["", "a", "b2", "c"],
+///        strings::SplitN(",a,b2,c", ",", 10)
+///    );
 ///
 /// ```
 pub fn SplitN<'a>(s: &'a str, sep: &str, n: int) -> Vec<&'a str> {
-    todo!()
+    let mut n = n;
+    if n == 0 {
+        return vec![];
+    }
+    if n < 0 {
+        return s.split(sep).collect();
+    }
+
+    let list: Vec<&'a str> = s.split(sep).collect();
+    let length = list.len();
+    if n > int!(length) {
+        n = int!(length);
+    }
+    s.splitn(n as usize, sep).collect()
 }
 
 /// Title returns a copy of the string s with all Unicode letters that begin words mapped to their Unicode title case.
