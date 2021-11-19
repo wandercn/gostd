@@ -1001,7 +1001,7 @@ pub fn ToValidUTF8<'a>(s: &'a str, replacement: &str) -> &'a str {
 /// Trim returns a slice of the string s with all leading and trailing Unicode code points contained in cutset removed.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将s前后端所有cutset包含的utf-8码值都去掉的字符串。
 /// </details>
 ///
 /// # Example
