@@ -1025,10 +1025,13 @@ pub fn Trim<'a>(mut s: &'a str, cutset: &str) -> &'a str {
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// let f = |x| x == '1' as u32 || x == '2' as u32;
+/// assert_eq!("Hello, Rust",strings::TrimFunc("2211Hello, Rust1122", f));
 /// ```
 pub fn TrimFunc(s: &str, f: fn(rune) -> bool) -> &str {
-    todo!()
+    s.trim_matches(|x| f(x as rune))
 }
 
 /// TrimLeft returns a slice of the string s with all leading Unicode code points contained in cutset removed.
