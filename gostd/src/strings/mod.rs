@@ -759,12 +759,65 @@ pub fn SplitAfter<'a>(s: &'a str, sep: &str) -> Vec<&'a str> {
 /// The count determines the number of substrings to return:
 /// ```text
 /// n > 0: at most n substrings; the last substring will be the unsplit remainder.
-/// n == 0: the result is nil (zero substrings)
+/// n == 0: the result is [] (zero substrings)
 /// n < 0: all substrings
 /// ```
 /// Edge cases for s and sep (for example, empty strings) are handled as described in the documentation for SplitAfter.
-pub fn SplitAfterN<'a>(s: &'a str, sep: &str, n: int) -> Vec<&'a str> {
-    todo!()
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// 用从s中出现的sep后面切断的方式进行分割，会分割到结尾，并返回生成的所有片段组成的切片（每一个sep都会进行一次切割，即使两个sep相邻，也会进行两次切割）。如果sep为空字符，Split会将s切分成每一个unicode码值一个字符串。
+///
+/// 参数n决定返回的切片的数目：
+///
+/// ```text
+///
+/// n > 0 : 返回的切片最多n个子字符串；最后一个子字符串包含未进行切割的部分(当n大于最大子串数量，也只返回最大值)。
+/// n == 0: 返回[]
+/// n < 0 : 返回所有的子字符
+///
+/// ```
+/// </details>
+///
+/// # Example
+///
+/// ```
+/// use gostd::strings;
+/// // n == 0 返回 []
+///    assert_eq!(Vec::<String>::new(), strings::SplitAfterN(",a,b2,c", ",", 0));
+///    assert_eq!(vec![",a,b2,c"], strings::SplitAfterN(",a,b2,c", ",", 1));
+///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", -1));
+///    assert_eq!(vec![",", "a,b2,c"], strings::SplitAfterN(",a,b2,c", ",", 2));
+///    assert_eq!(vec![",", "a,", "b2,c"],strings::SplitAfterN(",a,b2,c", ",", 3));
+///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", 4));
+/// // 当n大于最大子串数量，也只返回最大值。
+///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", 5));
+///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", 10));
+/// ```
+pub fn SplitAfterN<'a>(s: &'a str, sep: &str, n: int) -> Vec<String> {
+    let mut n = n;
+    let length = len!(s);
+    if n < 0 || uint!(n) > length - 1 {
+        return s.split_inclusive(sep).map(|x| x.to_string()).collect();
+    }
+
+    if n == 0 {
+        return vec![];
+    }
+
+    if n == 1 {
+        return vec![s.to_string()];
+    }
+
+    let mut list: Vec<String> = s.splitn(n as usize, sep).map(|x| x.to_string()).collect();
+
+    let list_len = list.len();
+    if n > int!(list_len - 1) {
+        n = int!(list_len - 1);
+    }
+    for i in 0..n as usize {
+        list.get_mut(i).unwrap().push_str(sep);
+    }
+    list
 }
 
 /// SplitN slices s into substrings separated by sep and returns a slice of the substrings between those separators.
