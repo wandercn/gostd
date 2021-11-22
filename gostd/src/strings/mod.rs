@@ -1027,8 +1027,8 @@ pub fn Trim<'a>(mut s: &'a str, cutset: &str) -> &'a str {
 /// ```
 /// use gostd::strings;
 ///
-/// let f = |x| x == '1' as u32 || x == '2' as u32;
-/// assert_eq!("Hello, Rust",strings::TrimFunc("2211Hello, Rust1122", f));
+/// let f = |x| x >= '1' as u32 && x <= '9' as u32;
+/// assert_eq!("Hello, Rust",strings::TrimFunc("2211345Hello, Rust1122345", f));
 /// ```
 pub fn TrimFunc(s: &str, f: fn(rune) -> bool) -> &str {
     s.trim_matches(|x| f(x as rune))
@@ -1056,31 +1056,39 @@ pub fn TrimLeft<'a>(s: &'a str, cutset: &str) -> &'a str {
 /// TrimLeftFunc returns a slice of the string s with all leading Unicode code points c satisfying f(c) removed.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将s前端所有满足f的unicode码值都去掉的字符串
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// let f = |x| x >= '1' as u32 && x <= '9' as u32;
+/// assert_eq!("Hello, Rust654321",strings::TrimLeftFunc("123456Hello, Rust654321", f));
+///
 ///
 /// ```
 pub fn TrimLeftFunc(s: &str, f: fn(rune) -> bool) -> &str {
-    todo!()
+    s.trim_start_matches(|x| f(x as rune))
 }
 
 /// TrimPrefix returns s without the provided leading prefix string. If s doesn't start with prefix, s is returned unchanged.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回去除s可能的前缀prefix的字符串。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!("Hello, Rust!xxx",strings::TrimPrefix("xxxHello, Rust!xxx","xxx"));
 ///
 /// ```
 pub fn TrimPrefix<'a>(s: &'a str, prefix: &str) -> &'a str {
-    todo!()
+    s.trim_start_matches(prefix)
 }
 
 /// TrimRight returns a slice of the string s, with all trailing Unicode code points contained in cutset removed.
@@ -1088,22 +1096,24 @@ pub fn TrimPrefix<'a>(s: &'a str, prefix: &str) -> &'a str {
 /// To remove a suffix, use TrimSuffix instead.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将s后端所有cutset包含的utf-8码值都去掉的字符串。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+/// assert_eq!("¡¡¡Hello, Gophers",strings::TrimRight("¡¡¡Hello, Gophers!!!", "!¡"));
 ///
 /// ```
 pub fn TrimRight<'a>(s: &'a str, cutset: &str) -> &'a str {
-    todo!()
+    s.trim_end_matches(|x| cutset.contains(x))
 }
 
 /// TrimRightFunc returns a slice of the string s with all trailing Unicode code points c satisfying f(c) removed.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将s后端所有满足f的unicode码值都去掉的字符串。
 /// </details>
 ///
 /// # Example
@@ -1118,7 +1128,7 @@ pub fn TrimRightFunc(s: &str, f: fn(rune) -> bool) -> &str {
 /// TrimSpace returns a slice of the string s, with all leading and trailing white space removed, as defined by Unicode.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将s前后端所有空白（is_whitespace()指定）都去掉的字符串。
 /// </details>
 ///
 /// # Example
@@ -1127,7 +1137,7 @@ pub fn TrimRightFunc(s: &str, f: fn(rune) -> bool) -> &str {
 ///
 /// ```
 pub fn TrimSpace(s: &str) -> &str {
-    todo!()
+    s.trim()
 }
 
 /// TrimSuffix returns s without the provided trailing suffix string. If s doesn't end with suffix, s is returned unchanged.
