@@ -6,39 +6,40 @@
 #![allow(non_camel_case_types)]
 #[macro_use]
 use crate::builtin::*;
+use std::io::Error;
 
 pub trait Reader {
-    fn Read(&self, p: Vec<byte>) -> Result<int, &str>
+    fn Read(&mut self, p: Vec<byte>) -> Result<int, Error>
     where
         Self: Sized;
 }
 
 pub trait Writer {
-    fn Write(&self, p: Vec<byte>) -> Result<int, &str>
+    fn Write(&mut self, p: Vec<byte>) -> Result<int, Error>
     where
         Self: Sized;
 }
 
 pub trait ReaderAt {
-    fn ReadAt(&self, b: Vec<byte>, off: int64) -> Result<int, &str>
+    fn ReadAt(&mut self, b: Vec<byte>, off: int64) -> Result<int, Error>
     where
         Self: Sized;
 }
 
 pub trait ByteReader {
-    fn ReadByte(&self) -> Result<byte, &str>
+    fn ReadByte(&mut self) -> Result<byte, Error>
     where
         Self: Sized;
 }
 
 pub trait RuneReader {
-    fn ReadRune(&self) -> Result<(rune, int), &str>
+    fn ReadRune(&mut self) -> Result<(rune, int), Error>
     where
         Self: Sized;
 }
 
 pub trait Seeker {
-    fn Seek(&self, offset: int64, whence: int) -> Result<int64, &str>
+    fn Seek(&mut self, offset: int64, whence: int) -> Result<int64, Error>
     where
         Self: Sized;
 }
