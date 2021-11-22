@@ -897,9 +897,9 @@ pub fn SplitN<'a>(s: &'a str, sep: &str, n: int) -> Vec<&'a str> {
 /// ```
 ///
 /// ```
-pub fn Title(s: &str) -> String {
+/* pub fn Title(s: &str) -> String {
     todo!()
-}
+} */
 
 /// ToLower returns s with all Unicode letters mapped to their lower case.
 /// <details class="rustdoc-toggle top-doc">
@@ -994,9 +994,9 @@ pub fn ToUpper(s: &str) -> String {
 /// ```
 ///
 /// ```
-pub fn ToValidUTF8<'a>(s: &'a str, replacement: &str) -> &'a str {
+/* pub fn ToValidUTF8<'a>(s: &'a str, replacement: &str) -> &'a str {
     todo!()
-}
+} */
 
 /// Trim returns a slice of the string s with all leading and trailing Unicode code points contained in cutset removed.
 /// <details class="rustdoc-toggle top-doc">
@@ -1152,16 +1152,19 @@ pub fn TrimSpace(s: &str) -> &str {
 /// TrimSuffix returns s without the provided trailing suffix string. If s doesn't end with suffix, s is returned unchanged.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回去除s可能的后缀suffix的字符串。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!("test",strings::TrimSuffix("test.rs",".rs"))
 ///
 /// ```
 pub fn TrimSuffix<'a>(s: &'a str, suffix: &str) -> &'a str {
-    todo!()
+    s.trim_end_matches(suffix)
 }
 
 // Builder Begin
@@ -1169,7 +1172,7 @@ pub fn TrimSuffix<'a>(s: &'a str, suffix: &str) -> &'a str {
 /// A Builder is used to efficiently build a string using Write methods. It minimizes memory copying. The zero value is ready to use. Do not copy a non-zero Builder.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// Builder 生成器用于使用写方法高效地构建字符串。它最大限度地减少了内存复制。零值已准备好使用。不要复制非零生成器。
 /// </details>
 ///
 /// # Example
@@ -1187,7 +1190,7 @@ impl Builder {
     /// initialization a Builder
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// 初始化生成器
     /// </details>
     pub fn new() -> Builder {
         let mut b = Builder::default();
@@ -1214,7 +1217,7 @@ impl Builder {
     /// Grow grows b's capacity, if necessary, to guarantee space for another n bytes. After Grow(n), at least n bytes can be written to b without another allocation. If n is negative, Grow panics.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// 如果需要的话，Grow会增加b的容量，以保证另一个n字节的空间。在Grow（n）之后，至少可以将n个字节写入b而无需另一次分配。如果n为负，则增加恐慌。
     /// </details>
     pub fn Grow(&mut self, n: int) {
         // self.copyCheck();
@@ -1229,7 +1232,7 @@ impl Builder {
     /// Len returns the number of accumulated bytes; b.Len() == len!(b.String()).
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// Len返回累计字节数；b.Len() == len!(b.String()).
     /// </details>
     pub fn Len(&self) -> int {
         int!(len!(self.buf))
@@ -1238,45 +1241,45 @@ impl Builder {
     /// Reset resets the Builder to be empty.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// 重置将生成器重置为空。
     /// </details>
     pub fn Reset(&mut self) {
         self.addr = Box::new(None);
-        self.buf = Vec::new();
+        self.buf.clear()
     }
 
     /// String returns the accumulated string.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// 返回累积的字符串。
     /// </details>
     pub fn String<'a>(&self) -> String {
         String::from_utf8(self.buf.clone()).unwrap()
     }
 
-    /// Write appends the contents of p to b's buffer. Write always returns len!(p), nil.
+    /// Write appends the contents of p to b's buffer. Write always returns len!(p).
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// Write将p的内容附加到b的缓冲区, 写总是返回len!(p).
     /// </details>
     pub fn Write<'a>(&mut self, p: Vec<byte>) -> int {
         self.buf.extend_from_slice(p.as_slice());
         int!(len!(p))
     }
 
-    /// WriteByte appends the byte c to b's buffer. The returned error is always nil.
+    /// WriteByte appends the byte c to b's buffer.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// WriteByte将字节c追加到b的缓冲区。
     /// </details>
     pub fn WriteByte(&mut self, c: byte) {
         self.buf.push(c)
     }
 
-    /// WriteRune appends the UTF-8 encoding of Unicode code point r to b's buffer. It returns the length of r and a nil error.
+    /// WriteRune appends the UTF-8 encoding of Unicode code point r to b's buffer. It returns the length of r.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// 将Unicode代码点r的UTF-8编码附加到b的缓冲区。它返回r的长度。
     /// </details>
     pub fn WriteRune<'a>(&mut self, r: rune) -> Result<int, &'a str> {
         if uint32!(r) < utf8::RuneSelf {
@@ -1293,10 +1296,10 @@ impl Builder {
         return Ok(n);
     }
 
-    /// WriteString appends the contents of s to b's buffer. It returns the length of s and a nil error.
+    /// WriteString appends the contents of s to b's buffer. It returns the length of s.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// WriteString将s的内容附加到b的缓冲区。它返回s的长度。
     /// </details>
     pub fn WriteString(&mut self, s: &str) -> Result<int, &str> {
         self.buf.append(s.as_bytes().to_vec().as_mut());
