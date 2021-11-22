@@ -1378,20 +1378,20 @@ impl io::Reader for Reader {
     /// <summary class="docblock">zh-cn</summary>
     ///
     /// </details>
-    fn Read(&mut self, b: Vec<byte>) -> Result<int, Error> {
+    fn Read(&mut self, mut b: Vec<byte>) -> Result<int, Error> {
         if self.i >= int64!(len!(self.s)) {
             return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
         }
         self.prevRune = -1;
-        self.s.extend(b.iter().map(|&x| x as char));
-        let n = len!(b);
+        let n = int!(len!(self.s.as_bytes()[uint!(self.i)..]));
+        b.copy_from_slice(self.s.as_bytes()[uint!(self.i)..].as_ref());
         self.i += int64!(n);
-        Ok(int!(n))
+        Ok(n)
     }
 }
 
 impl io::ReaderAt for Reader {
-    fn ReadAt(&mut self, b: Vec<byte>, off: int64) -> Result<int, Error> {
+    fn ReadAt(&mut self, mut b: Vec<byte>, off: int64) -> Result<int, Error> {
         if off < 0 {
             return Err(Error::new(
                 ErrorKind::Other,
@@ -1399,9 +1399,14 @@ impl io::ReaderAt for Reader {
             ));
         }
         if off >= int64!(len!(self.s)) {
+            return Err(Error::new(ErrorKind::UnexpectedEof, "EOF")); //todo io.EOF在rust中怎么表示
+        }
+        let n = len!(self.s.as_bytes()[uint!(off)..]);
+        b.copy_from_slice(self.s.as_bytes()[uint!(off)..].as_ref());
+        if n < len!(b) {
             return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
         }
-        todo!()
+        Ok(int!(n))
     }
 }
 

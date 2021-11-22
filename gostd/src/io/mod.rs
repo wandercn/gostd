@@ -9,13 +9,13 @@ use crate::builtin::*;
 use std::io::Error;
 
 pub trait Reader {
-    fn Read(&mut self, p: Vec<byte>) -> Result<int, Error>
+    fn Read(&mut self, b: Vec<byte>) -> Result<int, Error>
     where
         Self: Sized;
 }
 
 pub trait Writer {
-    fn Write(&mut self, p: Vec<byte>) -> Result<int, Error>
+    fn Write(&mut self, b: Vec<byte>) -> Result<int, Error>
     where
         Self: Sized;
 }
