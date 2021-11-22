@@ -1119,10 +1119,14 @@ pub fn TrimRight<'a>(s: &'a str, cutset: &str) -> &'a str {
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// let f = |x| x >= '1' as u32 && x <= '9' as u32;
+/// assert_eq!("123456Hello, Rust",strings::TrimRightFunc("123456Hello, Rust654321", f));
 ///
 /// ```
 pub fn TrimRightFunc(s: &str, f: fn(rune) -> bool) -> &str {
-    todo!()
+    s.trim_end_matches(|x| f(x as rune))
 }
 
 /// TrimSpace returns a slice of the string s, with all leading and trailing white space removed, as defined by Unicode.
@@ -1134,6 +1138,11 @@ pub fn TrimRightFunc(s: &str, f: fn(rune) -> bool) -> &str {
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!("Hello, Rust!",strings::TrimSpace("  Hello, Rust!  "));
+/// assert_eq!("Hello, Rust!",strings::TrimSpace("\nHello, Rust! \t "));
+/// assert_eq!("Hello, Rust!",strings::TrimSpace("\n\t Hello, Rust! \t\r "));
 ///
 /// ```
 pub fn TrimSpace(s: &str) -> &str {
