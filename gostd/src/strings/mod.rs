@@ -1317,25 +1317,29 @@ impl Builder {
 ///
 /// </details>
 pub struct Reader {
-    s: string,
+    s: String,
     i: int64,      // current reading index
     prevRune: int, // index of previous rune; or < 0
 }
 
 impl Reader {
-    /// NewReader returns a new Reader reading from s. It is similar to bytes.NewBufferString but more efficient and read-only.
+    /// new returns a new Reader reading from s.  more efficient and read-only.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// NewReader创建一个从s读取数据的Reader。更有效率，且为只读的。
     /// </details>
-    pub fn new() -> Reader {
-        todo!()
+    pub fn new(s: &str) -> Reader {
+        Reader {
+            s: s.into(),
+            i: 0,
+            prevRune: -1,
+        }
     }
 
     /// Len returns the number of bytes of the unread portion of the string.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// Len返回self包含的字符串还没有被读取的部分。
     /// </details>
     pub fn Len(&self) -> int {
         todo!()
@@ -1344,7 +1348,7 @@ impl Reader {
     ///  Reset resets the Reader to be reading from s.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// 重置将Reader重置为从s读取。
     /// </details>
     pub fn Reset(&self, s: &str) {
         todo!()
@@ -1353,7 +1357,7 @@ impl Reader {
     /// Size returns the original length of the underlying string. Size is the number of bytes available for reading via ReadAt. The returned value is always the same and is not affected by calls to any other method.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// Size返回基础字符串的原始长度。Size是可通过ReadAt读取的字节数。返回的值始终相同，并且不受对任何其他方法的调用的影响。
     /// </details>
     pub fn Size(&self) -> int64 {
         todo!()
