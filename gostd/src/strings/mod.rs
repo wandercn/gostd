@@ -1342,7 +1342,11 @@ impl Reader {
     /// Len返回self包含的字符串还没有被读取的部分。
     /// </details>
     pub fn Len(&self) -> int {
-        todo!()
+        if self.i >= int64!(len!(self.s)) {
+            return 0;
+        }
+
+        int!(int64!(len!(self.s)) - self.i)
     }
 
     ///  Reset resets the Reader to be reading from s.
@@ -1350,8 +1354,10 @@ impl Reader {
     /// <summary class="docblock">zh-cn</summary>
     /// 重置将Reader重置为从s读取。
     /// </details>
-    pub fn Reset(&self, s: &str) {
-        todo!()
+    pub fn Reset(&mut self, s: &str) {
+        self.s = s.into();
+        self.i = 0;
+        self.prevRune = -1;
     }
 
     /// Size returns the original length of the underlying string. Size is the number of bytes available for reading via ReadAt. The returned value is always the same and is not affected by calls to any other method.
@@ -1360,41 +1366,59 @@ impl Reader {
     /// Size返回基础字符串的原始长度。Size是可通过ReadAt读取的字节数。返回的值始终相同，并且不受对任何其他方法的调用的影响。
     /// </details>
     pub fn Size(&self) -> int64 {
-        todo!()
+        int64!(len!(self.s))
     }
 }
 
+use std::io::Error;
+use std::io::ErrorKind;
 impl io::Reader for Reader {
     /// Read implements the io.Reader interface.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
     ///
     /// </details>
-    fn Read(&self, b: Vec<byte>) -> Result<int, &str> {
-        todo!()
+    fn Read(&mut self, b: Vec<byte>) -> Result<int, Error> {
+        if self.i >= int64!(len!(self.s)) {
+            return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
+        }
+        self.prevRune = -1;
+        self.s.extend(b.iter().map(|&x| x as char));
+        let n = len!(b);
+        self.i += int64!(n);
+        Ok(int!(n))
     }
 }
 
 impl io::ReaderAt for Reader {
-    fn ReadAt(&self, b: Vec<byte>, off: int64) -> Result<int, &str> {
+    fn ReadAt(&mut self, b: Vec<byte>, off: int64) -> Result<int, Error> {
+        if off < 0 {
+            return Err(Error::new(
+                ErrorKind::Other,
+                "strings.Reader.ReadAt: negative offset",
+            ));
+        }
+        if off >= int64!(len!(self.s)) {
+            return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
+        }
         todo!()
     }
 }
 
 impl io::ByteReader for Reader {
-    fn ReadByte(&self) -> Result<byte, &str> {
+    fn ReadByte(&mut self) -> Result<byte, Error> {
         todo!()
     }
 }
 
 impl io::RuneReader for Reader {
-    fn ReadRune(&self) -> Result<(rune, int), &str> {
+    fn ReadRune(&mut self) -> Result<(rune, int), Error> {
         todo!()
     }
 }
 
 impl io::Seeker for Reader {
-    fn Seek(&self, offset: int64, whence: int) -> Result<int64, &str> {
+    fn Seek(&mut self, offset: int64, whence: int) -> Result<int64, Error> {
         todo!()
     }
 }
