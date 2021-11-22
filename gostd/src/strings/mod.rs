@@ -884,23 +884,6 @@ pub fn SplitN<'a>(s: &'a str, sep: &str, n: int) -> Vec<&'a str> {
     s.splitn(n as usize, sep).collect()
 }
 
-/// Title returns a copy of the string s with all Unicode letters that begin words mapped to their Unicode title case.
-///
-/// BUG(rsc): The rule Title uses for word boundaries does not handle Unicode punctuation properly.
-/// <details class="rustdoc-toggle top-doc">
-/// <summary class="docblock">zh-cn</summary>
-///
-/// </details>
-///
-/// # Example
-///
-/// ```
-///
-/// ```
-/* pub fn Title(s: &str) -> String {
-    todo!()
-} */
-
 /// ToLower returns s with all Unicode letters mapped to their lower case.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
@@ -917,21 +900,6 @@ pub fn SplitN<'a>(s: &'a str, sep: &str, n: int) -> Vec<&'a str> {
 pub fn ToLower(s: &str) -> String {
     s.to_lowercase()
 }
-
-/// ToLowerSpecial returns a copy of the string s with all Unicode letters mapped to their lower case using the case mapping specified by c.
-/// <details class="rustdoc-toggle top-doc">
-/// <summary class="docblock">zh-cn</summary>
-///
-/// </details>
-///
-/// # Example
-///
-/// ```
-///
-/// ```
-/* pub fn ToLowerSpecial(c: unicode.SpecialCase, s:&str)->&str{
-todo!()
-}  */
 
 /// ToTitle returns a copy of the string s with all Unicode letters mapped to their Unicode title case.
 /// <details class="rustdoc-toggle top-doc">
@@ -951,21 +919,6 @@ pub fn ToTitle(s: &str) -> String {
     s.to_uppercase()
 }
 
-/// ToTitleSpecial returns a copy of the string s with all Unicode letters mapped to their Unicode title case, giving priority to the special casing rules.
-/// <details class="rustdoc-toggle top-doc">
-/// <summary class="docblock">zh-cn</summary>
-///
-/// </details>
-///
-/// # Example
-///
-/// ```
-///
-/// ```
-/* pub fn ToTitleSpecial(c: unicode.SpecialCase, s: &str)->&str{ */
-/* todo!() */
-/* } */
-
 /// ToUpper returns s with all Unicode letters mapped to their upper case.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
@@ -982,21 +935,6 @@ pub fn ToTitle(s: &str) -> String {
 pub fn ToUpper(s: &str) -> String {
     s.to_uppercase()
 }
-
-/// ToValidUTF8 returns a copy of the string s with each run of invalid UTF-8 byte sequences replaced by the replacement string, which may be empty.
-/// <details class="rustdoc-toggle top-doc">
-/// <summary class="docblock">zh-cn</summary>
-///
-/// </details>
-///
-/// # Example
-///
-/// ```
-///
-/// ```
-/* pub fn ToValidUTF8<'a>(s: &'a str, replacement: &str) -> &'a str {
-    todo!()
-} */
 
 /// Trim returns a slice of the string s with all leading and trailing Unicode code points contained in cutset removed.
 /// <details class="rustdoc-toggle top-doc">
