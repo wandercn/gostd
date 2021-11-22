@@ -668,31 +668,41 @@ pub fn Repeat(s: &str, count: uint) -> String {
 /// It panics if count is negative or if the result of (len!(s) * count) overflows.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将s中前n个不重叠old子串都替换为new的新字符串，如果n<0会替换所有old子串
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!("oinky oinky oink",strings::Replace("oink oink oink", "k", "ky", 2));
+/// assert_eq!("moo moo moo",strings::Replace("oink oink oink", "oink", "moo", -1));
 ///
 /// ```
-pub fn Replace<'a>(s: &'a str, old: &str, new: &str, n: int) -> &'a str {
-    todo!()
+pub fn Replace<'a>(s: &'a str, old: &str, new: &str, n: int) -> String {
+    if n < 0 {
+        return s.replace(old, new);
+    }
+    s.replacen(old, new, uint!(n))
 }
 
 /// ReplaceAll returns a copy of the string s with all non-overlapping instances of old replaced by new. If old is empty, it matches at the beginning of the string and after each UTF-8 sequence, yielding up to k+1 replacements for a k-rune string.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将s中不重叠old子串都替换为new的新字符串。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!("moo moo moo",strings::ReplaceAll("oink oink oink", "oink", "moo"));
 ///
 /// ```
-pub fn ReplaceAll<'a>(s: &'a str, old: &str, new: &str) -> &'a str {
-    todo!()
+pub fn ReplaceAll<'a>(s: &'a str, old: &str, new: &str) -> String {
+    s.replace(old, new)
 }
 
 /// Split slices s into all substrings separated by sep and returns a slice of the substrings between those separators.
@@ -704,16 +714,21 @@ pub fn ReplaceAll<'a>(s: &'a str, old: &str, new: &str) -> &'a str {
 /// It is equivalent to SplitN with a count of -1.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 用去掉s中出现的sep的方式进行分割，会分割到结尾，并返回生成的所有片段组成的切片（每一个sep都会进行一次切割，即使两个sep相邻，也会进行两次切割）。如果sep为空字符，Split会将s切分成每一个unicode码值一个字符串。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!(vec!["a","b","c"],strings::Split("a,b,c", ","));
+/// assert_eq!(vec!["", "man ", "plan ", "canal panama"],strings::Split("a man a plan a canal panama", "a "));
+/// assert_eq!(vec![""," ", "x", "y", "z", " ",""],strings::Split(" xyz ", ""));
+/// assert_eq!(vec![""],strings::Split("", "Bernardo O'Higgins"));
 /// ```
 pub fn Split<'a>(s: &'a str, sep: &'a str) -> Vec<&'a str> {
-    todo!()
+    s.split(sep).collect()
 }
 
 /// SplitAfter slices s into all substrings after each instance of sep and returns a slice of those substrings.
@@ -725,16 +740,18 @@ pub fn Split<'a>(s: &'a str, sep: &'a str) -> Vec<&'a str> {
 /// It is equivalent to SplitAfterN with a count of -1.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 用从s中出现的sep后面切断的方式进行分割，会分割到结尾，并返回生成的所有片段组成的切片（每一个sep都会进行一次切割，即使两个sep相邻，也会进行两次切割）。如果sep为空字符，Split会将s切分成每一个unicode码值一个字符串。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!(vec!["a,", "b,", "c"],strings::SplitAfter("a,b,c", ","));
 /// ```
 pub fn SplitAfter<'a>(s: &'a str, sep: &str) -> Vec<&'a str> {
-    todo!()
+    s.split_inclusive(sep).collect()
 }
 
 /// SplitAfterN slices s into substrings after each instance of sep and returns a slice of those substrings.
@@ -742,12 +759,65 @@ pub fn SplitAfter<'a>(s: &'a str, sep: &str) -> Vec<&'a str> {
 /// The count determines the number of substrings to return:
 /// ```text
 /// n > 0: at most n substrings; the last substring will be the unsplit remainder.
-/// n == 0: the result is nil (zero substrings)
+/// n == 0: the result is [] (zero substrings)
 /// n < 0: all substrings
 /// ```
 /// Edge cases for s and sep (for example, empty strings) are handled as described in the documentation for SplitAfter.
-pub fn SplitAfterN<'a>(s: &'a str, sep: &str, n: int) -> Vec<&'a str> {
-    todo!()
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// 用从s中出现的sep后面切断的方式进行分割，会分割到结尾，并返回生成的所有片段组成的切片（每一个sep都会进行一次切割，即使两个sep相邻，也会进行两次切割）。如果sep为空字符，Split会将s切分成每一个unicode码值一个字符串。
+///
+/// 参数n决定返回的切片的数目：
+///
+/// ```text
+///
+/// n > 0 : 返回的切片最多n个子字符串；最后一个子字符串包含未进行切割的部分(当n大于最大子串数量，也只返回最大值)。
+/// n == 0: 返回[]
+/// n < 0 : 返回所有的子字符
+///
+/// ```
+/// </details>
+///
+/// # Example
+///
+/// ```
+/// use gostd::strings;
+/// // n == 0 返回 []
+///    assert_eq!(Vec::<String>::new(), strings::SplitAfterN(",a,b2,c", ",", 0));
+///    assert_eq!(vec![",a,b2,c"], strings::SplitAfterN(",a,b2,c", ",", 1));
+///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", -1));
+///    assert_eq!(vec![",", "a,b2,c"], strings::SplitAfterN(",a,b2,c", ",", 2));
+///    assert_eq!(vec![",", "a,", "b2,c"],strings::SplitAfterN(",a,b2,c", ",", 3));
+///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", 4));
+/// // 当n大于最大子串数量，也只返回最大值。
+///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", 5));
+///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", 10));
+/// ```
+pub fn SplitAfterN<'a>(s: &'a str, sep: &str, n: int) -> Vec<String> {
+    let mut n = n;
+    let length = len!(s);
+    if n < 0 || uint!(n) > length - 1 {
+        return s.split_inclusive(sep).map(|x| x.to_string()).collect();
+    }
+
+    if n == 0 {
+        return vec![];
+    }
+
+    if n == 1 {
+        return vec![s.to_string()];
+    }
+
+    let mut list: Vec<String> = s.splitn(n as usize, sep).map(|x| x.to_string()).collect();
+
+    let list_len = list.len();
+    if n > int!(list_len - 1) {
+        n = int!(list_len - 1);
+    }
+    for i in 0..n as usize {
+        list.get_mut(i).unwrap().push_str(sep);
+    }
+    list
 }
 
 /// SplitN slices s into substrings separated by sep and returns a slice of the substrings between those separators.
@@ -761,16 +831,57 @@ pub fn SplitAfterN<'a>(s: &'a str, sep: &str, n: int) -> Vec<&'a str> {
 /// Edge cases for s and sep (for example, empty strings) are handled as described in the documentation for Split.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
+/// 用去掉s中出现的sep的方式进行分割，会分割到结尾，并返回生成的所有片段组成的切片（每一个sep都会进行一次切割，即使两个sep相邻，也会进行两次切割）。如果sep为空字符，Split会将s切分成每一个unicode码值一个字符串。参数n决定返回的切片的数目：
 ///
+/// ```text
+/// n > 0 : 返回的切片最多n个子字符串；最后一个子字符串包含未进行切割的部分。
+/// n == 0: 返回[]
+/// n < 0 : 返回所有的子字符串组成的切片
+/// ```
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+///    assert_eq!(Vec::<String>::new(), strings::SplitN(",a,b2,c", ",", 0));
+///    assert_eq!(vec![",a,b2,c"], strings::SplitN(",a,b2,c", ",", 1));
+///    assert_eq!(
+///        vec!["", "a", "b2", "c"],
+///        strings::SplitN(",a,b2,c", ",", -1)
+///    );
+///    assert_eq!(vec!["", "a,b2,c"], strings::SplitN(",a,b2,c", ",", 2));
+///    assert_eq!(vec!["", "a", "b2,c"], strings::SplitN(",a,b2,c", ",", 3));
+///    assert_eq!(
+///        vec!["", "a", "b2", "c"],
+///        strings::SplitN(",a,b2,c", ",", 4)
+///    );
+///    assert_eq!(
+///        vec!["", "a", "b2", "c"],
+///        strings::SplitN(",a,b2,c", ",", 5)
+///    );
+///    assert_eq!(
+///        vec!["", "a", "b2", "c"],
+///        strings::SplitN(",a,b2,c", ",", 10)
+///    );
 ///
 /// ```
 pub fn SplitN<'a>(s: &'a str, sep: &str, n: int) -> Vec<&'a str> {
-    todo!()
+    let mut n = n;
+    if n == 0 {
+        return vec![];
+    }
+    if n < 0 {
+        return s.split(sep).collect();
+    }
+
+    let list: Vec<&'a str> = s.split(sep).collect();
+    let length = list.len();
+    if n > int!(length) {
+        n = int!(length);
+    }
+    s.splitn(n as usize, sep).collect()
 }
 
 /// Title returns a copy of the string s with all Unicode letters that begin words mapped to their Unicode title case.
@@ -786,23 +897,25 @@ pub fn SplitN<'a>(s: &'a str, sep: &str, n: int) -> Vec<&'a str> {
 /// ```
 ///
 /// ```
-pub fn Title(s: &str) -> &str {
+/* pub fn Title(s: &str) -> String {
     todo!()
-}
+} */
 
 /// ToLower returns s with all Unicode letters mapped to their lower case.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将所有字母都转为对应的小写版本的拷贝。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!("gopher",strings::ToLower("Gopher"));
 /// ```
-pub fn ToLower(s: &str) -> &str {
-    todo!()
+pub fn ToLower(s: &str) -> String {
+    s.to_lowercase()
 }
 
 /// ToLowerSpecial returns a copy of the string s with all Unicode letters mapped to their lower case using the case mapping specified by c.
@@ -823,16 +936,19 @@ todo!()
 /// ToTitle returns a copy of the string s with all Unicode letters mapped to their Unicode title case.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将所有字母都转为对应的标题版本的拷贝。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!("LOUD NOISES",strings::ToTitle("loud noises"));
+/// assert_eq!("ХЛЕБ",strings::ToTitle("хлеб"));
 /// ```
-pub fn ToTitle(s: &str) -> &str {
-    todo!()
+pub fn ToTitle(s: &str) -> String {
+    s.to_uppercase()
 }
 
 /// ToTitleSpecial returns a copy of the string s with all Unicode letters mapped to their Unicode title case, giving priority to the special casing rules.
@@ -853,16 +969,18 @@ pub fn ToTitle(s: &str) -> &str {
 /// ToUpper returns s with all Unicode letters mapped to their upper case.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将所有字母都转为对应的大写版本的拷贝。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!("GOPHER",strings::ToUpper("Gopher"));
 /// ```
-pub fn ToUpper(s: &str) -> &str {
-    todo!()
+pub fn ToUpper(s: &str) -> String {
+    s.to_uppercase()
 }
 
 /// ToValidUTF8 returns a copy of the string s with each run of invalid UTF-8 byte sequences replaced by the replacement string, which may be empty.
@@ -876,23 +994,26 @@ pub fn ToUpper(s: &str) -> &str {
 /// ```
 ///
 /// ```
-pub fn ToValidUTF8<'a>(s: &'a str, replacement: &str) -> &'a str {
+/* pub fn ToValidUTF8<'a>(s: &'a str, replacement: &str) -> &'a str {
     todo!()
-}
+} */
 
 /// Trim returns a slice of the string s with all leading and trailing Unicode code points contained in cutset removed.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将s前后端所有cutset包含的utf-8码值都去掉的字符串。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!("Hello, 中国",strings::Trim("¡¡¡Hello, 中国!!!", "!¡"));
 ///
 /// ```
-pub fn Trim<'a>(s: &'a str, cutset: &str) -> &'a str {
-    todo!()
+pub fn Trim<'a>(mut s: &'a str, cutset: &str) -> &'a str {
+    s.trim_matches(|x| cutset.contains(x))
 }
 
 /// TrimFunc returns a slice of the string s with all leading and trailing Unicode code points c satisfying f(c) removed.
@@ -904,10 +1025,13 @@ pub fn Trim<'a>(s: &'a str, cutset: &str) -> &'a str {
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// let f = |x| x >= '1' as u32 && x <= '9' as u32;
+/// assert_eq!("Hello, Rust",strings::TrimFunc("2211345Hello, Rust1122345", f));
 /// ```
 pub fn TrimFunc(s: &str, f: fn(rune) -> bool) -> &str {
-    todo!()
+    s.trim_matches(|x| f(x as rune))
 }
 
 /// TrimLeft returns a slice of the string s with all leading Unicode code points contained in cutset removed.
@@ -915,46 +1039,56 @@ pub fn TrimFunc(s: &str, f: fn(rune) -> bool) -> &str {
 /// To remove a prefix, use TrimPrefix instead.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将s前端所有cutset包含的utf-8码值都去掉的字符串。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
 ///
+/// assert_eq!("Hello, Gophers!!!",strings::TrimLeft("¡¡¡Hello, Gophers!!!", "!¡"))
 /// ```
 pub fn TrimLeft<'a>(s: &'a str, cutset: &str) -> &'a str {
-    todo!()
+    s.trim_start_matches(|x| cutset.contains(x))
 }
 
 /// TrimLeftFunc returns a slice of the string s with all leading Unicode code points c satisfying f(c) removed.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将s前端所有满足f的unicode码值都去掉的字符串
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// let f = |x| x >= '1' as u32 && x <= '9' as u32;
+/// assert_eq!("Hello, Rust654321",strings::TrimLeftFunc("123456Hello, Rust654321", f));
+///
 ///
 /// ```
 pub fn TrimLeftFunc(s: &str, f: fn(rune) -> bool) -> &str {
-    todo!()
+    s.trim_start_matches(|x| f(x as rune))
 }
 
 /// TrimPrefix returns s without the provided leading prefix string. If s doesn't start with prefix, s is returned unchanged.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回去除s可能的前缀prefix的字符串。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!("Hello, Rust!xxx",strings::TrimPrefix("xxxHello, Rust!xxx","xxx"));
 ///
 /// ```
 pub fn TrimPrefix<'a>(s: &'a str, prefix: &str) -> &'a str {
-    todo!()
+    s.trim_start_matches(prefix)
 }
 
 /// TrimRight returns a slice of the string s, with all trailing Unicode code points contained in cutset removed.
@@ -962,61 +1096,75 @@ pub fn TrimPrefix<'a>(s: &'a str, prefix: &str) -> &'a str {
 /// To remove a suffix, use TrimSuffix instead.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将s后端所有cutset包含的utf-8码值都去掉的字符串。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+/// assert_eq!("¡¡¡Hello, Gophers",strings::TrimRight("¡¡¡Hello, Gophers!!!", "!¡"));
 ///
 /// ```
 pub fn TrimRight<'a>(s: &'a str, cutset: &str) -> &'a str {
-    todo!()
+    s.trim_end_matches(|x| cutset.contains(x))
 }
 
 /// TrimRightFunc returns a slice of the string s with all trailing Unicode code points c satisfying f(c) removed.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将s后端所有满足f的unicode码值都去掉的字符串。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// let f = |x| x >= '1' as u32 && x <= '9' as u32;
+/// assert_eq!("123456Hello, Rust",strings::TrimRightFunc("123456Hello, Rust654321", f));
 ///
 /// ```
 pub fn TrimRightFunc(s: &str, f: fn(rune) -> bool) -> &str {
-    todo!()
+    s.trim_end_matches(|x| f(x as rune))
 }
 
 /// TrimSpace returns a slice of the string s, with all leading and trailing white space removed, as defined by Unicode.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将s前后端所有空白（is_whitespace()指定）都去掉的字符串。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!("Hello, Rust!",strings::TrimSpace("  Hello, Rust!  "));
+/// assert_eq!("Hello, Rust!",strings::TrimSpace("\nHello, Rust! \t "));
+/// assert_eq!("Hello, Rust!",strings::TrimSpace("\n\t Hello, Rust! \t\r "));
 ///
 /// ```
 pub fn TrimSpace(s: &str) -> &str {
-    todo!()
+    s.trim()
 }
 
 /// TrimSuffix returns s without the provided trailing suffix string. If s doesn't end with suffix, s is returned unchanged.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回去除s可能的后缀suffix的字符串。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
+/// use gostd::strings;
+///
+/// assert_eq!("test",strings::TrimSuffix("test.rs",".rs"))
 ///
 /// ```
 pub fn TrimSuffix<'a>(s: &'a str, suffix: &str) -> &'a str {
-    todo!()
+    s.trim_end_matches(suffix)
 }
 
 // Builder Begin
@@ -1024,7 +1172,7 @@ pub fn TrimSuffix<'a>(s: &'a str, suffix: &str) -> &'a str {
 /// A Builder is used to efficiently build a string using Write methods. It minimizes memory copying. The zero value is ready to use. Do not copy a non-zero Builder.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// Builder 生成器用于使用写方法高效地构建字符串。它最大限度地减少了内存复制。零值已准备好使用。不要复制非零生成器。
 /// </details>
 ///
 /// # Example
@@ -1042,7 +1190,7 @@ impl Builder {
     /// initialization a Builder
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// 初始化生成器
     /// </details>
     pub fn new() -> Builder {
         let mut b = Builder::default();
@@ -1069,7 +1217,7 @@ impl Builder {
     /// Grow grows b's capacity, if necessary, to guarantee space for another n bytes. After Grow(n), at least n bytes can be written to b without another allocation. If n is negative, Grow panics.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// 如果需要的话，Grow会增加b的容量，以保证另一个n字节的空间。在Grow（n）之后，至少可以将n个字节写入b而无需另一次分配。如果n为负，则增加恐慌。
     /// </details>
     pub fn Grow(&mut self, n: int) {
         // self.copyCheck();
@@ -1084,7 +1232,7 @@ impl Builder {
     /// Len returns the number of accumulated bytes; b.Len() == len!(b.String()).
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// Len返回累计字节数；b.Len() == len!(b.String()).
     /// </details>
     pub fn Len(&self) -> int {
         int!(len!(self.buf))
@@ -1093,45 +1241,45 @@ impl Builder {
     /// Reset resets the Builder to be empty.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// 重置将生成器重置为空。
     /// </details>
     pub fn Reset(&mut self) {
         self.addr = Box::new(None);
-        self.buf = Vec::new();
+        self.buf.clear()
     }
 
     /// String returns the accumulated string.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// 返回累积的字符串。
     /// </details>
     pub fn String<'a>(&self) -> String {
         String::from_utf8(self.buf.clone()).unwrap()
     }
 
-    /// Write appends the contents of p to b's buffer. Write always returns len!(p), nil.
+    /// Write appends the contents of p to b's buffer. Write always returns len!(p).
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// Write将p的内容附加到b的缓冲区, 写总是返回len!(p).
     /// </details>
     pub fn Write<'a>(&mut self, p: Vec<byte>) -> int {
         self.buf.extend_from_slice(p.as_slice());
         int!(len!(p))
     }
 
-    /// WriteByte appends the byte c to b's buffer. The returned error is always nil.
+    /// WriteByte appends the byte c to b's buffer.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// WriteByte将字节c追加到b的缓冲区。
     /// </details>
     pub fn WriteByte(&mut self, c: byte) {
         self.buf.push(c)
     }
 
-    /// WriteRune appends the UTF-8 encoding of Unicode code point r to b's buffer. It returns the length of r and a nil error.
+    /// WriteRune appends the UTF-8 encoding of Unicode code point r to b's buffer. It returns the length of r.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// 将Unicode代码点r的UTF-8编码附加到b的缓冲区。它返回r的长度。
     /// </details>
     pub fn WriteRune<'a>(&mut self, r: rune) -> Result<int, &'a str> {
         if uint32!(r) < utf8::RuneSelf {
@@ -1148,10 +1296,10 @@ impl Builder {
         return Ok(n);
     }
 
-    /// WriteString appends the contents of s to b's buffer. It returns the length of s and a nil error.
+    /// WriteString appends the contents of s to b's buffer. It returns the length of s.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// WriteString将s的内容附加到b的缓冲区。它返回s的长度。
     /// </details>
     pub fn WriteString(&mut self, s: &str) -> Result<int, &str> {
         self.buf.append(s.as_bytes().to_vec().as_mut());
@@ -1169,80 +1317,113 @@ impl Builder {
 ///
 /// </details>
 pub struct Reader {
-    s: string,
+    s: String,
     i: int64,      // current reading index
     prevRune: int, // index of previous rune; or < 0
 }
 
 impl Reader {
-    /// NewReader returns a new Reader reading from s. It is similar to bytes.NewBufferString but more efficient and read-only.
+    /// new returns a new Reader reading from s.  more efficient and read-only.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// NewReader创建一个从s读取数据的Reader。更有效率，且为只读的。
     /// </details>
-    pub fn new() -> Reader {
-        todo!()
+    pub fn new(s: &str) -> Reader {
+        Reader {
+            s: s.into(),
+            i: 0,
+            prevRune: -1,
+        }
     }
 
     /// Len returns the number of bytes of the unread portion of the string.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// Len返回self包含的字符串还没有被读取的部分。
     /// </details>
     pub fn Len(&self) -> int {
-        todo!()
+        if self.i >= int64!(len!(self.s)) {
+            return 0;
+        }
+
+        int!(int64!(len!(self.s)) - self.i)
     }
 
     ///  Reset resets the Reader to be reading from s.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// 重置将Reader重置为从s读取。
     /// </details>
-    pub fn Reset(&self, s: &str) {
-        todo!()
+    pub fn Reset(&mut self, s: &str) {
+        self.s = s.into();
+        self.i = 0;
+        self.prevRune = -1;
     }
 
     /// Size returns the original length of the underlying string. Size is the number of bytes available for reading via ReadAt. The returned value is always the same and is not affected by calls to any other method.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// Size返回基础字符串的原始长度。Size是可通过ReadAt读取的字节数。返回的值始终相同，并且不受对任何其他方法的调用的影响。
     /// </details>
     pub fn Size(&self) -> int64 {
-        todo!()
+        int64!(len!(self.s))
     }
 }
 
+use std::io::Error;
+use std::io::ErrorKind;
 impl io::Reader for Reader {
     /// Read implements the io.Reader interface.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
     ///
     /// </details>
-    fn Read(&self, b: Vec<byte>) -> Result<int, &str> {
-        todo!()
+    fn Read(&mut self, mut b: Vec<byte>) -> Result<int, Error> {
+        if self.i >= int64!(len!(self.s)) {
+            return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
+        }
+        self.prevRune = -1;
+        let n = int!(len!(self.s.as_bytes()[uint!(self.i)..]));
+        b.copy_from_slice(self.s.as_bytes()[uint!(self.i)..].as_ref());
+        self.i += int64!(n);
+        Ok(n)
     }
 }
 
 impl io::ReaderAt for Reader {
-    fn ReadAt(&self, b: Vec<byte>, off: int64) -> Result<int, &str> {
-        todo!()
+    fn ReadAt(&mut self, mut b: Vec<byte>, off: int64) -> Result<int, Error> {
+        if off < 0 {
+            return Err(Error::new(
+                ErrorKind::Other,
+                "strings.Reader.ReadAt: negative offset",
+            ));
+        }
+        if off >= int64!(len!(self.s)) {
+            return Err(Error::new(ErrorKind::UnexpectedEof, "EOF")); //todo io.EOF在rust中怎么表示
+        }
+        let n = len!(self.s.as_bytes()[uint!(off)..]);
+        b.copy_from_slice(self.s.as_bytes()[uint!(off)..].as_ref());
+        if n < len!(b) {
+            return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
+        }
+        Ok(int!(n))
     }
 }
 
 impl io::ByteReader for Reader {
-    fn ReadByte(&self) -> Result<byte, &str> {
+    fn ReadByte(&mut self) -> Result<byte, Error> {
         todo!()
     }
 }
 
 impl io::RuneReader for Reader {
-    fn ReadRune(&self) -> Result<(rune, int), &str> {
+    fn ReadRune(&mut self) -> Result<(rune, int), Error> {
         todo!()
     }
 }
 
 impl io::Seeker for Reader {
-    fn Seek(&self, offset: int64, whence: int) -> Result<int64, &str> {
+    fn Seek(&mut self, offset: int64, whence: int) -> Result<int64, Error> {
         todo!()
     }
 }
