@@ -300,6 +300,38 @@ pub fn HasSuffix(s: &str, suffix: &str) -> bool {
     s.ends_with(suffix)
 }
 
+/// Cut slices s around the first instance of sep,
+/// returning the text before and after sep.
+/// The found result reports whether sep appears in s.
+/// If sep does not appear in s, cut returns s, "", false.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// 在s中的第一个分隔字符串sep处切分字符串，返回sep前面部分before和sep后面的部分字符串after。found 值表示在s字符串中是否找到sep字符串。如果seq在s中找不到，切割结果返回(s,"",false)。
+/// </details>
+///
+/// # Example
+/// ```
+/// use gostd::strings;
+///
+/// assert_eq!(strings::Cut("127.0.0.1:8080",":"),("127.0.0.1","8080",true));
+/// ```
+pub fn Cut<'a>(s: &'a str, sep: &str) -> (&'a str, &'a str, bool) {
+    let before: &'a str;
+    let after: &'a str;
+    let found: bool;
+    let i = Index(s, sep);
+    if i >= 0 {
+        before = &s[..uint!(i)];
+        after = &s[(uint!(i) + len!(sep))..];
+        found = true;
+        return (before, after, found);
+    }
+    before = s;
+    after = "";
+    found = false;
+    (before, after, found)
+}
+
 /// Index returns the index of the first instance of substr in s, or -1 if substr is not present in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
