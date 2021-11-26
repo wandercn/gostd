@@ -45,7 +45,7 @@ pub trait Seeker {
 }
 
 pub trait ByteScanner {
-    fn UnreadByte(&self) -> Result<int, &str>
+    fn UnreadByte(&mut self) -> Result<int, Error>
     where
         Self: Sized;
 }

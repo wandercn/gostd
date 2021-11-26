@@ -1286,6 +1286,7 @@ impl Builder {
 /// <summary class="docblock">zh-cn</summary>
 ///
 /// </details>
+#[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
 pub struct Reader {
     s: String,
     i: int64,      // current reading index
@@ -1394,7 +1395,23 @@ impl io::ByteReader for Reader {
 
 impl io::RuneReader for Reader {
     fn ReadRune(&mut self) -> Result<(rune, int), Error> {
-        todo!()
+        if self.i >= int64!(len!(self.s)) {
+            self.prevRune = -1;
+            return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
+        }
+        self.prevRune = self.i as int;
+        if let Some(c) = self.s.chars().nth(uint!(self.i)) {
+            if rune!(c) < utf8::RuneSelf {
+                self.i += 1;
+                return Ok((rune!(c), 1));
+            }
+            let size = c.to_string().as_bytes().len() as int;
+            self.i += 1;
+            return Ok((c as rune, size as isize));
+        } else {
+            self.prevRune = -1;
+            return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
+        }
     }
 }
 
@@ -1405,8 +1422,16 @@ impl io::Seeker for Reader {
 }
 
 impl io::ByteScanner for Reader {
-    fn UnreadByte(&self) -> Result<int, &str> {
-        todo!()
+    fn UnreadByte(&mut self) -> Result<int, Error> {
+        if self.i <= 0 {
+            return Err(Error::new(
+                ErrorKind::Other,
+                "strings.Reader.UnreadByte: at beginning of string",
+            ));
+        }
+        self.prevRune = -1;
+        self.i -= 1;
+        Ok(0)
     }
 }
 
