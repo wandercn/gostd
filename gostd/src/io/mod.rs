@@ -8,6 +8,11 @@
 use crate::builtin::*;
 use std::io::Error;
 
+pub enum Whence {
+    SeekStat,
+    SeekCurrent,
+    SeekEnd,
+}
 pub trait Reader {
     fn Read(&mut self, b: Vec<byte>) -> Result<int, Error>
     where
@@ -39,7 +44,7 @@ pub trait RuneReader {
 }
 
 pub trait Seeker {
-    fn Seek(&mut self, offset: int64, whence: int) -> Result<int64, Error>
+    fn Seek(&mut self, offset: int64, whence: Whence) -> int64
     where
         Self: Sized;
 }

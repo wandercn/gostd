@@ -1405,7 +1405,7 @@ impl io::RuneReader for Reader {
                 self.i += 1;
                 return Ok((rune!(c), 1));
             }
-            let size = c.to_string().as_bytes().len() as int;
+            let size = c.len_utf8() as int;
             self.i += 1;
             return Ok((c as rune, size as isize));
         } else {
@@ -1415,9 +1415,18 @@ impl io::RuneReader for Reader {
     }
 }
 
+use io::Whence;
 impl io::Seeker for Reader {
-    fn Seek(&mut self, offset: int64, whence: int) -> Result<int64, Error> {
-        todo!()
+    fn Seek(&mut self, offset: int64, whence: Whence) -> int64 {
+        self.prevRune = -1;
+        let abs: int64;
+        match whence {
+            Whence::SeekStat => abs = offset,
+            Whence::SeekCurrent => abs = self.i + offset,
+            Whence::SeekEnd => abs = int64!(len!(self.s)) + offset,
+        }
+        self.i = abs;
+        abs
     }
 }
 
