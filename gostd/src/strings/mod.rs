@@ -1382,7 +1382,13 @@ impl io::ReaderAt for Reader {
 
 impl io::ByteReader for Reader {
     fn ReadByte(&mut self) -> Result<byte, Error> {
-        todo!()
+        self.prevRune = -1;
+        if self.i >= int64!(len!(self.s)) {
+            return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
+        }
+        let b = self.s.as_bytes()[uint!(self.i)];
+        self.i += 1;
+        Ok(b)
     }
 }
 
