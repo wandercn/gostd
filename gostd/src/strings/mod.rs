@@ -733,7 +733,7 @@ pub fn Replace<'a>(s: &'a str, old: &str, new: &str, n: int) -> String {
 /// assert_eq!("moo moo moo",strings::ReplaceAll("oink oink oink", "oink", "moo"));
 ///
 /// ```
-pub fn ReplaceAll<'a>(s: &'a str, old: &str, new: &str) -> String {
+pub fn ReplaceAll<'a>(s: &'a str, old: &'a str, new: &'a str) -> String {
     s.replace(old, new)
 }
 
@@ -1445,45 +1445,83 @@ impl io::ByteScanner for Reader {
 }
 
 impl io::WriterTo for Reader {
-    fn WriteTo(&self, w: Box<dyn io::Writer>) -> Result<int64, &str> {
-        todo!()
+    fn WriteTo(&mut self, w: Box<dyn io::Writer>) -> Result<int64, Error> {
+        self.prevRune = -1;
+        if self.i >= int64!(len!(self.s)) {
+            return Ok(0);
+        }
+        let s = self.s.get(self.i as usize..).unwrap();
+        if let Ok(m) = io::WriteString(w, s) {
+            if m > int!(len!(s)) {
+                panic!("gostd::strings::Reader::WriteTo: invalid WriteString count")
+            }
+            if m != int!(len!(s)) {
+                return Err(Error::new(ErrorKind::Other, "short write"));
+            }
+            self.i += int64!(m);
+            let n = int64!(m);
+            return Ok(n);
+        } else {
+            return Err(Error::new(ErrorKind::Other, "short write"));
+        }
     }
 }
 
-trait replacer {
-    fn Replace(&self, s: &str) -> &str
-    where
-        Self: Sized;
-    fn WriteString(&self, w: Box<dyn io::Writer>, s: string) -> Result<int, &str>
-    where
-        Self: Sized;
+pub trait replacer {
+    fn Replace(&mut self, s: &str) -> &str;
+    // where
+    // Self: Sized;
+    fn WriteString(&mut self, w: Box<dyn io::Writer>, s: &str) -> Result<int, &str>;
+    // where
+    // Self: Sized;
 }
 
-use std::sync::Once;
 /// NewReplacer returns a new Replacer from a list of old, new string pairs. Replacements are performed in the order they appear in the target string, without overlapping matches. The old string comparisons are done in argument order.
 
 /// NewReplacer panics if given an odd number of arguments.
-struct Replacer<'a> {
-    once: Once, // guards buildOnce method
-    r: Box<dyn replacer>,
-    oldnew: Vec<&'a str>,
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// 使用提供的多组old、new字符串对创建并返回一个*Replacer。替换是依次进行的，匹配时不会重叠。
+/// </details>
+///
+/// # Example
+///
+/// ```
+/// use gostd::strings::Replacer;
+///
+///    let p = vec![("<", "&lt;"), (">", "&gt;")];
+///    let r = Replacer::new(p);
+///    let s = r.Replace("This is <b>HTML</b>!");
+///    println!("{}", s);
+///
+/// ```
+/// # Output
+///
+/// ```text
+/// This is &lt;b&gt;HTML&lt;/b&gt;!
+/// ```
+
+pub struct Replacer<'a> {
+    oldnew: Vec<(&'a str, &'a str)>,
 }
 
 impl<'a> Replacer<'a> {
     /// NewReplacer returns a new Replacer from a list of old, new string pairs. Replacements are performed in the order they appear in the target string, without overlapping matches. The old string comparisons are done in argument order.
     ///
     /// NewReplacer panics if given an odd number of arguments.
-    pub fn NewReplacer(oldnew: &str) -> &Replacer {
-        todo!()
+    pub fn new(pairs: Vec<(&'a str, &'a str)>) -> Replacer<'a> {
+        Replacer { oldnew: pairs }
     }
-
     /// Replace returns a copy of s with all replacements performed.
-    pub fn Replace(&self, s: &str) -> &str {
-        todo!()
+    pub fn Replace(self, s: &str) -> String {
+        let mut new_str = s.to_owned();
+        for pair in self.oldnew.clone() {
+            new_str = ReplaceAll(new_str.as_str(), pair.0, pair.1);
+        }
+        new_str
     }
-
     /// WriteString writes s to w with all replacements performed.
-    pub fn WriteString(&self, w: Box<dyn io::Writer>, s: &str) -> Result<int, &str> {
-        todo!()
+    pub fn WriteString(&mut self, mut w: Box<dyn io::Writer>, s: &str) -> Result<int, Error> {
+        w.Write(s.as_bytes().to_vec())
     }
 }

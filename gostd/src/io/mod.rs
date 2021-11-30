@@ -20,9 +20,7 @@ pub trait Reader {
 }
 
 pub trait Writer {
-    fn Write(&mut self, b: Vec<byte>) -> Result<int, Error>
-    where
-        Self: Sized;
+    fn Write(&mut self, b: Vec<byte>) -> Result<int, Error>;
 }
 
 pub trait ReaderAt {
@@ -56,7 +54,17 @@ pub trait ByteScanner {
 }
 
 pub trait WriterTo {
-    fn WriteTo(&self, w: Box<dyn Writer>) -> Result<int64, &str>
+    fn WriteTo(&mut self, w: Box<dyn Writer>) -> Result<int64, Error>
     where
         Self: Sized;
+}
+
+pub trait StringWriter {
+    fn WriteString(s: &str) -> Result<int, Error>
+    where
+        Self: Sized;
+}
+
+pub fn WriteString(mut w: Box<dyn Writer>, s: &str) -> Result<int, Error> {
+    w.Write(s.as_bytes().to_owned())
 }
