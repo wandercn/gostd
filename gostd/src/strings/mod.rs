@@ -1467,15 +1467,6 @@ impl io::WriterTo for Reader {
     }
 }
 
-pub trait replacer {
-    fn Replace(self, s: &str) -> String
-    where
-        Self: Sized;
-    fn WriteString(&self, w: Box<dyn io::Writer>, s: &str) -> Result<int, Error>
-    where
-        Self: Sized;
-}
-
 /// Replacer replaces a list of strings with replacements. It is safe for concurrent use by multiple goroutines.
 ///
 /// <details class="rustdoc-toggle top-doc">
