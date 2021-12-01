@@ -1227,25 +1227,6 @@ impl Builder {
         String::from_utf8(self.buf.clone()).unwrap()
     }
 
-    /// Write appends the contents of p to b's buffer. Write always returns len!(p).
-    /// <details class="rustdoc-toggle top-doc">
-    /// <summary class="docblock">zh-cn</summary>
-    /// Write将p的内容附加到b的缓冲区, 写总是返回len!(p).
-    /// </details>
-    pub fn Write<'a>(&mut self, p: Vec<byte>) -> int {
-        self.buf.extend_from_slice(p.as_slice());
-        int!(len!(p))
-    }
-
-    /// WriteByte appends the byte c to b's buffer.
-    /// <details class="rustdoc-toggle top-doc">
-    /// <summary class="docblock">zh-cn</summary>
-    /// WriteByte将字节c追加到b的缓冲区。
-    /// </details>
-    pub fn WriteByte(&mut self, c: byte) {
-        self.buf.push(c)
-    }
-
     /// WriteRune appends the UTF-8 encoding of Unicode code point r to b's buffer. It returns the length of r.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
@@ -1265,15 +1246,44 @@ impl Builder {
         self.buf = self.buf.get(..l + (n.abs() as uint)).unwrap().to_vec();
         return Ok(n);
     }
+}
 
+use crate::io::ByteWriter;
+impl ByteWriter for Builder {
+    /// WriteByte appends the byte c to b's buffer.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// WriteByte将字节c追加到b的缓冲区。
+    /// </details>
+    fn WriteByte(&mut self, c: byte) -> Result<(), Error> {
+        self.buf.push(c);
+        Ok(())
+    }
+}
+
+use crate::io::StringWriter;
+impl StringWriter for Builder {
     /// WriteString appends the contents of s to b's buffer. It returns the length of s.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
     /// WriteString将s的内容附加到b的缓冲区。它返回s的长度。
     /// </details>
-    pub fn WriteString(&mut self, s: &str) -> Result<int, &str> {
+    fn WriteString(&mut self, s: &str) -> Result<int, Error> {
         self.buf.append(s.as_bytes().to_vec().as_mut());
         return Ok(len!(self.buf) as int);
+    }
+}
+
+use crate::io::Writer;
+impl Writer for Builder {
+    /// Write appends the contents of p to b's buffer. Write always returns len!(p).
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Write将p的内容附加到b的缓冲区, 写总是返回len!(p).
+    /// </details>
+    fn Write<'a>(&mut self, p: Vec<byte>) -> Result<int, Error> {
+        self.buf.extend_from_slice(p.as_slice());
+        Ok(int!(len!(p)))
     }
 }
 
@@ -1431,7 +1441,7 @@ impl io::Seeker for Reader {
 }
 
 impl io::ByteScanner for Reader {
-    fn UnreadByte(&mut self) -> Result<int, Error> {
+    fn UnreadByte(&mut self) -> Result<(), Error> {
         if self.i <= 0 {
             return Err(Error::new(
                 ErrorKind::Other,
@@ -1440,7 +1450,7 @@ impl io::ByteScanner for Reader {
         }
         self.prevRune = -1;
         self.i -= 1;
-        Ok(0)
+        Ok(())
     }
 }
 
