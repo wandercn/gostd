@@ -1496,10 +1496,10 @@ impl<'a> Replacer<'a> {
     /// # Example
     ///
     /// ```
-    /// use gostd::strings::Replacer;
+    /// use gostd::strings;
     ///
     ///    let p = vec![("<", "&lt;"), (">", "&gt;")];
-    ///    let r = Replacer::new(p);
+    ///    let r = strings::Replacer::new(p);
     ///    let s = r.Replace("This is <b>HTML</b>!");
     ///    println!("{}", s);
     ///
@@ -1512,14 +1512,12 @@ impl<'a> Replacer<'a> {
     pub fn new(pairs: Vec<(&'a str, &'a str)>) -> Replacer<'a> {
         Replacer { oldnew: pairs }
     }
-}
-impl<'a> replacer for Replacer<'a> {
     /// Replace returns a copy of s with all replacements performed.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
     /// Replace返回s的所有替换进行完后的拷贝.
     /// </details>
-    fn Replace(self, s: &str) -> String {
+    pub fn Replace(self, s: &str) -> String {
         let mut new_str = s.to_owned();
         for pair in self.oldnew.clone() {
             new_str = ReplaceAll(new_str.as_str(), pair.0, pair.1);
@@ -1531,7 +1529,7 @@ impl<'a> replacer for Replacer<'a> {
     /// <summary class="docblock">zh-cn</summary>
     /// WriteString向w中写入s的所有替换进行完后的拷贝
     /// </details>
-    fn WriteString(&self, mut w: Box<dyn io::Writer>, s: &str) -> Result<int, Error> {
+    pub fn WriteString(&self, mut w: Box<dyn io::Writer>, s: &str) -> Result<int, Error> {
         w.Write(s.as_bytes().to_vec())
     }
 }
