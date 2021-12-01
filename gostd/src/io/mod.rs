@@ -8,6 +8,11 @@
 use crate::builtin::*;
 use std::io::Error;
 
+pub enum Whence {
+    SeekStat,
+    SeekCurrent,
+    SeekEnd,
+}
 pub trait Reader {
     fn Read(&mut self, b: Vec<byte>) -> Result<int, Error>
     where
@@ -15,9 +20,7 @@ pub trait Reader {
 }
 
 pub trait Writer {
-    fn Write(&mut self, b: Vec<byte>) -> Result<int, Error>
-    where
-        Self: Sized;
+    fn Write(&mut self, b: Vec<byte>) -> Result<int, Error>;
 }
 
 pub trait ReaderAt {
@@ -39,19 +42,29 @@ pub trait RuneReader {
 }
 
 pub trait Seeker {
-    fn Seek(&mut self, offset: int64, whence: int) -> Result<int64, Error>
+    fn Seek(&mut self, offset: int64, whence: Whence) -> int64
     where
         Self: Sized;
 }
 
 pub trait ByteScanner {
-    fn UnreadByte(&self) -> Result<int, &str>
+    fn UnreadByte(&mut self) -> Result<int, Error>
     where
         Self: Sized;
 }
 
 pub trait WriterTo {
-    fn WriteTo(&self, w: Box<dyn Writer>) -> Result<int64, &str>
+    fn WriteTo(&mut self, w: Box<dyn Writer>) -> Result<int64, Error>
     where
         Self: Sized;
+}
+
+pub trait StringWriter {
+    fn WriteString(s: &str) -> Result<int, Error>
+    where
+        Self: Sized;
+}
+
+pub fn WriteString(mut w: Box<dyn Writer>, s: &str) -> Result<int, Error> {
+    w.Write(s.as_bytes().to_owned())
 }

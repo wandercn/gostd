@@ -733,7 +733,7 @@ pub fn Replace<'a>(s: &'a str, old: &str, new: &str, n: int) -> String {
 /// assert_eq!("moo moo moo",strings::ReplaceAll("oink oink oink", "oink", "moo"));
 ///
 /// ```
-pub fn ReplaceAll<'a>(s: &'a str, old: &str, new: &str) -> String {
+pub fn ReplaceAll<'a>(s: &'a str, old: &'a str, new: &'a str) -> String {
     s.replace(old, new)
 }
 
@@ -1286,6 +1286,7 @@ impl Builder {
 /// <summary class="docblock">zh-cn</summary>
 ///
 /// </details>
+#[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
 pub struct Reader {
     s: String,
     i: int64,      // current reading index
@@ -1382,68 +1383,144 @@ impl io::ReaderAt for Reader {
 
 impl io::ByteReader for Reader {
     fn ReadByte(&mut self) -> Result<byte, Error> {
-        todo!()
+        self.prevRune = -1;
+        if self.i >= int64!(len!(self.s)) {
+            return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
+        }
+        let b = self.s.as_bytes()[uint!(self.i)];
+        self.i += 1;
+        Ok(b)
     }
 }
 
 impl io::RuneReader for Reader {
     fn ReadRune(&mut self) -> Result<(rune, int), Error> {
-        todo!()
+        if self.i >= int64!(len!(self.s)) {
+            self.prevRune = -1;
+            return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
+        }
+        self.prevRune = self.i as int;
+        if let Some(c) = self.s.chars().nth(uint!(self.i)) {
+            if rune!(c) < utf8::RuneSelf {
+                self.i += 1;
+                return Ok((rune!(c), 1));
+            }
+            let size = c.len_utf8() as int;
+            self.i += 1;
+            return Ok((c as rune, size as isize));
+        } else {
+            self.prevRune = -1;
+            return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
+        }
     }
 }
 
+use io::Whence;
 impl io::Seeker for Reader {
-    fn Seek(&mut self, offset: int64, whence: int) -> Result<int64, Error> {
-        todo!()
+    fn Seek(&mut self, offset: int64, whence: Whence) -> int64 {
+        self.prevRune = -1;
+        let abs: int64;
+        match whence {
+            Whence::SeekStat => abs = offset,
+            Whence::SeekCurrent => abs = self.i + offset,
+            Whence::SeekEnd => abs = int64!(len!(self.s)) + offset,
+        }
+        self.i = abs;
+        abs
     }
 }
 
 impl io::ByteScanner for Reader {
-    fn UnreadByte(&self) -> Result<int, &str> {
-        todo!()
+    fn UnreadByte(&mut self) -> Result<int, Error> {
+        if self.i <= 0 {
+            return Err(Error::new(
+                ErrorKind::Other,
+                "strings.Reader.UnreadByte: at beginning of string",
+            ));
+        }
+        self.prevRune = -1;
+        self.i -= 1;
+        Ok(0)
     }
 }
 
 impl io::WriterTo for Reader {
-    fn WriteTo(&self, w: Box<dyn io::Writer>) -> Result<int64, &str> {
-        todo!()
+    fn WriteTo(&mut self, w: Box<dyn io::Writer>) -> Result<int64, Error> {
+        self.prevRune = -1;
+        if self.i >= int64!(len!(self.s)) {
+            return Ok(0);
+        }
+        let s = self.s.get(self.i as usize..).unwrap();
+        if let Ok(m) = io::WriteString(w, s) {
+            if m > int!(len!(s)) {
+                panic!("gostd::strings::Reader::WriteTo: invalid WriteString count")
+            }
+            if m != int!(len!(s)) {
+                return Err(Error::new(ErrorKind::Other, "short write"));
+            }
+            self.i += int64!(m);
+            let n = int64!(m);
+            return Ok(n);
+        } else {
+            return Err(Error::new(ErrorKind::Other, "short write"));
+        }
     }
 }
 
-trait replacer {
-    fn Replace(&self, s: &str) -> &str
-    where
-        Self: Sized;
-    fn WriteString(&self, w: Box<dyn io::Writer>, s: string) -> Result<int, &str>
-    where
-        Self: Sized;
-}
-
-use std::sync::Once;
-/// NewReplacer returns a new Replacer from a list of old, new string pairs. Replacements are performed in the order they appear in the target string, without overlapping matches. The old string comparisons are done in argument order.
-
-/// NewReplacer panics if given an odd number of arguments.
-struct Replacer<'a> {
-    once: Once, // guards buildOnce method
-    r: Box<dyn replacer>,
-    oldnew: Vec<&'a str>,
+/// Replacer replaces a list of strings with replacements. It is safe for concurrent use by multiple goroutines.
+///
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Replacer类型进行一系列字符串的替换。
+/// </details>
+pub struct Replacer<'a> {
+    oldnew: Vec<(&'a str, &'a str)>,
 }
 
 impl<'a> Replacer<'a> {
-    /// NewReplacer returns a new Replacer from a list of old, new string pairs. Replacements are performed in the order they appear in the target string, without overlapping matches. The old string comparisons are done in argument order.
+    /// new returns a new Replacer from a list of old, new string pairs. Replacements are performed in the order they appear in the target string, without overlapping matches. The old string comparisons are done in argument order.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 使用提供的多组old、new字符串对创建并返回一个*Replacer。替换是依次进行的，匹配时不会重叠。
+    /// </details>
     ///
-    /// NewReplacer panics if given an odd number of arguments.
-    pub fn NewReplacer(oldnew: &str) -> &Replacer {
-        todo!()
+    /// # Example
+    ///
+    /// ```
+    /// use gostd::strings;
+    ///
+    ///    let p = vec![("<", "&lt;"), (">", "&gt;")];
+    ///    let r = strings::Replacer::new(p);
+    ///    let s = r.Replace("This is <b>HTML</b>!");
+    ///    println!("{}", s);
+    ///
+    /// ```
+    /// # Output
+    ///
+    /// ```text
+    /// This is &lt;b&gt;HTML&lt;/b&gt;!
+    /// ```
+    pub fn new(pairs: Vec<(&'a str, &'a str)>) -> Replacer<'a> {
+        Replacer { oldnew: pairs }
     }
-
     /// Replace returns a copy of s with all replacements performed.
-    pub fn Replace(&self, s: &str) -> &str {
-        todo!()
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Replace返回s的所有替换进行完后的拷贝.
+    /// </details>
+    pub fn Replace(self, s: &str) -> String {
+        let mut new_str = s.to_owned();
+        for pair in self.oldnew.clone() {
+            new_str = ReplaceAll(new_str.as_str(), pair.0, pair.1);
+        }
+        new_str
     }
-
     /// WriteString writes s to w with all replacements performed.
-    pub fn WriteString(&self, w: Box<dyn io::Writer>, s: &str) -> Result<int, &str> {
-        todo!()
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// WriteString向w中写入s的所有替换进行完后的拷贝
+    /// </details>
+    pub fn WriteString(&self, mut w: Box<dyn io::Writer>, s: &str) -> Result<int, Error> {
+        w.Write(s.as_bytes().to_vec())
     }
 }
