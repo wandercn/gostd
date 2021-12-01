@@ -142,9 +142,98 @@ use gostd::vendor
 - [x] docs.rs文档增加例子程序"RUN"按钮,但是要复制代码本地运行,在rust play运行不了(因为下载量没到前100)。
 - [x] time支持local时区信息自动从系统读取，可以用time::Now()获取本地时间。
 - [x] strings模块，字符串处理函数已完成。除了Reader相关方法还没全实现。(version >=0.2.3)
+- [x] strings模块, 完成剩余的方法实现。(version >=0.2.4)
+- [x] io模块,完成部分接口例如Reader，Writer等。(version >=0.2.4)
 
 # 独立发布包
  
 独立发布gostd_time，代码等价于 use gostd::time 。 
 
 独立发布gostd_builtin, 代码等价于 use gostd::builtin 。 
+
+# 使用例子
+
+## strings模块
+
+1. 字符串替换 strings::ReplaceAll()
+
+```rust
+use gostd::strings;
+
+fn main() {
+
+    assert_eq!(
+        "moo moo moo",
+        strings::ReplaceAll("oink oink oink", "oink", "moo")
+    );
+}
+```
+
+2. 字符串分割 strings::Split()
+
+```rust
+use gostd::strings;
+
+fn main() {
+
+    assert_eq!(vec!["a", "b", "c"], strings::Split("a,b,c", ","));
+    assert_eq!(
+        vec!["", "man ", "plan ", "canal panama"],
+        strings::Split("a man a plan a canal panama", "a ")
+    );
+    assert_eq!(
+        vec!["", " ", "x", "y", "z", " ", ""],
+        strings::Split(" xyz ", "")
+    );
+    assert_eq!(vec![""], strings::Split("", "Bernardo O'Higgins"));
+}
+
+```
+
+3. 字符串位置查找 strings::Index
+
+```rust
+use gostd::strings;
+
+fn main() {
+
+    assert_eq!(4, strings::Index("chicken", "ken"));
+    assert_eq!(-1, strings::Index("chicken", "dmr"));
+}
+
+```
+
+4. 将多个字符串连接成一个新字符串 strings::Join
+
+```rust 
+use gostd::strings;
+
+fn main() {
+
+    let s = vec!["foo", "bar", "baz"];
+    assert_eq!("foo, bar, baz", strings::Join(s, ", "));
+}
+
+```
+
+5. 字符串转换成大写 strings::ToUpper
+
+```rust
+use gostd::strings;
+
+fn main() {
+
+    assert_eq!("GOPHER", strings::ToUpper("Gopher"));
+}
+```
+
+6. 字符串转换成小写 strings::ToLower
+```rust
+use gostd::strings;
+
+fn main() {
+
+    assert_eq!("gopher", strings::ToLower("Gopher"));
+}
+
+```
