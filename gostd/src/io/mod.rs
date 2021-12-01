@@ -48,9 +48,13 @@ pub trait Seeker {
 }
 
 pub trait ByteScanner {
-    fn UnreadByte(&mut self) -> Result<int, Error>
+    fn UnreadByte(&mut self) -> Result<(), Error>
     where
         Self: Sized;
+}
+
+pub trait ByteWriter {
+    fn WriteByte(&mut self, c: byte) -> Result<(), Error>;
 }
 
 pub trait WriterTo {
@@ -60,7 +64,7 @@ pub trait WriterTo {
 }
 
 pub trait StringWriter {
-    fn WriteString(s: &str) -> Result<int, Error>
+    fn WriteString(&mut self, s: &str) -> Result<int, Error>
     where
         Self: Sized;
 }
