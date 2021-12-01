@@ -1468,52 +1468,58 @@ impl io::WriterTo for Reader {
 }
 
 pub trait replacer {
-    fn Replace(&mut self, s: &str) -> &str;
-    // where
-    // Self: Sized;
-    fn WriteString(&mut self, w: Box<dyn io::Writer>, s: &str) -> Result<int, &str>;
-    // where
-    // Self: Sized;
+    fn Replace(self, s: &str) -> String
+    where
+        Self: Sized;
+    fn WriteString(&self, w: Box<dyn io::Writer>, s: &str) -> Result<int, Error>
+    where
+        Self: Sized;
 }
 
-/// NewReplacer returns a new Replacer from a list of old, new string pairs. Replacements are performed in the order they appear in the target string, without overlapping matches. The old string comparisons are done in argument order.
-
-/// NewReplacer panics if given an odd number of arguments.
+/// Replacer replaces a list of strings with replacements. It is safe for concurrent use by multiple goroutines.
+///
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 使用提供的多组old、new字符串对创建并返回一个*Replacer。替换是依次进行的，匹配时不会重叠。
+/// Replacer类型进行一系列字符串的替换。
 /// </details>
-///
-/// # Example
-///
-/// ```
-/// use gostd::strings::Replacer;
-///
-///    let p = vec![("<", "&lt;"), (">", "&gt;")];
-///    let r = Replacer::new(p);
-///    let s = r.Replace("This is <b>HTML</b>!");
-///    println!("{}", s);
-///
-/// ```
-/// # Output
-///
-/// ```text
-/// This is &lt;b&gt;HTML&lt;/b&gt;!
-/// ```
-
 pub struct Replacer<'a> {
     oldnew: Vec<(&'a str, &'a str)>,
 }
 
 impl<'a> Replacer<'a> {
-    /// NewReplacer returns a new Replacer from a list of old, new string pairs. Replacements are performed in the order they appear in the target string, without overlapping matches. The old string comparisons are done in argument order.
+    /// new returns a new Replacer from a list of old, new string pairs. Replacements are performed in the order they appear in the target string, without overlapping matches. The old string comparisons are done in argument order.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 使用提供的多组old、new字符串对创建并返回一个*Replacer。替换是依次进行的，匹配时不会重叠。
+    /// </details>
     ///
-    /// NewReplacer panics if given an odd number of arguments.
+    /// # Example
+    ///
+    /// ```
+    /// use gostd::strings::Replacer;
+    ///
+    ///    let p = vec![("<", "&lt;"), (">", "&gt;")];
+    ///    let r = Replacer::new(p);
+    ///    let s = r.Replace("This is <b>HTML</b>!");
+    ///    println!("{}", s);
+    ///
+    /// ```
+    /// # Output
+    ///
+    /// ```text
+    /// This is &lt;b&gt;HTML&lt;/b&gt;!
+    /// ```
     pub fn new(pairs: Vec<(&'a str, &'a str)>) -> Replacer<'a> {
         Replacer { oldnew: pairs }
     }
+}
+impl<'a> replacer for Replacer<'a> {
     /// Replace returns a copy of s with all replacements performed.
-    pub fn Replace(self, s: &str) -> String {
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// Replace返回s的所有替换进行完后的拷贝.
+    /// </details>
+    fn Replace(self, s: &str) -> String {
         let mut new_str = s.to_owned();
         for pair in self.oldnew.clone() {
             new_str = ReplaceAll(new_str.as_str(), pair.0, pair.1);
@@ -1521,7 +1527,11 @@ impl<'a> Replacer<'a> {
         new_str
     }
     /// WriteString writes s to w with all replacements performed.
-    pub fn WriteString(&mut self, mut w: Box<dyn io::Writer>, s: &str) -> Result<int, Error> {
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// WriteString向w中写入s的所有替换进行完后的拷贝
+    /// </details>
+    fn WriteString(&self, mut w: Box<dyn io::Writer>, s: &str) -> Result<int, Error> {
         w.Write(s.as_bytes().to_vec())
     }
 }
