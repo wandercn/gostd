@@ -198,7 +198,7 @@ const TimeFormat: &str = "Mon, 02 Jan 2006 15:04:05 GMT";
 const TrailerPrefix: &str = "Trailer:";
 
 use crate::io::*;
-use crate::net::url::{Userinfo, Values, URL};
+use crate::net::url;
 use crate::strings;
 use crate::time;
 use std::collections::HashMap;
@@ -223,12 +223,16 @@ impl Client {
         self.Do(&req)
     }
 
-    pub fn PostForm(&mut self, url: &str, data: Values) -> CResponse {
+    pub fn PostForm(&mut self, url: &str, data: url::Values) -> CResponse {
         self.Post(
             url,
             "application/x-www-form-urlencoded",
             Box::new(strings::Reader::new(data.Encode().as_str())),
         )
+    }
+    pub fn Head(&mut self, url: &str) -> CResponse {
+        let mut req = Request::New(Method::Head, url)?;
+        self.Do(&req)
     }
 
     pub fn Do(&mut self, req: &Request) -> CResponse {
@@ -244,7 +248,7 @@ pub trait RoundTripper {
     fn RoundTrip(&self, r: Request) -> Result<Response, Error>;
 }
 
-fn refererForURL(lastReq: &URL, newReq: &URL) -> String {
+fn refererForURL(lastReq: &url::URL, newReq: &url::URL) -> String {
     if (lastReq.Scheme == "https") && (newReq.Scheme == "http") {
         return "".to_string();
     }
@@ -257,9 +261,31 @@ fn refererForURL(lastReq: &URL, newReq: &URL) -> String {
     referer
 }
 
-pub struct Request {}
+pub struct Request<'a> {
+    Method: Method,
+    URL: url::URL<'a>,
+    Proto: &'a str,
+    ProtoMajor: int,
+    ProtoMinor: int,
+    Header: Header,
+    // Body io.ReadCloser
+    // GetBody func() (io.ReadCloser, error)
+    ContentLength: int64,
+    TransferEncoding: Vec<String>,
+    Close: bool,
+    Host: &'a str,
+    Form: url::Values,
+    PostForm: url::Values,
+    // MultipartForm:*multipart.Form,
+    Trailer: Header,
+    RemoteAddr: &'a str,
+    RequestURI: &'a str,
+    // TLS *tls.ConnectionState,
+    // Cancel <-chan struct{}
+    // ctx context.Context
+}
 
-impl Request {
+impl<'a> Request<'a> {
     pub fn New(method: Method, url: &str) -> Result<Request, Error> {
         todo!()
     }
@@ -267,12 +293,26 @@ impl Request {
         todo!()
     }
 }
+#[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
 pub struct Response {}
 
 pub trait CookieJar {
-    fn SetCookies(&self, u: URL, cookies: Vec<&Cookie>);
+    fn SetCookies(&self, u: &url::URL, cookies: Vec<&Cookie>);
 
-    fn Cookies(&self, u: URL) -> Vec<&Cookie>;
+    fn Cookies(&self, u: &url::URL) -> Vec<&Cookie>;
+}
+
+#[derive(Default, PartialEq, Debug, Clone)]
+pub struct Header(HashMap<String, Vec<String>>);
+
+impl Header {
+    pub fn Add(&mut self, key: &str, value: &str) {
+        todo!()
+    }
+
+    pub fn Set(&mut self, key: &str, value: &str) {
+        todo!()
+    }
 }
 
 #[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
