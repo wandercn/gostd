@@ -218,8 +218,8 @@ impl Client {
         self.Do(&req)
     }
     pub fn Post(&mut self, url: &str, contentType: &str, body: Box<dyn Reader>) -> CResponse {
-        let req = Request::NewWithBody(Method::Post, url, body)?;
-        // req.Header.Set("Content-Type", contentType)
+        let mut req = Request::NewWithBody(Method::Post, url, body)?;
+        req.Header.Set("Content-Type", contentType);
         self.Do(&req)
     }
 
@@ -342,3 +342,16 @@ pub struct Cookie<'a> {
 //
 // See https://tools.ietf.org/html/draft-ietf-httpbis-cookie-same-site-00 for details.
 type SameSite = int;
+
+fn hasPort(s: &str) -> bool {
+    strings::LastIndex(s, ":") > strings::LastIndex(s, "]")
+}
+
+// removeEmptyPort strips the empty port in ":port" to ""
+// as mandated by RFC 3986 Section 6.2.3.
+fn removeEmptyPort(host: &str) -> &str {
+    if hasPort(host) {
+        return strings::TrimSuffix(host, ":");
+    }
+    host
+}
