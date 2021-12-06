@@ -6,6 +6,8 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
+#[cfg(test)]
+mod tests;
 use crate::builtin::*;
 
 #[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
@@ -65,7 +67,19 @@ impl Values {
     }
 }
 use crate::strings;
-
+/// Parse parses rawurl into a URL structure.
+///
+/// The rawurl may be relative (a path, without a host) or absolute
+/// (starting with a scheme). Trying to parse a hostname and path
+/// without a scheme is invalid but may not necessarily return an
+/// error, due to parsing ambiguities.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Parse函数解析rawurl为一个URL结构体，rawurl可以是绝对地址，也可以是相对地址。
+/// </details>
+///
+/// # Example
+///
 pub fn Parse(rawurl: &str) -> Result<URL, Error> {
     // Cut off #frag
     let (u, frag, _) = strings::Cut(rawurl, "#");
@@ -182,6 +196,66 @@ enum Encoding {
 }
 
 use crate::io::*;
+/// QueryUnescape does the inverse transformation of QueryEscape,
+/// converting each 3-byte encoded substring of the form "%AB" into the
+/// hex-decoded byte 0xAB.
+/// It returns an error if any % is not followed by two hexadecimal
+/// digits.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// QueryUnescape函数用于将QueryEscape转码的字符串还原。它会把%AB改为字节0xAB，将'+'改为' '。如果有某个%后面未跟两个十六进制数字，本函数会返回错误。
+/// </details>
+///
+/// # Example
+///
+pub fn QueryUnescape(s: &str) -> Result<string, Error> {
+    unescape(s, Encoding::encodeQueryComponent)
+}
+
+/// PathUnescape does the inverse transformation of PathEscape,
+/// converting each 3-byte encoded substring of the form "%AB" into the
+/// hex-decoded byte 0xAB. It returns an error if any % is not followed
+/// by two hexadecimal digits.
+///
+/// PathUnescape is identical to QueryUnescape except that it does not
+/// unescape '+' to ' ' (space).
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// PathUnescape进行PathEscape的逆变换，将“%AB”形式的每个3字节编码子字符串转换为十六进制解码字节0xAB。如果未遵循任何%，则返回错误由两个十六进制数字组成。PathunScape与QuerynScape相同，只是它不相同将“+”卸载到“”（空格）。
+/// </details>
+///
+/// # Example
+///
+pub fn PathUnescape(s: &str) -> Result<string, Error> {
+    unescape(s, Encoding::encodePathSegment)
+}
+
+/// QueryEscape escapes the string so it can be safely placed
+/// inside a URL query.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// QueryEscape函数对s进行转码使之可以安全的用在URL查询里。
+/// </details>
+///
+/// # Example
+///
+pub fn QueryEscape(s: &str) -> String {
+    return escape(s, Encoding::encodeQueryComponent);
+}
+
+/// PathEscape escapes the string so it can be safely placed inside a URL path segment,
+/// replacing special characters (including /) with %XX sequences as needed.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// PathEscape将转义字符串，以便将其安全地放置在URL路径段中，
+/// 根据需要将特殊字符（包括/）替换为%XX序列。
+/// </details>
+///
+/// # Example
+///
+pub fn PathEscape(s: &str) -> String {
+    return escape(s, Encoding::encodePathSegment);
+}
 
 fn unescape(mut s: &str, mode: Encoding) -> Result<String, Error> {
     let mut n = 0;
@@ -272,8 +346,95 @@ fn unescape(mut s: &str, mode: Encoding) -> Result<String, Error> {
 }
 
 fn shouldEscape(c: byte, mode: Encoding) -> bool {
-    todo!()
+    let c = c as char;
+    if 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c && c <= '9' {
+        return false;
+    }
+
+    if mode == Encoding::encodeHost || mode == Encoding::encodeZone {
+        match c as char {
+            '!' | '$' | '&' | '\'' | '(' | ')' | '*' | '+' | ',' | ';' | '=' | ':' | '[' | ']'
+            | '<' | '>' | '"' => return false,
+            _ => (),
+        }
+    }
+
+    match c as char {
+        '-' | '_' | '.' | '~' => return false,
+        '$' | '&' | '+' | ',' | '/' | ':' | ';' | '=' | '?' | '@' => match mode {
+            Encoding::encodePath => return c == '?',
+            Encoding::encodePathSegment => return c == '/' || c == ';' || c == ',' || c == '?',
+            Encoding::encodeUserPassword => return c == '@' || c == '/' || c == '?' || c == ':',
+            Encoding::encodeQueryComponent => return true,
+            Encoding::encodeFragment => return false,
+            _ => (),
+        },
+        _ => (),
+    }
+    if mode == Encoding::encodeFragment {
+        match c {
+            '!' | '(' | ')' | '*' => return false,
+            _ => (),
+        }
+    }
+    true
 }
+const upperhex: &str = "0123456789ABCDEF";
+
 fn escape(s: &str, mode: Encoding) -> String {
-    todo!()
+    let mut spaceCount = 0;
+    let mut hexCount = 0;
+    for i in 0..len!(s) {
+        let c = s.as_bytes()[i];
+        if shouldEscape(c, mode) {
+            if c == b' ' && mode == Encoding::encodeQueryComponent {
+                spaceCount += 1;
+            } else {
+                hexCount += 1;
+            }
+        }
+    }
+    if spaceCount == 0 && hexCount == 0 {
+        return s.to_string();
+    }
+
+    let mut buf: [byte; 64] = [0; 64];
+    let mut t = Vec::<byte>::new();
+    let mut required = len!(s) + 2 * hexCount;
+    if required <= len!(buf) {
+        t = buf[..required].to_vec();
+    } else {
+        t = Vec::<byte>::with_capacity(required);
+        for i in 0..t.capacity() {
+            t.push(0);
+        }
+    }
+
+    if hexCount == 0 {
+        t.copy_from_slice(s.as_bytes());
+        for i in 0..len!(s) {
+            if s.as_bytes()[i] == b' ' {
+                t[i] = b'+';
+            }
+        }
+        return string(t.as_slice());
+    }
+    let mut j = 0;
+    for i in 0..len!(s) {
+        let c = s.as_bytes()[i];
+
+        if c == b' ' && mode == Encoding::encodeQueryComponent {
+            t[j] = b'+';
+            j += 1;
+        } else if shouldEscape(c, mode) {
+            t[j] = b'%';
+            t[j + 1] = upperhex.as_bytes()[uint!(c >> 4)];
+            t[j + 2] = upperhex.as_bytes()[uint!(c & 15)];
+            j += 3;
+        } else {
+            t[j] = s.as_bytes()[i];
+            j += 1;
+        }
+    }
+    string(t.as_slice())
 }
