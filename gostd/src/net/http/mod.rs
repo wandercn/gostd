@@ -239,13 +239,49 @@ impl Client {
         self.done(req)
     }
 
+    fn send(
+        &mut self,
+        req: &Request,
+        deadline: time::Time,
+    ) -> Result<(Response, fn() -> bool), Error> {
+        let (resp, didTimeout) = send(req, self.transport(), deadline)?;
+        Ok((resp, didTimeout))
+    }
+
     fn done(&mut self, req: &Request) -> CResponse {
+        let deadline = self.deadline();
+        let loc = req.Header.Get("Location");
+        let u = url::Parse(loc.as_str())?;
+        let (resp, didTimeout) = self.send(req, deadline)?;
+        Ok(resp)
+    }
+
+    fn deadline(&mut self) -> time::Time {
+        if self.Timeout > time::Duration::new(0) {
+            return time::Now().Add(&self.Timeout);
+        }
+        time::Time::default()
+    }
+
+    fn transport(&self) -> Box<dyn RoundTripper> {
         todo!()
     }
 }
 
+fn send(
+    ireq: &Request,
+    rt: Box<dyn RoundTripper>,
+    deadline: time::Time,
+) -> Result<(Response, fn() -> bool), Error> {
+    let resp = rt.RoundTrip(ireq)?;
+    fn didTimeout() -> bool {
+        return false;
+    };
+    Ok((resp, didTimeout)) //didTimeout待修改
+}
+
 pub trait RoundTripper {
-    fn RoundTrip(&self, r: Request) -> Result<Response, Error>;
+    fn RoundTrip(&self, r: &Request) -> Result<Response, Error>;
 }
 
 fn refererForURL(lastReq: &url::URL, newReq: &url::URL) -> String {
@@ -253,7 +289,7 @@ fn refererForURL(lastReq: &url::URL, newReq: &url::URL) -> String {
         return "".to_string();
     }
     let mut referer = lastReq.String();
-    if let Some(user) = lastReq.User {
+    if let Some(user) = lastReq.User.clone() {
         return referer;
     }
     let auth = "@";
@@ -261,10 +297,10 @@ fn refererForURL(lastReq: &url::URL, newReq: &url::URL) -> String {
     referer
 }
 
-pub struct Request<'a> {
+pub struct Request {
     Method: Method,
-    URL: url::URL<'a>,
-    Proto: &'a str,
+    URL: url::URL,
+    Proto: String,
     ProtoMajor: int,
     ProtoMinor: int,
     Header: Header,
@@ -273,21 +309,43 @@ pub struct Request<'a> {
     ContentLength: int64,
     TransferEncoding: Vec<String>,
     Close: bool,
-    Host: &'a str,
+    Host: String,
     Form: url::Values,
     PostForm: url::Values,
     // MultipartForm:*multipart.Form,
     Trailer: Header,
-    RemoteAddr: &'a str,
-    RequestURI: &'a str,
+    RemoteAddr: String,
+    RequestURI: String,
     // TLS *tls.ConnectionState,
     // Cancel <-chan struct{}
     // ctx context.Context
 }
 
-impl<'a> Request<'a> {
+impl Request {
     pub fn New(method: Method, url: &str) -> Result<Request, Error> {
-        todo!()
+        let mut u = url::Parse(url)?;
+
+        u.Host = removeEmptyPort(u.Host.as_str()).to_string();
+        let req = Request {
+            Method: method,
+            URL: u.clone(),
+            Proto: "HTTP/1.1".to_string(),
+            ProtoMajor: 1,
+            ProtoMinor: 1,
+            Header: Header::default(),
+            ContentLength: 0,
+            TransferEncoding: Vec::<String>::new(),
+            Close: false,
+            Form: url::Values::default(),
+            PostForm: url::Values::default(),
+            Trailer: Header::default(),
+            RemoteAddr: "".to_string(),
+            RequestURI: "".to_string(),
+
+            // Body: None,
+            Host: u.Host.to_owned(),
+        };
+        Ok(req)
     }
     pub fn NewWithBody(method: Method, url: &str, body: Box<dyn Reader>) -> Result<Request, Error> {
         todo!()
@@ -313,16 +371,20 @@ impl Header {
     pub fn Set(&mut self, key: &str, value: &str) {
         todo!()
     }
+
+    pub fn Get(&self, key: &str) -> String {
+        todo!()
+    }
 }
 
 #[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
-pub struct Cookie<'a> {
-    Name: &'a str,
-    Value: &'a str,
-    Path: &'a str,       // optional
-    Domain: &'a str,     // optional
+pub struct Cookie {
+    Name: String,
+    Value: String,
+    Path: String,        // optional
+    Domain: String,      // optional
     Expires: time::Time, // optional
-    RawExpires: &'a str, // for reading cookies only
+    RawExpires: String,  // for reading cookies only
 
     // MaxAge=0 means no 'Max-Age' attribute specified.
     // MaxAge<0 means delete cookie now, equivalently 'Max-Age: 0'
@@ -331,8 +393,8 @@ pub struct Cookie<'a> {
     Secure: bool,
     HttpOnly: bool,
     SameSite: SameSite,
-    Raw: &'a str,
-    Unparsed: Vec<&'a str>, // Raw text of unparsed attribute-value pairs
+    Raw: String,
+    Unparsed: Vec<String>, // Raw text of unparsed attribute-value pairs
 }
 
 // SameSite allows a server to define a cookie attribute making it impossible for
@@ -354,4 +416,60 @@ fn removeEmptyPort(host: &str) -> &str {
         return strings::TrimSuffix(host, ":");
     }
     host
+}
+use crate::net::Conn;
+use std::sync;
+#[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
+struct Transport {
+    // idleMu: sync::Mutex,
+    closeIdle: bool,
+    // idleConn:HashMap<String, Vec<>>
+    Proxy: Option<url::URL>,
+    Dial: fn(network: &str, addr: &str) -> Result<Box<dyn Conn>, Error>,
+    ForceAttemptHTTP2: bool,
+    MaxIdleConns: int,
+    // IdleConnTimeout:       90 * time.Second,
+    // TLSHandshakeTimeout:   10 * time.Second,
+    // ExpectContinueTimeout: 1 * time.Second,
+}
+
+impl Transport {
+    pub fn RoundTrip(&mut self, req: &Request) -> CResponse {
+        self.roundTrip(req)
+    }
+
+    fn getConn(treq: &transportRequest, cm: connectMethod) -> Result<persistConn, Error> {
+        todo!()
+    }
+
+    fn connectMethodForRequest(treq: &transportRequest) -> Result<connectMethod, Error> {
+        let mut cm: connectMethod::default();
+        cm.targetScheme = treq.URL.Scheme;
+        cm.targetAddr = canonicalAddr(treq.URL.clone());
+        cm.proxyURL = None;
+        cm.onlyH1 = true; //待优化
+    }
+}
+
+fn canonicalAddr(url: &url::URL) -> String {
+    let addr = url.Hostname();
+    let port = url.Port();
+    todo!()
+}
+fn roundTrip(req: &Request) -> CResponse {}
+
+#[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
+struct transportRequest {
+    Req: Request,
+}
+
+#[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
+struct connectMethod {
+    proxyURL: Option<url::URL>, // nil for no proxy, else full proxy URL
+    targetScheme: String,       // "http" or "https"
+    // If proxyURL specifies an http or https proxy, and targetScheme is http (not https),
+    // then targetAddr is not included in the connect method key, because the socket can
+    // be reused for different targetAddr values.
+    targetAddr: String,
+    onlyH1: bool, // whether to disable HTTP/2 and force HTTP/1
 }
