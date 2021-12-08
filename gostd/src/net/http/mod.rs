@@ -297,8 +297,9 @@ fn refererForURL(lastReq: &url::URL, newReq: &url::URL) -> String {
     referer
 }
 
+#[derive(Default, Clone)]
 pub struct Request {
-    Method: Method,
+    Method: String,
     URL: url::URL,
     Proto: String,
     ProtoMajor: int,
@@ -327,7 +328,7 @@ impl Request {
 
         u.Host = removeEmptyPort(u.Host.as_str()).to_string();
         let req = Request {
-            Method: method,
+            Method: method.String().to_owned(),
             URL: u.clone(),
             Proto: "HTTP/1.1".to_string(),
             ProtoMajor: 1,
@@ -348,6 +349,14 @@ impl Request {
         Ok(req)
     }
     pub fn NewWithBody(method: Method, url: &str, body: Box<dyn Reader>) -> Result<Request, Error> {
+        todo!()
+    }
+
+    pub fn Write(&self, w: impl Writer) -> Result<(), Error> {
+        self.write(w, false)
+    }
+
+    fn write(&self, w: impl Writer, usingProxy: bool) -> Result<(), Error> {
         todo!()
     }
 }
@@ -417,53 +426,134 @@ fn removeEmptyPort(host: &str) -> &str {
     }
     host
 }
-use crate::net::Conn;
 use std::sync;
-#[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
+#[derive(Default, Clone)]
 struct Transport {
     // idleMu: sync::Mutex,
     closeIdle: bool,
     // idleConn:HashMap<String, Vec<>>
     Proxy: Option<url::URL>,
-    Dial: fn(network: &str, addr: &str) -> Result<Box<dyn Conn>, Error>,
+    // Dial: fn(network: &str, addr: &str) -> Result<net::TcpConn, Error>,
     ForceAttemptHTTP2: bool,
     MaxIdleConns: int,
     // IdleConnTimeout:       90 * time.Second,
     // TLSHandshakeTimeout:   10 * time.Second,
     // ExpectContinueTimeout: 1 * time.Second,
+    DisableKeepAlives: bool,
+
+    DisableCompression: bool,
+    iMaxIdleConnsPerHost: int,
+    MaxConnsPerHost: int,
+    MaxResponseHeaderBytes: int64,
+    WriteBufferSize: int,
+    ReadBufferSize: int,
+    tlsNextProtoWasNil: bool,
 }
 
+use std::net;
+use std::sync::mpsc;
 impl Transport {
     pub fn RoundTrip(&mut self, req: &Request) -> CResponse {
         self.roundTrip(req)
     }
+    fn roundTrip(&mut self, req: &Request) -> CResponse {
+        let treq = &mut transportRequest {
+            Req: req.clone(),
+            extra: None,
+        };
+        let cm = self.connectMethodForRequest(treq)?;
+        let (mut pconn, mut conn) = self.getConn(treq, cm)?;
 
-    fn getConn(treq: &transportRequest, cm: connectMethod) -> Result<persistConn, Error> {
-        todo!()
+        pconn.roundTrip(treq, conn)
     }
 
-    fn connectMethodForRequest(treq: &transportRequest) -> Result<connectMethod, Error> {
-        let mut cm: connectMethod::default();
-        cm.targetScheme = treq.URL.Scheme;
-        cm.targetAddr = canonicalAddr(treq.URL.clone());
+    fn getConn(
+        &mut self,
+        treq: &transportRequest,
+        cm: connectMethod,
+    ) -> Result<(persistConn, TcpConn), Error> {
+        let conn = self.dialConn(cm)?;
+        let pconn = persistConn::default();
+        Ok((pconn, conn))
+    }
+
+    fn dialConn(&mut self, cm: connectMethod) -> Result<TcpConn, Error> {
+        // pconn.t = self;
+        // pconn.reqch = mpsc::channel();
+        // pconn.writech = mpsc::channel();
+        // pconn.writeLoopDone = mpsc::channel();
+        let conn = self.dial("tcp", cm.addr().as_str())?;
+        // pconn.conn = conn;
+        // pconn.br = bufio::NewReaderSize(pconn, self.readBufferSize());
+        // pconn.bw = bufio::NewWriterSize(persistConnWriter { pconn }, self.writeBufferSize());
+        // 待实现读写进程
+        /* go pconn.readLoop()
+        go pconn.writeLoop() */
+        // Ok(pconn)
+        Ok(conn)
+    }
+
+    fn dial(&mut self, network: &str, addr: &str) -> Result<TcpConn, Error> {
+        let mut stream = net::TcpStream::connect(addr)?;
+        Ok(stream)
+    }
+
+    fn connectMethodForRequest(&mut self, treq: &transportRequest) -> Result<connectMethod, Error> {
+        let mut cm = connectMethod::default();
+        cm.targetScheme = treq.Req.URL.Scheme.clone();
+        cm.targetAddr = canonicalAddr(&treq.Req.URL.clone());
         cm.proxyURL = None;
         cm.onlyH1 = true; //待优化
+        Ok(cm)
+    }
+
+    fn wirteBufferSize(self) -> int {
+        if self.WriteBufferSize > 0 {
+            return self.WriteBufferSize;
+        }
+        4 << 10
+    }
+
+    fn readBufferSize(self) -> int {
+        if self.ReadBufferSize > 0 {
+            return self.ReadBufferSize;
+        }
+        4 << 10
+    }
+}
+fn canonicalAddr(url: &url::URL) -> String {
+    let portMap: HashMap<String, String> = [
+        ("http".to_string(), "80".to_string()),
+        ("https".to_string(), "443".to_string()),
+        ("socks5".to_string(), "1080".to_string()),
+    ]
+    .iter()
+    .cloned()
+    .collect();
+    let addr = url.Hostname().clone();
+    let mut port = url.Port().clone();
+    if port == "" {
+        port = portMap.get(url.Scheme.as_str()).unwrap().to_string();
+    }
+    strings::Join(vec![addr.as_str(), port.as_str()], ":")
+}
+
+#[derive(Default, Clone)]
+struct transportRequest {
+    Req: Request,
+    extra: Option<Header>,
+}
+
+impl transportRequest {
+    fn extraHeaders(&mut self) -> Header {
+        if let Some(extra) = self.extra.clone() {
+            return extra;
+        }
+        Header::default()
     }
 }
 
-fn canonicalAddr(url: &url::URL) -> String {
-    let addr = url.Hostname();
-    let port = url.Port();
-    todo!()
-}
-fn roundTrip(req: &Request) -> CResponse {}
-
-#[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
-struct transportRequest {
-    Req: Request,
-}
-
-#[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
+#[derive(Default, PartialEq, PartialOrd, Clone)]
 struct connectMethod {
     proxyURL: Option<url::URL>, // nil for no proxy, else full proxy URL
     targetScheme: String,       // "http" or "https"
@@ -472,4 +562,52 @@ struct connectMethod {
     // be reused for different targetAddr values.
     targetAddr: String,
     onlyH1: bool, // whether to disable HTTP/2 and force HTTP/1
+}
+impl connectMethod {
+    fn scheme(&self) -> String {
+        self.targetScheme.clone()
+    }
+
+    fn addr(&self) -> String {
+        self.targetAddr.clone()
+    }
+}
+use crate::net::TcpConn;
+use std::sync::mpsc::channel;
+#[derive(Default, Clone)]
+struct persistConn {
+    t: Transport,
+    // br: bufio.Reader,
+    // bw: bufio.Writer,
+    nwrite: int64,
+    // reqch: channel,
+    // writech: channel,
+    isProxy: bool,
+    sawEOF: bool,
+    readLimit: int64,
+    // writeErrch: channel,
+    // writeLoopDone: channel,
+    numExpectedResponses: int,
+    broken: bool,
+    reused: bool,
+}
+
+use std::io::prelude::*;
+impl persistConn {
+    fn roundTrip(&mut self, req: &mut transportRequest, mut conn: TcpConn) -> CResponse {
+        self.numExpectedResponses += 1;
+        let mut requestedGzip = false;
+        if !self.t.DisableCompression
+            && req.Req.Header.Get("Accept-Encoding") == ""
+            && req.Req.Header.Get("Range") == ""
+            && req.Req.Method != "HEAD".to_string()
+        {
+            requestedGzip = true;
+            req.extra = Some(req.Req.Header.clone());
+            let mut hd = req.extra.take().unwrap();
+            hd.Set("Accept-Encoding", "gzip");
+            req.extra = Some(hd);
+        }
+        todo!()
+    }
 }

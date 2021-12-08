@@ -55,11 +55,11 @@ impl URL {
         }
         Ok(())
     }
-    pub fn Hostname(&mut self) -> String {
+    pub fn Hostname(&self) -> String {
         let (host, _, _) = strings::Cut(self.Host.as_str(), ":");
         host.to_string()
     }
-    pub fn Port(&mut self) -> String {
+    pub fn Port(&self) -> String {
         let (_, port, _) = strings::Cut(self.Host.as_str(), ":");
         port.to_string()
     }
