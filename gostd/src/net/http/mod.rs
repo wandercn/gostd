@@ -206,13 +206,20 @@ use std::io::Error;
 
 pub struct Client {
     Transport: Box<dyn RoundTripper>,
-    CheckRedirect: fn(req: &Request, via: Vec<&Request>) -> Result<(), Error>,
+    // CheckRedirect: fn(req: &Request, via: Vec<&Request>) -> Result<(), Error>,
     Jar: Box<dyn CookieJar>,
     Timeout: time::Duration,
 }
 
 type CResponse = Result<Response, Error>;
 impl Client {
+    pub fn New() -> Client {
+        Client {
+            Transport: Box::new(Transport::default()),
+            Timeout: time::Duration::new(0),
+            Jar: Box::new(Cookie::default()),
+        }
+    }
     pub fn Get(&mut self, url: &str) -> CResponse {
         let mut req = Request::New(Method::Get, url)?;
         self.Do(&req)
@@ -239,13 +246,49 @@ impl Client {
         self.done(req)
     }
 
+    fn send(
+        &mut self,
+        req: &Request,
+        deadline: time::Time,
+    ) -> Result<(Response, fn() -> bool), Error> {
+        let (resp, didTimeout) = send(req, self.transport(), deadline)?;
+        Ok((resp, didTimeout))
+    }
+
     fn done(&mut self, req: &Request) -> CResponse {
-        todo!()
+        let deadline = self.deadline();
+        /*     let loc = req.Header.Get("Location"); */
+        /* let u = url::Parse(loc.as_str())?; */
+        let (resp, didTimeout) = self.send(req, deadline)?;
+        Ok(resp)
+    }
+
+    fn deadline(&mut self) -> time::Time {
+        if self.Timeout > time::Duration::new(0) {
+            return time::Now().Add(&self.Timeout);
+        }
+        time::Time::default()
+    }
+
+    fn transport(&self) -> Box<dyn RoundTripper> {
+        Box::new(Transport::default())
     }
 }
 
+fn send(
+    ireq: &Request,
+    mut rt: Box<dyn RoundTripper>,
+    deadline: time::Time,
+) -> Result<(Response, fn() -> bool), Error> {
+    let resp = rt.RoundTrip(ireq)?;
+    fn didTimeout() -> bool {
+        return false;
+    };
+    Ok((resp, didTimeout)) //didTimeout待修改
+}
+
 pub trait RoundTripper {
-    fn RoundTrip(&self, r: Request) -> Result<Response, Error>;
+    fn RoundTrip(&mut self, r: &Request) -> Result<Response, Error>;
 }
 
 fn refererForURL(lastReq: &url::URL, newReq: &url::URL) -> String {
@@ -253,7 +296,7 @@ fn refererForURL(lastReq: &url::URL, newReq: &url::URL) -> String {
         return "".to_string();
     }
     let mut referer = lastReq.String();
-    if let Some(user) = lastReq.User {
+    if let Some(user) = lastReq.User.clone() {
         return referer;
     }
     let auth = "@";
@@ -261,10 +304,11 @@ fn refererForURL(lastReq: &url::URL, newReq: &url::URL) -> String {
     referer
 }
 
-pub struct Request<'a> {
-    Method: Method,
-    URL: url::URL<'a>,
-    Proto: &'a str,
+#[derive(Default, Clone, Debug)]
+pub struct Request {
+    Method: String,
+    URL: url::URL,
+    Proto: String,
     ProtoMajor: int,
     ProtoMinor: int,
     Header: Header,
@@ -273,33 +317,84 @@ pub struct Request<'a> {
     ContentLength: int64,
     TransferEncoding: Vec<String>,
     Close: bool,
-    Host: &'a str,
+    Host: String,
     Form: url::Values,
     PostForm: url::Values,
     // MultipartForm:*multipart.Form,
     Trailer: Header,
-    RemoteAddr: &'a str,
-    RequestURI: &'a str,
+    RemoteAddr: String,
+    RequestURI: String,
     // TLS *tls.ConnectionState,
     // Cancel <-chan struct{}
     // ctx context.Context
 }
 
-impl<'a> Request<'a> {
+impl Request {
     pub fn New(method: Method, url: &str) -> Result<Request, Error> {
-        todo!()
+        let mut u = url::Parse(url)?;
+
+        u.Host = removeEmptyPort(u.Host.as_str()).to_string();
+        let req = Request {
+            Method: method.String().to_owned(),
+            URL: u.clone(),
+            Proto: "HTTP/1.1".to_string(),
+            ProtoMajor: 1,
+            ProtoMinor: 1,
+            Header: Header::default(),
+            ContentLength: 0,
+            TransferEncoding: Vec::<String>::new(),
+            Close: false,
+            Form: url::Values::default(),
+            PostForm: url::Values::default(),
+            Trailer: Header::default(),
+            RemoteAddr: "".to_string(),
+            RequestURI: "".to_string(),
+
+            // Body: None,
+            Host: u.Host.to_owned(),
+        };
+        Ok(req)
     }
     pub fn NewWithBody(method: Method, url: &str, body: Box<dyn Reader>) -> Result<Request, Error> {
         todo!()
     }
+
+    pub fn Write(&self) -> Result<String, Error> {
+        self.write(false)
+    }
+
+    fn write(&self, usingProxy: bool) -> Result<String, Error> {
+        let mut buf = strings::Builder::new();
+        let host = self.Host.clone();
+        let ruri = self.URL.RequestURI();
+        let userAgent = "rust-http-client/1.1";
+        buf.WriteString(format!("{} {} HTTP/1.1\r\n", self.Method.as_str(), ruri).as_str());
+        buf.WriteString(format!("Host: {}\r\n", host).as_str());
+        buf.WriteString(format!("User-Agent: {}\r\n", userAgent).as_str());
+        buf.WriteString("\r\n");
+        Ok(buf.String())
+    }
 }
-#[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
-pub struct Response {}
+#[derive(Default, Debug, Clone)]
+pub struct Response {
+    Status: String,
+    StatusCode: int,
+    Proto: String,
+    ProtoMajor: int,
+    ProtoMinor: int,
+    Header: Header,
+    ContentLength: int64,
+    TransferEncoding: Vec<String>,
+    Close: bool,
+    Uncompressed: bool,
+    Trailer: Header,
+    Request: Request,
+}
 
 pub trait CookieJar {
-    fn SetCookies(&self, u: &url::URL, cookies: Vec<&Cookie>);
+    fn SetCookies(&mut self, u: &url::URL, cookies: Vec<Cookie>);
 
-    fn Cookies(&self, u: &url::URL) -> Vec<&Cookie>;
+    fn Cookies(&self, u: &url::URL) -> Vec<Cookie>;
 }
 
 #[derive(Default, PartialEq, Debug, Clone)]
@@ -307,22 +402,34 @@ pub struct Header(HashMap<String, Vec<String>>);
 
 impl Header {
     pub fn Add(&mut self, key: &str, value: &str) {
-        todo!()
+        self.0
+            .get_mut(&key.to_string())
+            .unwrap()
+            .push(value.to_string())
     }
 
     pub fn Set(&mut self, key: &str, value: &str) {
-        todo!()
+        self.0.insert(key.to_string(), vec![value.to_string()]);
+    }
+
+    pub fn Get(&self, key: &str) -> String {
+        self.0
+            .get(key)
+            .unwrap_or(&vec!["".to_string()])
+            .get(0)
+            .unwrap()
+            .to_string()
     }
 }
 
 #[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
-pub struct Cookie<'a> {
-    Name: &'a str,
-    Value: &'a str,
-    Path: &'a str,       // optional
-    Domain: &'a str,     // optional
+pub struct Cookie {
+    Name: String,
+    Value: String,
+    Path: String,        // optional
+    Domain: String,      // optional
     Expires: time::Time, // optional
-    RawExpires: &'a str, // for reading cookies only
+    RawExpires: String,  // for reading cookies only
 
     // MaxAge=0 means no 'Max-Age' attribute specified.
     // MaxAge<0 means delete cookie now, equivalently 'Max-Age: 0'
@@ -331,10 +438,19 @@ pub struct Cookie<'a> {
     Secure: bool,
     HttpOnly: bool,
     SameSite: SameSite,
-    Raw: &'a str,
-    Unparsed: Vec<&'a str>, // Raw text of unparsed attribute-value pairs
+    Raw: String,
+    Unparsed: Vec<String>, // Raw text of unparsed attribute-value pairs
 }
 
+impl CookieJar for Cookie {
+    fn SetCookies(&mut self, u: &url::URL, cookies: Vec<Cookie>) {
+        todo!()
+    }
+
+    fn Cookies(&self, u: &url::URL) -> Vec<Cookie> {
+        todo!()
+    }
+}
 // SameSite allows a server to define a cookie attribute making it impossible for
 // the browser to send this cookie along with cross-site requests. The main
 // goal is to mitigate the risk of cross-origin information leakage, and provide
@@ -354,4 +470,207 @@ fn removeEmptyPort(host: &str) -> &str {
         return strings::TrimSuffix(host, ":");
     }
     host
+}
+use std::sync;
+#[derive(Default, Clone)]
+struct Transport {
+    // idleMu: sync::Mutex,
+    closeIdle: bool,
+    // idleConn:HashMap<String, Vec<>>
+    Proxy: Option<url::URL>,
+    // Dial: fn(network: &str, addr: &str) -> Result<net::TcpConn, Error>,
+    ForceAttemptHTTP2: bool,
+    MaxIdleConns: int,
+    // IdleConnTimeout:       90 * time.Second,
+    // TLSHandshakeTimeout:   10 * time.Second,
+    // ExpectContinueTimeout: 1 * time.Second,
+    DisableKeepAlives: bool,
+
+    DisableCompression: bool,
+    iMaxIdleConnsPerHost: int,
+    MaxConnsPerHost: int,
+    MaxResponseHeaderBytes: int64,
+    WriteBufferSize: int,
+    ReadBufferSize: int,
+    tlsNextProtoWasNil: bool,
+}
+
+use std::net;
+use std::sync::mpsc;
+impl RoundTripper for Transport {
+    fn RoundTrip(&mut self, req: &Request) -> CResponse {
+        self.roundTrip(req)
+    }
+}
+impl Transport {
+    fn roundTrip(&mut self, req: &Request) -> CResponse {
+        let treq = &mut transportRequest {
+            Req: req.clone(),
+            extra: None,
+        };
+        let cm = self.connectMethodForRequest(treq)?;
+        let (mut pconn, mut conn) = self.getConn(treq, cm)?;
+
+        pconn.roundTrip(treq, conn)
+    }
+
+    fn getConn(
+        &mut self,
+        treq: &transportRequest,
+        cm: connectMethod,
+    ) -> Result<(persistConn, TcpConn), Error> {
+        let conn = self.dialConn(cm)?;
+        let pconn = persistConn::default();
+        Ok((pconn, conn))
+    }
+
+    fn dialConn(&mut self, cm: connectMethod) -> Result<TcpConn, Error> {
+        // pconn.t = self;
+        // pconn.reqch = mpsc::channel();
+        // pconn.writech = mpsc::channel();
+        // pconn.writeLoopDone = mpsc::channel();
+        self.dial("tcp", cm.addr().as_str())
+        // pconn.conn = conn;
+        // pconn.br = bufio::NewReaderSize(pconn, self.readBufferSize());
+        // pconn.bw = bufio::NewWriterSize(persistConnWriter { pconn }, self.writeBufferSize());
+        // 待实现读写进程
+        /* go pconn.readLoop()
+        go pconn.writeLoop() */
+        // Ok(pconn)
+    }
+
+    fn dial(&mut self, network: &str, addr: &str) -> Result<TcpConn, Error> {
+        let mut stream = net::TcpStream::connect(addr)?;
+        stream.try_clone()
+    }
+
+    fn connectMethodForRequest(&mut self, treq: &transportRequest) -> Result<connectMethod, Error> {
+        let mut cm = connectMethod::default();
+        cm.targetScheme = treq.Req.URL.Scheme.clone();
+        cm.targetAddr = canonicalAddr(&treq.Req.URL.clone());
+        cm.proxyURL = None;
+        cm.onlyH1 = true; //待优化
+        Ok(cm)
+    }
+
+    fn wirteBufferSize(self) -> int {
+        if self.WriteBufferSize > 0 {
+            return self.WriteBufferSize;
+        }
+        4 << 10
+    }
+
+    fn readBufferSize(self) -> int {
+        if self.ReadBufferSize > 0 {
+            return self.ReadBufferSize;
+        }
+        4 << 10
+    }
+}
+fn canonicalAddr(url: &url::URL) -> String {
+    let portMap: HashMap<String, String> = [
+        ("http".to_string(), "80".to_string()),
+        ("https".to_string(), "443".to_string()),
+        ("socks5".to_string(), "1080".to_string()),
+    ]
+    .iter()
+    .cloned()
+    .collect();
+    let addr = url.Hostname().clone();
+    let mut port = url.Port().clone();
+    if port == "" {
+        port = portMap.get(url.Scheme.as_str()).unwrap().to_string();
+    }
+    strings::Join(vec![addr.as_str(), port.as_str()], ":")
+}
+
+#[derive(Default, Clone)]
+struct transportRequest {
+    Req: Request,
+    extra: Option<Header>,
+}
+
+impl transportRequest {
+    fn extraHeaders(&mut self) -> Header {
+        if let Some(extra) = self.extra.clone() {
+            return extra;
+        }
+        Header::default()
+    }
+}
+
+#[derive(Default, PartialEq, PartialOrd, Clone)]
+struct connectMethod {
+    proxyURL: Option<url::URL>, // nil for no proxy, else full proxy URL
+    targetScheme: String,       // "http" or "https"
+    // If proxyURL specifies an http or https proxy, and targetScheme is http (not https),
+    // then targetAddr is not included in the connect method key, because the socket can
+    // be reused for different targetAddr values.
+    targetAddr: String,
+    onlyH1: bool, // whether to disable HTTP/2 and force HTTP/1
+}
+impl connectMethod {
+    fn scheme(&self) -> String {
+        self.targetScheme.clone()
+    }
+
+    fn addr(&self) -> String {
+        self.targetAddr.clone()
+    }
+}
+use crate::net::TcpConn;
+use std::sync::mpsc::channel;
+#[derive(Default, Clone)]
+struct persistConn {
+    t: Transport,
+    // br: bufio.Reader,
+    // bw: bufio.Writer,
+    nwrite: int64,
+    // reqch: channel,
+    // writech: channel,
+    isProxy: bool,
+    sawEOF: bool,
+    readLimit: int64,
+    // writeErrch: channel,
+    // writeLoopDone: channel,
+    numExpectedResponses: int,
+    broken: bool,
+    reused: bool,
+}
+
+use std::io::prelude::*;
+use std::io::BufReader;
+use std::net::Shutdown;
+impl persistConn {
+    fn roundTrip(&mut self, req: &mut transportRequest, mut conn: TcpConn) -> CResponse {
+        self.numExpectedResponses += 1;
+        let mut requestedGzip = false;
+        if !self.t.DisableCompression
+            && req.Req.Header.Get("Accept-Encoding") == ""
+            && req.Req.Header.Get("Range") == ""
+            && req.Req.Method != "HEAD".to_string()
+        {
+            requestedGzip = true;
+            req.extra = Some(req.Req.Header.clone());
+            let mut hd = req.extra.take().unwrap();
+            hd.Set("Accept-Encoding", "gzip");
+            req.extra = Some(hd);
+        }
+        let r = req.Req.Write()?;
+        conn.write(r.as_bytes());
+        conn.shutdown(Shutdown::Write)?; // 这里不关闭链接，下面读取就会阻塞,待以后研究。
+        let mut reader = BufReader::new(&conn);
+        let mut line = String::new();
+        let mut buf = strings::Builder::new();
+        loop {
+            let count = reader.read_line(&mut line).expect("read_line failed!");
+            buf.WriteString(line.as_str())?;
+            line.clear();
+            if count == 0 {
+                break;
+            }
+        }
+        println!("response: {}", buf.String());
+        Ok(Response::default())
+    }
 }

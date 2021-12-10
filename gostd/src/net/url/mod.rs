@@ -11,31 +11,31 @@ mod tests;
 use crate::builtin::*;
 
 #[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
-pub struct URL<'a> {
+pub struct URL {
     pub Scheme: String,
-    pub Opaque: String,             // encoded opaque data
-    pub User: Option<Userinfo<'a>>, // username and password information
-    pub Host: String,               // host or host:port
-    pub Path: String,               // path (relative paths may omit leading slash)
-    pub RawPath: String,            // encoded path hint (see EscapedPath method)
-    pub ForceQuery: bool,           // append a query ('?') even if RawQuery is empty
-    pub RawQuery: String,           // encoded query values, without '?'
-    pub Fragment: String,           // fragment for references, without '#'
-    pub RawFragment: String,        // encoded fragment hint (see EscapedFragment method)
+    pub Opaque: String,         // encoded opaque data
+    pub User: Option<Userinfo>, // username and password information
+    pub Host: String,           // host or host:port
+    pub Path: String,           // path (relative paths may omit leading slash)
+    pub RawPath: String,        // encoded path hint (see EscapedPath method)
+    pub ForceQuery: bool,       // append a query ('?') even if RawQuery is empty
+    pub RawQuery: String,       // encoded query values, without '?'
+    pub Fragment: String,       // fragment for references, without '#'
+    pub RawFragment: String,    // encoded fragment hint (see EscapedFragment method)
 }
 
 // The Userinfo type is an immutable encapsulation of username and
 // password details for a URL. An existing Userinfo value is guaranteed
 // to have a username set (potentially empty, as allowed by RFC 2396),
 // and optionally a password.
-#[derive(Default, PartialEq, PartialOrd, Debug, Clone, Copy)]
-pub struct Userinfo<'a> {
-    username: &'a str,
-    password: &'a str,
+#[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
+pub struct Userinfo {
+    username: String,
+    password: String,
     passwordSet: bool,
 }
 
-impl<'a> URL<'a> {
+impl URL {
     pub fn String(&self) -> String {
         todo!()
     }
@@ -55,10 +55,39 @@ impl<'a> URL<'a> {
         }
         Ok(())
     }
+
+    pub fn Hostname(&self) -> String {
+        let (host, _, _) = strings::Cut(self.Host.as_str(), ":");
+        host.to_string()
+    }
+
+    pub fn Port(&self) -> String {
+        let (_, port, _) = strings::Cut(self.Host.as_str(), ":");
+        port.to_string()
+    }
+
+    pub fn RequestURI(&self) -> String {
+        let mut result = self.Opaque.clone();
+        if result == "" {
+            result = escape(self.Path.as_str(), Encoding::encodePath);
+            if result == "" {
+                result = "/".to_owned()
+            }
+        } else {
+            if strings::HasPrefix(result.as_str(), "//") {
+                result = strings::Join(vec![self.Scheme.as_str(), result.as_str()], ":").clone();
+            }
+        }
+        if self.ForceQuery || self.RawQuery != "" {
+            result = strings::Join(vec![result.as_str(), self.RawQuery.as_str()], "?");
+        }
+        result
+    }
 }
 use std::collections::HashMap;
 use std::io::Error;
 use std::io::ErrorKind;
+#[derive(Default, PartialEq, Debug, Clone)]
 pub struct Values(HashMap<String, Vec<String>>);
 
 impl Values {
@@ -138,7 +167,16 @@ fn parse<'a>(rawurl: &'a str, viaRequest: bool) -> Result<URL, Error> {
             return nil, err
         }
     } */
-    url.setPath(rest)?;
+    if (url.Scheme != "" || !viaRequest && !strings::HasPrefix(rest, "///"))
+        && strings::HasPrefix(rest, "//")
+    {
+        let res2 = strings::Cut(strings::TrimPrefix(rest, "//"), "/");
+        url.Host = res2.0.to_string();
+        rest = res2.1;
+    }
+    let mut l = String::from("/");
+    l.push_str(rest);
+    url.setPath(l.as_str())?;
     Ok(url)
 }
 
