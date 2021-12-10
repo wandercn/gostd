@@ -206,13 +206,20 @@ use std::io::Error;
 
 pub struct Client {
     Transport: Box<dyn RoundTripper>,
-    CheckRedirect: fn(req: &Request, via: Vec<&Request>) -> Result<(), Error>,
+    // CheckRedirect: fn(req: &Request, via: Vec<&Request>) -> Result<(), Error>,
     Jar: Box<dyn CookieJar>,
     Timeout: time::Duration,
 }
 
 type CResponse = Result<Response, Error>;
 impl Client {
+    pub fn New() -> Client {
+        Client {
+            Transport: Box::new(Transport::default()),
+            Timeout: time::Duration::new(0),
+            Jar: Box::new(Cookie::default()),
+        }
+    }
     pub fn Get(&mut self, url: &str) -> CResponse {
         let mut req = Request::New(Method::Get, url)?;
         self.Do(&req)
@@ -250,8 +257,8 @@ impl Client {
 
     fn done(&mut self, req: &Request) -> CResponse {
         let deadline = self.deadline();
-        let loc = req.Header.Get("Location");
-        let u = url::Parse(loc.as_str())?;
+        /*     let loc = req.Header.Get("Location"); */
+        /* let u = url::Parse(loc.as_str())?; */
         let (resp, didTimeout) = self.send(req, deadline)?;
         Ok(resp)
     }
@@ -264,13 +271,13 @@ impl Client {
     }
 
     fn transport(&self) -> Box<dyn RoundTripper> {
-        todo!()
+        Box::new(Transport::default())
     }
 }
 
 fn send(
     ireq: &Request,
-    rt: Box<dyn RoundTripper>,
+    mut rt: Box<dyn RoundTripper>,
     deadline: time::Time,
 ) -> Result<(Response, fn() -> bool), Error> {
     let resp = rt.RoundTrip(ireq)?;
@@ -281,7 +288,7 @@ fn send(
 }
 
 pub trait RoundTripper {
-    fn RoundTrip(&self, r: &Request) -> Result<Response, Error>;
+    fn RoundTrip(&mut self, r: &Request) -> Result<Response, Error>;
 }
 
 fn refererForURL(lastReq: &url::URL, newReq: &url::URL) -> String {
@@ -297,7 +304,7 @@ fn refererForURL(lastReq: &url::URL, newReq: &url::URL) -> String {
     referer
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct Request {
     Method: String,
     URL: url::URL,
@@ -352,21 +359,42 @@ impl Request {
         todo!()
     }
 
-    pub fn Write(&self, w: impl Writer) -> Result<(), Error> {
-        self.write(w, false)
+    pub fn Write(&self) -> Result<String, Error> {
+        self.write(false)
     }
 
-    fn write(&self, w: impl Writer, usingProxy: bool) -> Result<(), Error> {
-        todo!()
+    fn write(&self, usingProxy: bool) -> Result<String, Error> {
+        let mut buf = strings::Builder::new();
+        let host = self.Host.clone();
+        let ruri = self.URL.RequestURI();
+        let userAgent = "rust-http-client/1.1";
+        buf.WriteString(format!("{} {} HTTP/1.1\r\n", self.Method.as_str(), ruri).as_str());
+        buf.WriteString(format!("Host: {}\r\n", host).as_str());
+        buf.WriteString(format!("User-Agent: {}\r\n", userAgent).as_str());
+        buf.WriteString("\r\n");
+        Ok(buf.String())
     }
 }
-#[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
-pub struct Response {}
+#[derive(Default, Debug, Clone)]
+pub struct Response {
+    Status: String,
+    StatusCode: int,
+    Proto: String,
+    ProtoMajor: int,
+    ProtoMinor: int,
+    Header: Header,
+    ContentLength: int64,
+    TransferEncoding: Vec<String>,
+    Close: bool,
+    Uncompressed: bool,
+    Trailer: Header,
+    Request: Request,
+}
 
 pub trait CookieJar {
-    fn SetCookies(&self, u: &url::URL, cookies: Vec<&Cookie>);
+    fn SetCookies(&mut self, u: &url::URL, cookies: Vec<Cookie>);
 
-    fn Cookies(&self, u: &url::URL) -> Vec<&Cookie>;
+    fn Cookies(&self, u: &url::URL) -> Vec<Cookie>;
 }
 
 #[derive(Default, PartialEq, Debug, Clone)]
@@ -374,15 +402,23 @@ pub struct Header(HashMap<String, Vec<String>>);
 
 impl Header {
     pub fn Add(&mut self, key: &str, value: &str) {
-        todo!()
+        self.0
+            .get_mut(&key.to_string())
+            .unwrap()
+            .push(value.to_string())
     }
 
     pub fn Set(&mut self, key: &str, value: &str) {
-        todo!()
+        self.0.insert(key.to_string(), vec![value.to_string()]);
     }
 
     pub fn Get(&self, key: &str) -> String {
-        todo!()
+        self.0
+            .get(key)
+            .unwrap_or(&vec!["".to_string()])
+            .get(0)
+            .unwrap()
+            .to_string()
     }
 }
 
@@ -406,6 +442,15 @@ pub struct Cookie {
     Unparsed: Vec<String>, // Raw text of unparsed attribute-value pairs
 }
 
+impl CookieJar for Cookie {
+    fn SetCookies(&mut self, u: &url::URL, cookies: Vec<Cookie>) {
+        todo!()
+    }
+
+    fn Cookies(&self, u: &url::URL) -> Vec<Cookie> {
+        todo!()
+    }
+}
 // SameSite allows a server to define a cookie attribute making it impossible for
 // the browser to send this cookie along with cross-site requests. The main
 // goal is to mitigate the risk of cross-origin information leakage, and provide
@@ -452,10 +497,12 @@ struct Transport {
 
 use std::net;
 use std::sync::mpsc;
-impl Transport {
-    pub fn RoundTrip(&mut self, req: &Request) -> CResponse {
+impl RoundTripper for Transport {
+    fn RoundTrip(&mut self, req: &Request) -> CResponse {
         self.roundTrip(req)
     }
+}
+impl Transport {
     fn roundTrip(&mut self, req: &Request) -> CResponse {
         let treq = &mut transportRequest {
             Req: req.clone(),
@@ -482,7 +529,7 @@ impl Transport {
         // pconn.reqch = mpsc::channel();
         // pconn.writech = mpsc::channel();
         // pconn.writeLoopDone = mpsc::channel();
-        let conn = self.dial("tcp", cm.addr().as_str())?;
+        self.dial("tcp", cm.addr().as_str())
         // pconn.conn = conn;
         // pconn.br = bufio::NewReaderSize(pconn, self.readBufferSize());
         // pconn.bw = bufio::NewWriterSize(persistConnWriter { pconn }, self.writeBufferSize());
@@ -490,12 +537,11 @@ impl Transport {
         /* go pconn.readLoop()
         go pconn.writeLoop() */
         // Ok(pconn)
-        Ok(conn)
     }
 
     fn dial(&mut self, network: &str, addr: &str) -> Result<TcpConn, Error> {
         let mut stream = net::TcpStream::connect(addr)?;
-        Ok(stream)
+        stream.try_clone()
     }
 
     fn connectMethodForRequest(&mut self, treq: &transportRequest) -> Result<connectMethod, Error> {
@@ -593,6 +639,8 @@ struct persistConn {
 }
 
 use std::io::prelude::*;
+use std::io::BufReader;
+use std::net::Shutdown;
 impl persistConn {
     fn roundTrip(&mut self, req: &mut transportRequest, mut conn: TcpConn) -> CResponse {
         self.numExpectedResponses += 1;
@@ -608,6 +656,21 @@ impl persistConn {
             hd.Set("Accept-Encoding", "gzip");
             req.extra = Some(hd);
         }
-        todo!()
+        let r = req.Req.Write()?;
+        conn.write(r.as_bytes());
+        conn.shutdown(Shutdown::Write)?; // 这里不关闭链接，下面读取就会阻塞,待以后研究。
+        let mut reader = BufReader::new(&conn);
+        let mut line = String::new();
+        let mut buf = strings::Builder::new();
+        loop {
+            let count = reader.read_line(&mut line).expect("read_line failed!");
+            buf.WriteString(line.as_str())?;
+            line.clear();
+            if count == 0 {
+                break;
+            }
+        }
+        println!("response: {}", buf.String());
+        Ok(Response::default())
     }
 }

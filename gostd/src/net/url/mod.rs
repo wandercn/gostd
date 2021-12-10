@@ -55,13 +55,33 @@ impl URL {
         }
         Ok(())
     }
+
     pub fn Hostname(&self) -> String {
         let (host, _, _) = strings::Cut(self.Host.as_str(), ":");
         host.to_string()
     }
+
     pub fn Port(&self) -> String {
         let (_, port, _) = strings::Cut(self.Host.as_str(), ":");
         port.to_string()
+    }
+
+    pub fn RequestURI(&self) -> String {
+        let mut result = self.Opaque.clone();
+        if result == "" {
+            result = escape(self.Path.as_str(), Encoding::encodePath);
+            if result == "" {
+                result = "/".to_owned()
+            }
+        } else {
+            if strings::HasPrefix(result.as_str(), "//") {
+                result = strings::Join(vec![self.Scheme.as_str(), result.as_str()], ":").clone();
+            }
+        }
+        if self.ForceQuery || self.RawQuery != "" {
+            result = strings::Join(vec![result.as_str(), self.RawQuery.as_str()], "?");
+        }
+        result
     }
 }
 use std::collections::HashMap;
@@ -147,7 +167,16 @@ fn parse<'a>(rawurl: &'a str, viaRequest: bool) -> Result<URL, Error> {
             return nil, err
         }
     } */
-    url.setPath(rest)?;
+    if (url.Scheme != "" || !viaRequest && !strings::HasPrefix(rest, "///"))
+        && strings::HasPrefix(rest, "//")
+    {
+        let res2 = strings::Cut(strings::TrimPrefix(rest, "//"), "/");
+        url.Host = res2.0.to_string();
+        rest = res2.1;
+    }
+    let mut l = String::from("/");
+    l.push_str(rest);
+    url.setPath(l.as_str())?;
     Ok(url)
 }
 
