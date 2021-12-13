@@ -220,6 +220,18 @@ pub fn PostForm(url: &str, data: url::Values) -> HttpResult {
     Client::New().PostForm(url, data)
 }
 
+pub fn Patch(url: &str, body: Box<dyn Reader>) -> HttpResult {
+    Client::New().Patch(url, body)
+}
+
+pub fn Put(url: &str, body: Box<dyn Reader>) -> HttpResult {
+    Client::New().Put(url, body)
+}
+
+pub fn Delete(url: &str) -> HttpResult {
+    Client::New().Delete(url)
+}
+
 pub struct Client {
     Transport: Box<dyn RoundTripper>,
     // CheckRedirect: fn(req: &Request, via: Vec<&Request>) -> Result<(), Error>,
@@ -236,10 +248,12 @@ impl Client {
             Jar: Box::new(Cookie::default()),
         }
     }
+
     pub fn Get(&mut self, url: &str) -> HttpResult {
         let mut req = Request::New(Method::Get, url)?;
         self.Do(&req)
     }
+
     pub fn Post(&mut self, url: &str, contentType: &str, body: Box<dyn Reader>) -> HttpResult {
         let mut req = Request::NewWithBody(Method::Post, url, body)?;
         req.Header.Set("Content-Type", contentType);
@@ -253,8 +267,24 @@ impl Client {
             Box::new(strings::Reader::new(data.Encode().as_str())),
         )
     }
+
     pub fn Head(&mut self, url: &str) -> HttpResult {
         let mut req = Request::New(Method::Head, url)?;
+        self.Do(&req)
+    }
+
+    pub fn Patch(&mut self, url: &str, body: Box<dyn Reader>) -> HttpResult {
+        let mut req = Request::NewWithBody(Method::Patch, url, body)?;
+        self.Do(&req)
+    }
+
+    pub fn Put(&mut self, url: &str, body: Box<dyn Reader>) -> HttpResult {
+        let mut req = Request::NewWithBody(Method::Put, url, body)?;
+        self.Do(&req)
+    }
+
+    pub fn Delete(&mut self, url: &str) -> HttpResult {
+        let mut req = Request::New(Method::Delete, url)?;
         self.Do(&req)
     }
 
@@ -371,6 +401,7 @@ impl Request {
         };
         Ok(req)
     }
+
     pub fn NewWithBody(method: Method, url: &str, body: Box<dyn Reader>) -> Result<Request, Error> {
         todo!()
     }
