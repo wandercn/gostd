@@ -204,6 +204,22 @@ use crate::time;
 use std::collections::HashMap;
 use std::io::Error;
 
+pub fn Get(url: &str) -> HttpResult {
+    Client::New().Get(url)
+}
+
+pub fn Head(url: &str) -> HttpResult {
+    Client::New().Head(url)
+}
+
+pub fn Post(url: &str, contentType: &str, body: Box<dyn Reader>) -> HttpResult {
+    Client::New().Post(url, contentType, body)
+}
+
+pub fn PostForm(url: &str, data: url::Values) -> HttpResult {
+    Client::New().PostForm(url, data)
+}
+
 pub struct Client {
     Transport: Box<dyn RoundTripper>,
     // CheckRedirect: fn(req: &Request, via: Vec<&Request>) -> Result<(), Error>,
@@ -211,7 +227,7 @@ pub struct Client {
     Timeout: time::Duration,
 }
 
-type CResponse = Result<Response, Error>;
+type HttpResult = Result<Response, Error>;
 impl Client {
     pub fn New() -> Client {
         Client {
@@ -220,29 +236,29 @@ impl Client {
             Jar: Box::new(Cookie::default()),
         }
     }
-    pub fn Get(&mut self, url: &str) -> CResponse {
+    pub fn Get(&mut self, url: &str) -> HttpResult {
         let mut req = Request::New(Method::Get, url)?;
         self.Do(&req)
     }
-    pub fn Post(&mut self, url: &str, contentType: &str, body: Box<dyn Reader>) -> CResponse {
+    pub fn Post(&mut self, url: &str, contentType: &str, body: Box<dyn Reader>) -> HttpResult {
         let mut req = Request::NewWithBody(Method::Post, url, body)?;
         req.Header.Set("Content-Type", contentType);
         self.Do(&req)
     }
 
-    pub fn PostForm(&mut self, url: &str, data: url::Values) -> CResponse {
+    pub fn PostForm(&mut self, url: &str, data: url::Values) -> HttpResult {
         self.Post(
             url,
             "application/x-www-form-urlencoded",
             Box::new(strings::Reader::new(data.Encode().as_str())),
         )
     }
-    pub fn Head(&mut self, url: &str) -> CResponse {
+    pub fn Head(&mut self, url: &str) -> HttpResult {
         let mut req = Request::New(Method::Head, url)?;
         self.Do(&req)
     }
 
-    pub fn Do(&mut self, req: &Request) -> CResponse {
+    pub fn Do(&mut self, req: &Request) -> HttpResult {
         self.done(req)
     }
 
@@ -255,7 +271,7 @@ impl Client {
         Ok((resp, didTimeout))
     }
 
-    fn done(&mut self, req: &Request) -> CResponse {
+    fn done(&mut self, req: &Request) -> HttpResult {
         let deadline = self.deadline();
         /*     let loc = req.Header.Get("Location"); */
         /* let u = url::Parse(loc.as_str())?; */
@@ -498,12 +514,12 @@ struct Transport {
 use std::net;
 use std::sync::mpsc;
 impl RoundTripper for Transport {
-    fn RoundTrip(&mut self, req: &Request) -> CResponse {
+    fn RoundTrip(&mut self, req: &Request) -> HttpResult {
         self.roundTrip(req)
     }
 }
 impl Transport {
-    fn roundTrip(&mut self, req: &Request) -> CResponse {
+    fn roundTrip(&mut self, req: &Request) -> HttpResult {
         let treq = &mut transportRequest {
             Req: req.clone(),
             extra: None,
@@ -642,7 +658,7 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::net::Shutdown;
 impl persistConn {
-    fn roundTrip(&mut self, req: &mut transportRequest, mut conn: TcpConn) -> CResponse {
+    fn roundTrip(&mut self, req: &mut transportRequest, mut conn: TcpConn) -> HttpResult {
         self.numExpectedResponses += 1;
         let mut requestedGzip = false;
         if !self.t.DisableCompression
