@@ -303,8 +303,6 @@ impl Client {
 
     fn done(&mut self, req: &Request) -> HttpResult {
         let deadline = self.deadline();
-        /*     let loc = req.Header.Get("Location"); */
-        /* let u = url::Parse(loc.as_str())?; */
         let (resp, didTimeout) = self.send(req, deadline)?;
         Ok(resp)
     }
@@ -719,5 +717,98 @@ impl persistConn {
         }
         println!("response: {}", buf.String());
         Ok(Response::default())
+    }
+}
+
+use std::io::ErrorKind;
+pub fn ReadResponse(mut r: BufReader<&TcpConn>, req: &Request) -> HttpResult {
+    let mut resp = Response::default();
+    resp.Request = req.clone();
+    let mut line = String::new();
+    r.read_line(&mut line)?;
+    let i = strings::IndexByte(line.as_str(), b' ');
+    if i == -1 {
+        return Err(Error::new(ErrorKind::Other, "malformed HTTP response"));
+    }
+    resp.Proto = line.get(..i as usize).unwrap().to_string();
+    resp.Status = strings::TrimLeft(&line.as_str()[i as usize + 1..], " ").to_string();
+    let statusCode = &resp.Status.as_str()[..i as usize];
+    if len!(statusCode) != 3 {
+        return Err(Error::new(ErrorKind::Other, "malformed HTTP status code"));
+    }
+    resp.StatusCode = statusCode.parse::<int>().unwrap();
+    if resp.StatusCode < 0 {
+        return Err(Error::new(ErrorKind::Other, "malformed HTTP status code"));
+    }
+
+    let vers = ParseHTTPVersion(resp.Proto.as_str());
+    let ok = vers.2;
+    if !ok {
+        return Err(Error::new(ErrorKind::Other, "malformed HTTP version"));
+    }
+    resp.ProtoMajor = vers.0;
+    resp.ProtoMinor = vers.1;
+
+    for line in r.lines().into_iter() {
+        let kv = line?;
+        let mut i = strings::IndexByte(kv.as_str(), b':');
+        if i < 0 {
+            return Err(Error::new(ErrorKind::Other, "malformed MIME header line"));
+        }
+        let key = canonicalMIMEHeaderKey(&kv.as_bytes()[..i as usize]);
+        if key == "".to_string() {
+            continue;
+        }
+        i += 1;
+        while (uint!(i) < len!(kv.as_bytes())
+            && (kv.as_bytes()[i as usize] == b' ' || kv.as_bytes()[i as usize] == b'\t'))
+        {
+            i += 1;
+        }
+        let value = string(&kv.as_bytes()[i as usize..]);
+    }
+
+    todo!()
+}
+
+fn canonicalMIMEHeaderKey(a: &[byte]) -> String {
+    todo!()
+}
+
+pub fn ParseHTTPVersion(vers: &str) -> (int, int, bool) {
+    let Big = 1000000;
+    match vers {
+        "HTTP/1.1" => return (1, 1, true),
+        "HTTP/1.0" => return (1, 0, true),
+        _ => {
+            if !strings::HasPrefix(vers, "HTTP/") {
+                return (0, 0, false);
+            }
+
+            let dot = strings::Index(vers, ".");
+
+            if dot < 0 {
+                return (0, 0, false);
+            }
+            let mut major = 0;
+            let mut minor = 0;
+
+            if let Ok(mj) = vers.get(5..dot as usize).unwrap().parse::<int>() {
+                major = mj;
+                if major < 0 || major > Big {
+                    return (0, 0, false);
+                }
+            } else {
+                return (0, 0, false);
+            }
+
+            if let Ok(mi) = vers.get(dot as usize + 1..).unwrap().parse::<int>() {
+                minor = mi;
+                return (0, 0, false);
+            } else {
+                return (0, 0, false);
+            }
+            return (major, minor, true);
+        }
     }
 }
