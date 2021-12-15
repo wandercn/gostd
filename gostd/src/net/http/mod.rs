@@ -749,6 +749,8 @@ pub fn ReadResponse(mut r: BufReader<&TcpConn>, req: &Request) -> HttpResult {
     resp.ProtoMajor = vers.0;
     resp.ProtoMinor = vers.1;
 
+    let mut m: MIMEHeader = HashMap::new();
+    let mut strs: Vec<String> = vec![];
     for line in r.lines().into_iter() {
         let kv = line?;
         let mut i = strings::IndexByte(kv.as_str(), b':');
@@ -765,10 +767,35 @@ pub fn ReadResponse(mut r: BufReader<&TcpConn>, req: &Request) -> HttpResult {
         {
             i += 1;
         }
+        let mut vv = Vec::<String>::new();
         let value = string(&kv.as_bytes()[i as usize..]);
+        if let Some(mut v) = m.get(&key) {
+            vv = v.to_owned();
+            vv.push(value);
+            m.insert(key, vv.to_owned());
+        } else {
+            if len!(strs) > 0 {
+                vv = strs.as_slice()[..1].to_vec();
+                strs = strs.get(1..).unwrap().to_vec();
+                m.insert(key, vv.clone());
+            }
+        }
     }
+    resp.Header = Header(m);
+    fixPragmaCacheControl(resp.Header);
+    resp
+}
 
-    todo!()
+type MIMEHeader = HashMap<String, Vec<String>>;
+
+fn fixPragmaCacheControl(mut header: Header) {
+    if let Some(hp) = header.0.get("Pragma") {
+        if len!(hp) > 0 && &hp[0] == "no-cache" {
+            if header.0.get("Cache-Control").is_none() {
+                header.Set("Cache-Control", "no-cache");
+            }
+        }
+    }
 }
 
 fn canonicalMIMEHeaderKey(a: &[byte]) -> String {
