@@ -204,6 +204,34 @@ use crate::time;
 use std::collections::HashMap;
 use std::io::Error;
 
+pub fn Get(url: &str) -> HttpResult {
+    Client::New().Get(url)
+}
+
+pub fn Head(url: &str) -> HttpResult {
+    Client::New().Head(url)
+}
+
+pub fn Post(url: &str, contentType: &str, body: Box<dyn Reader>) -> HttpResult {
+    Client::New().Post(url, contentType, body)
+}
+
+pub fn PostForm(url: &str, data: url::Values) -> HttpResult {
+    Client::New().PostForm(url, data)
+}
+
+pub fn Patch(url: &str, body: Box<dyn Reader>) -> HttpResult {
+    Client::New().Patch(url, body)
+}
+
+pub fn Put(url: &str, body: Box<dyn Reader>) -> HttpResult {
+    Client::New().Put(url, body)
+}
+
+pub fn Delete(url: &str) -> HttpResult {
+    Client::New().Delete(url)
+}
+
 pub struct Client {
     Transport: Box<dyn RoundTripper>,
     // CheckRedirect: fn(req: &Request, via: Vec<&Request>) -> Result<(), Error>,
@@ -211,7 +239,7 @@ pub struct Client {
     Timeout: time::Duration,
 }
 
-type CResponse = Result<Response, Error>;
+pub type HttpResult = Result<Response, Error>;
 impl Client {
     pub fn New() -> Client {
         Client {
@@ -220,29 +248,47 @@ impl Client {
             Jar: Box::new(Cookie::default()),
         }
     }
-    pub fn Get(&mut self, url: &str) -> CResponse {
+
+    pub fn Get(&mut self, url: &str) -> HttpResult {
         let mut req = Request::New(Method::Get, url)?;
         self.Do(&req)
     }
-    pub fn Post(&mut self, url: &str, contentType: &str, body: Box<dyn Reader>) -> CResponse {
+
+    pub fn Post(&mut self, url: &str, contentType: &str, body: Box<dyn Reader>) -> HttpResult {
         let mut req = Request::NewWithBody(Method::Post, url, body)?;
         req.Header.Set("Content-Type", contentType);
         self.Do(&req)
     }
 
-    pub fn PostForm(&mut self, url: &str, data: url::Values) -> CResponse {
+    pub fn PostForm(&mut self, url: &str, data: url::Values) -> HttpResult {
         self.Post(
             url,
             "application/x-www-form-urlencoded",
             Box::new(strings::Reader::new(data.Encode().as_str())),
         )
     }
-    pub fn Head(&mut self, url: &str) -> CResponse {
+
+    pub fn Head(&mut self, url: &str) -> HttpResult {
         let mut req = Request::New(Method::Head, url)?;
         self.Do(&req)
     }
 
-    pub fn Do(&mut self, req: &Request) -> CResponse {
+    pub fn Patch(&mut self, url: &str, body: Box<dyn Reader>) -> HttpResult {
+        let mut req = Request::NewWithBody(Method::Patch, url, body)?;
+        self.Do(&req)
+    }
+
+    pub fn Put(&mut self, url: &str, body: Box<dyn Reader>) -> HttpResult {
+        let mut req = Request::NewWithBody(Method::Put, url, body)?;
+        self.Do(&req)
+    }
+
+    pub fn Delete(&mut self, url: &str) -> HttpResult {
+        let mut req = Request::New(Method::Delete, url)?;
+        self.Do(&req)
+    }
+
+    pub fn Do(&mut self, req: &Request) -> HttpResult {
         self.done(req)
     }
 
@@ -255,10 +301,8 @@ impl Client {
         Ok((resp, didTimeout))
     }
 
-    fn done(&mut self, req: &Request) -> CResponse {
+    fn done(&mut self, req: &Request) -> HttpResult {
         let deadline = self.deadline();
-        /*     let loc = req.Header.Get("Location"); */
-        /* let u = url::Parse(loc.as_str())?; */
         let (resp, didTimeout) = self.send(req, deadline)?;
         Ok(resp)
     }
@@ -355,6 +399,7 @@ impl Request {
         };
         Ok(req)
     }
+
     pub fn NewWithBody(method: Method, url: &str, body: Box<dyn Reader>) -> Result<Request, Error> {
         todo!()
     }
@@ -385,13 +430,187 @@ pub struct Response {
     Header: Header,
     ContentLength: int64,
     TransferEncoding: Vec<String>,
+    Body: Option<Vec<String>>,
     Close: bool,
     Uncompressed: bool,
     Trailer: Header,
     Request: Request,
 }
 
-pub trait CookieJar {
+impl Response {
+    pub fn Cookies(&self) -> Vec<Cookie> {
+        readSetCookies(&self.Header)
+    }
+}
+fn isCookieNameValid(raw: &str) -> bool {
+    if raw == "" {
+        return false;
+    }
+    strings::IndexFunc(raw, isNotToken) < 0
+}
+
+fn isNotToken(r: rune) -> bool {
+    !validHeaderFieldByte(r as u8)
+}
+
+fn validCookieValueByte(b: byte) -> bool {
+    return 0x20 <= b && b < 0x7f && b != b'"' && b != b';' && b != b'\\';
+}
+
+fn parseCookieValue(mut raw: &str, allowDoubleQuote: bool) -> (string, bool) {
+    // Strip the quotes, if present.
+    if allowDoubleQuote
+        && len!(raw) > 1
+        && raw.bytes().nth(0) == Some(b'"')
+        && raw.bytes().nth((len!(raw) - 1)) == Some(b'"')
+    {
+        raw = &raw[1..len!(raw) - 1]
+    }
+    for i in 0..len!(raw) {
+        if !validCookieValueByte(raw.as_bytes()[i as usize]) {
+            return ("".to_string(), false);
+        }
+    }
+    return (raw.to_string(), true);
+}
+fn readSetCookies(h: &Header) -> Vec<Cookie> {
+    let cookieCount = len!(h.0.get(&"Set-Cookie".to_string()).unwrap());
+    if cookieCount == 0 {
+        return vec![];
+    }
+    let mut cookies = Vec::with_capacity(cookieCount);
+    for line in h.0.get("Set-Cookie").unwrap() {
+        let mut parts = strings::Split(strings::TrimSpace(line.as_str()), ";");
+        if len!(parts) == 1 && parts[0] == "" {
+            continue;
+        }
+        parts[0] = strings::TrimSpace(parts[0]);
+
+        let j = strings::Index(parts[0], "=");
+        if j < 0 {
+            continue;
+        }
+        let mut name = &parts[0][..j as usize];
+        let mut value = &parts[0][j as usize + 1..];
+        if !isCookieNameValid(name) {
+            continue;
+        }
+        let cookie = parseCookieValue(value, true);
+        value = &cookie.0;
+        let ok = &cookie.1;
+        if !ok {
+            continue;
+        }
+        let mut c = Cookie::default();
+        c.Name = name.to_string();
+        c.Value = value.to_string();
+        c.Raw = line.to_string();
+
+        for i in 1..len!(parts) {
+            parts[i] = strings::TrimSpace(parts[i]);
+            if len!(parts[i]) == 0 {
+                continue;
+            }
+            let mut attr = parts[i];
+            let mut val = "";
+            let j = strings::Index(attr, "=");
+            if j >= 0 {
+                attr = &attr[..j as usize];
+                val = &attr[j as usize + 1..];
+            }
+            if !attr.is_ascii() {
+                continue;
+            }
+
+            let cok = parseCookieValue(val, false);
+            val = &cok.0;
+            let ok = &cok.1;
+            if !ok {
+                c.Unparsed.push(parts[i].to_string());
+                continue;
+            }
+            let lowerAttr = strings::ToLower(attr);
+            match lowerAttr.as_str() {
+                "sameste" => {
+                    if !val.is_ascii() {
+                        c.SameSite = SameSite::SameSiteDefaultMode;
+                        continue;
+                    }
+                    let lowerVal = strings::ToLower(val);
+                    match lowerVal.as_str() {
+                        "lax" => c.SameSite = SameSite::SameSiteLaxMode,
+                        "strict" => c.SameSite = SameSite::SameSiteStrictMode,
+                        "none" => c.SameSite = SameSite::SameSiteNoneModepub,
+                        _ => c.SameSite = SameSite::SameSiteDefaultMode,
+                    }
+                    continue;
+                }
+                "secure" => {
+                    c.Secure = true;
+                    continue;
+                }
+                "httponly" => {
+                    c.HttpOnly = true;
+                    continue;
+                }
+                "domain" => {
+                    c.Domain = val.to_string();
+                    continue;
+                }
+                "max-age" => {
+                    let mut secs: int = 0;
+                    let res = val.parse::<int>();
+                    if res.is_err() || (secs != 0 && val.bytes().nth(0) == Some(b'0')) {
+                        break;
+                    }
+                    secs = res.unwrap();
+                    if secs <= 0 {
+                        secs = -1;
+                    }
+                    c.MaxAge = secs;
+                    continue;
+                }
+                "expires" => {
+                    c.RawExpires = val.to_string();
+                    if let Ok(mut exptime) = time::Parse(time::RFC1123, val) {
+                        c.Expires = exptime.UTC();
+                    } else {
+                        if let Ok(mut exptime) = time::Parse("Mon, 02-Jan-2006 15:04:05 MST", val) {
+                            c.Expires = exptime.UTC();
+                        } else {
+                            c.Expires = time::Time::default();
+                            break;
+                        }
+                    }
+                    continue;
+                }
+                "path" => {
+                    c.Path = val.to_string();
+                    continue;
+                }
+                _ => (),
+            }
+            c.Unparsed.push(parts[i].to_string());
+        }
+        cookies.push(c);
+    }
+    cookies
+}
+
+#[derive(PartialEq, PartialOrd, Debug, Clone)]
+pub enum SameSite {
+    SameSiteDefaultMode,
+    SameSiteLaxMode,
+    SameSiteStrictMode,
+    SameSiteNoneModepub,
+}
+
+impl Default for SameSite {
+    fn default() -> Self {
+        SameSite::SameSiteDefaultMode
+    }
+}
+trait CookieJar {
     fn SetCookies(&mut self, u: &url::URL, cookies: Vec<Cookie>);
 
     fn Cookies(&self, u: &url::URL) -> Vec<Cookie>;
@@ -457,7 +676,7 @@ impl CookieJar for Cookie {
 // some protection against cross-site request forgery attacks.
 //
 // See https://tools.ietf.org/html/draft-ietf-httpbis-cookie-same-site-00 for details.
-type SameSite = int;
+// type SameSite = int;
 
 fn hasPort(s: &str) -> bool {
     strings::LastIndex(s, ":") > strings::LastIndex(s, "]")
@@ -498,12 +717,12 @@ struct Transport {
 use std::net;
 use std::sync::mpsc;
 impl RoundTripper for Transport {
-    fn RoundTrip(&mut self, req: &Request) -> CResponse {
+    fn RoundTrip(&mut self, req: &Request) -> HttpResult {
         self.roundTrip(req)
     }
 }
 impl Transport {
-    fn roundTrip(&mut self, req: &Request) -> CResponse {
+    fn roundTrip(&mut self, req: &Request) -> HttpResult {
         let treq = &mut transportRequest {
             Req: req.clone(),
             extra: None,
@@ -642,7 +861,7 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::net::Shutdown;
 impl persistConn {
-    fn roundTrip(&mut self, req: &mut transportRequest, mut conn: TcpConn) -> CResponse {
+    fn roundTrip(&mut self, req: &mut transportRequest, mut conn: TcpConn) -> HttpResult {
         self.numExpectedResponses += 1;
         let mut requestedGzip = false;
         if !self.t.DisableCompression
@@ -662,7 +881,8 @@ impl persistConn {
         let mut reader = BufReader::new(&conn);
         let mut line = String::new();
         let mut buf = strings::Builder::new();
-        loop {
+        let resp = ReadResponse(reader, &req.Req)?;
+        /* loop {
             let count = reader.read_line(&mut line).expect("read_line failed!");
             buf.WriteString(line.as_str())?;
             line.clear();
@@ -670,7 +890,243 @@ impl persistConn {
                 break;
             }
         }
-        println!("response: {}", buf.String());
-        Ok(Response::default())
+        println!("response: {}", buf.String()); */
+        Ok(resp)
+    }
+}
+
+use std::io::ErrorKind;
+pub fn ReadResponse(mut r: BufReader<&TcpConn>, req: &Request) -> HttpResult {
+    let mut resp = Response::default();
+    resp.Request = req.clone();
+    let mut line = String::new();
+    r.read_line(&mut line)?;
+    let i = strings::IndexByte(line.as_str(), b' ');
+    if i == -1 {
+        return Err(Error::new(ErrorKind::Other, "malformed HTTP response"));
+    }
+    resp.Proto = line.get(..i as usize).unwrap().to_string();
+    resp.Status = strings::TrimLeft(&line.as_str()[i as usize + 1..], " ").to_string();
+    let mut statusCode = resp.Status.as_str();
+    let i = strings::IndexByte(resp.Status.as_str(), b' ');
+    if i != -1 {
+        statusCode = &resp.Status.as_str()[..i as usize];
+    }
+    if len!(statusCode) != 3 {
+        return Err(Error::new(ErrorKind::Other, "malformed HTTP status code"));
+    }
+    resp.StatusCode = statusCode.parse::<int>().unwrap();
+    if resp.StatusCode < 0 {
+        return Err(Error::new(ErrorKind::Other, "malformed HTTP status code"));
+    }
+
+    let vers = ParseHTTPVersion(resp.Proto.as_str());
+    let ok = vers.2;
+    if !ok {
+        return Err(Error::new(ErrorKind::Other, "malformed HTTP version"));
+    }
+    resp.ProtoMajor = vers.0;
+    resp.ProtoMinor = vers.1;
+
+    let mut m: MIMEHeader = HashMap::new();
+    let mut strs: Vec<String> = vec![];
+    let mut body: Vec<String> = vec![];
+    for line in r.lines().into_iter() {
+        let kv = line?;
+        let mut i = strings::IndexByte(kv.as_str(), b':');
+
+        if i < 0 {
+            body.push(kv.clone());
+            continue;
+        }
+
+        let key = canonicalMIMEHeaderKey(kv.as_str().get(..i as usize).unwrap());
+        if key == "".to_string() {
+            continue;
+        }
+        i += 1;
+        while (uint!(i) < len!(kv.as_bytes())
+            && (kv.as_bytes()[i as usize] == b' ' || kv.as_bytes()[i as usize] == b'\t'))
+        {
+            i += 1;
+        }
+        let mut vv = Vec::<String>::new();
+        let value = string(&kv.as_bytes()[i as usize..]);
+        if let Some(mut v) = m.get(&key) {
+            vv = v.to_owned();
+            vv.push(value);
+            m.insert(key, vv.to_owned());
+        } else {
+            if len!(strs) > 0 {
+                vv = strs.as_slice()[..1].to_vec();
+                strs = strs.get(1..).unwrap().to_vec();
+                m.insert(key, vv.clone());
+            }
+        }
+    }
+    resp.Header = Header(m);
+    fixPragmaCacheControl(&mut resp.Header);
+    resp.Body = Some(body);
+    Ok(resp)
+}
+pub type MIMEHeader = HashMap<String, Vec<String>>;
+
+fn fixPragmaCacheControl(header: &mut Header) {
+    if let Some(hp) = header.0.get("Pragma") {
+        if len!(hp) > 0 && &hp[0] == "no-cache" {
+            if header.0.get("Cache-Control").is_none() {
+                header.Set("Cache-Control", "no-cache");
+            }
+        }
+    }
+}
+
+fn validHeaderFieldByte(b: byte) -> bool {
+    let isTokenTable: HashMap<char, bool> = [
+        ('!', true),
+        ('#', true),
+        ('$', true),
+        ('%', true),
+        ('&', true),
+        ('\'', true),
+        ('*', true),
+        ('+', true),
+        ('-', true),
+        ('.', true),
+        ('0', true),
+        ('1', true),
+        ('2', true),
+        ('3', true),
+        ('4', true),
+        ('5', true),
+        ('6', true),
+        ('7', true),
+        ('8', true),
+        ('9', true),
+        ('A', true),
+        ('B', true),
+        ('C', true),
+        ('D', true),
+        ('E', true),
+        ('F', true),
+        ('G', true),
+        ('H', true),
+        ('I', true),
+        ('J', true),
+        ('K', true),
+        ('L', true),
+        ('M', true),
+        ('N', true),
+        ('O', true),
+        ('P', true),
+        ('Q', true),
+        ('R', true),
+        ('S', true),
+        ('T', true),
+        ('U', true),
+        ('W', true),
+        ('V', true),
+        ('X', true),
+        ('Y', true),
+        ('Z', true),
+        ('^', true),
+        ('_', true),
+        ('`', true),
+        ('a', true),
+        ('b', true),
+        ('c', true),
+        ('d', true),
+        ('e', true),
+        ('f', true),
+        ('g', true),
+        ('h', true),
+        ('i', true),
+        ('j', true),
+        ('k', true),
+        ('l', true),
+        ('m', true),
+        ('n', true),
+        ('o', true),
+        ('p', true),
+        ('q', true),
+        ('r', true),
+        ('s', true),
+        ('t', true),
+        ('u', true),
+        ('v', true),
+        ('w', true),
+        ('x', true),
+        ('y', true),
+        ('z', true),
+        ('|', true),
+        ('~', true),
+    ]
+    .iter()
+    .cloned()
+    .collect();
+
+    return int!(b) < int!(len!(isTokenTable)) && isTokenTable.get(&(b as char)).is_some();
+}
+
+const toLower: byte = (b'a' - b'A');
+fn canonicalMIMEHeaderKey(a: &str) -> String {
+    let mut a = a.to_owned();
+    for c in a.as_bytes() {
+        if validHeaderFieldByte(*c) {
+            continue;
+        }
+        return string(a.as_bytes());
+    }
+    let mut upper = true;
+    let mut new = String::new();
+    for (i, &c) in a.as_bytes().iter().enumerate() {
+        let mut c1 = c;
+        if upper && b'a' <= c && c <= b'z' {
+            c1 -= toLower;
+        } else if !upper && b'A' <= c && c <= b'Z' {
+            c1 += toLower;
+        }
+        new.push(c1 as char);
+
+        upper = c1 == b'_';
+    }
+    new.clone()
+}
+
+pub fn ParseHTTPVersion(vers: &str) -> (int, int, bool) {
+    let Big = 1000000;
+    match vers {
+        "HTTP/1.1" => return (1, 1, true),
+        "HTTP/1.0" => return (1, 0, true),
+        _ => {
+            if !strings::HasPrefix(vers, "HTTP/") {
+                return (0, 0, false);
+            }
+
+            let dot = strings::Index(vers, ".");
+
+            if dot < 0 {
+                return (0, 0, false);
+            }
+            let mut major = 0;
+            let mut minor = 0;
+
+            if let Ok(mj) = vers.get(5..dot as usize).unwrap().parse::<int>() {
+                major = mj;
+                if major < 0 || major > Big {
+                    return (0, 0, false);
+                }
+            } else {
+                return (0, 0, false);
+            }
+
+            if let Ok(mi) = vers.get(dot as usize + 1..).unwrap().parse::<int>() {
+                minor = mi;
+                return (0, 0, false);
+            } else {
+                return (0, 0, false);
+            }
+            return (major, minor, true);
+        }
     }
 }
