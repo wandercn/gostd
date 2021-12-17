@@ -430,7 +430,7 @@ pub struct Response {
     Header: Header,
     ContentLength: int64,
     TransferEncoding: Vec<String>,
-    Body: Option<Vec<String>>,
+    Body: Option<String>,
     Close: bool,
     Uncompressed: bool,
     Trailer: Header,
@@ -894,9 +894,10 @@ impl persistConn {
         Ok(resp)
     }
 }
-
 use std::io::ErrorKind;
-pub fn ReadResponse(mut r: BufReader<&TcpConn>, req: &Request) -> HttpResult {
+const EOF: &str = "0";
+
+pub fn ReadResponse<'a>(mut r: BufReader<&TcpConn>, req: &'a Request) -> HttpResult {
     let mut resp = Response::default();
     resp.Request = req.clone();
     let mut line = String::new();
@@ -930,13 +931,22 @@ pub fn ReadResponse(mut r: BufReader<&TcpConn>, req: &Request) -> HttpResult {
 
     let mut m: MIMEHeader = HashMap::new();
     let mut strs: Vec<String> = vec![];
-    let mut body: Vec<String> = vec![];
+    let mut buf = strings::Builder::new();
+    // let mut isBody = false;
     for line in r.lines().into_iter() {
         let kv = line?;
+        println!("{}", kv);
         let mut i = strings::IndexByte(kv.as_str(), b':');
-
         if i < 0 {
-            body.push(kv.clone());
+            if strings::HasPrefix(kv.as_str(), "<!") || strings::HasPrefix(kv.as_str(), "{") {
+                // isBody = true;
+            }
+            if kv.as_str() == EOF {
+                // isBody = false;
+            }
+            if len!(kv) > 0 {
+                buf.WriteString(kv.as_str());
+            }
             continue;
         }
 
@@ -966,7 +976,7 @@ pub fn ReadResponse(mut r: BufReader<&TcpConn>, req: &Request) -> HttpResult {
     }
     resp.Header = Header(m);
     fixPragmaCacheControl(&mut resp.Header);
-    resp.Body = Some(body);
+    resp.Body = Some(buf.String());
     Ok(resp)
 }
 pub type MIMEHeader = HashMap<String, Vec<String>>;
