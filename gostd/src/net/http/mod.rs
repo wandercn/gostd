@@ -422,19 +422,19 @@ impl Request {
 }
 #[derive(Default, Debug, Clone)]
 pub struct Response {
-    Status: String,
-    StatusCode: int,
-    Proto: String,
-    ProtoMajor: int,
-    ProtoMinor: int,
+    pub Status: String,
+    pub StatusCode: int,
+    pub Proto: String,
+    pub ProtoMajor: int,
+    pub ProtoMinor: int,
     pub Header: Header,
-    ContentLength: int64,
-    TransferEncoding: Vec<String>,
+    pub ContentLength: int64,
+    pub TransferEncoding: Vec<String>,
     pub Body: Option<Vec<u8>>,
-    Close: bool,
-    Uncompressed: bool,
-    Trailer: Header,
-    Request: Request,
+    pub Close: bool,
+    pub Uncompressed: bool,
+    pub Trailer: Header,
+    pub Request: Request,
 }
 
 impl Response {
@@ -620,6 +620,9 @@ trait CookieJar {
 pub struct Header(HashMap<String, Vec<String>>);
 
 impl Header {
+    pub fn NewWithHashMap(m: HashMap<String, Vec<String>>) -> Header {
+        Header(m)
+    }
     pub fn Add(&mut self, key: &str, value: &str) {
         self.0
             .get_mut(&key.to_string())
@@ -908,7 +911,8 @@ pub fn ReadResponse<'a>(mut r: BufReader<&TcpConn>, req: &'a Request) -> HttpRes
         return Err(Error::new(ErrorKind::Other, "malformed HTTP response"));
     }
     resp.Proto = line.get(..i as usize).unwrap().to_string();
-    resp.Status = strings::TrimLeft(&line.as_str()[i as usize + 1..], " ").to_string();
+    resp.Status =
+        strings::TrimLeft(&line.as_str()[i as usize + 1..len!(line) - 2], " ").to_string();
     let mut statusCode = resp.Status.as_str();
     let i = strings::IndexByte(resp.Status.as_str(), b' ');
     if i != -1 {
@@ -936,7 +940,7 @@ pub fn ReadResponse<'a>(mut r: BufReader<&TcpConn>, req: &'a Request) -> HttpRes
     let headPart: Vec<u8> = response[..(startIndex - 2_usize)].to_vec();
     let bodyPart: Vec<u8> = response[startIndex..].to_vec();
     // parse headPart
-    resp.Header = Header(parseHeader(headPart));
+    resp.Header = Header::NewWithHashMap(parseHeader(headPart));
     fixPragmaCacheControl(&mut resp.Header);
     // set Body
     resp.Body = Some(bodyPart);
@@ -954,10 +958,9 @@ fn fixPragmaCacheControl(header: &mut Header) {
     }
 }
 
-fn parseHeader(headerPart: Vec<u8>) -> MIMEHeader {
+fn parseHeader(headPart: Vec<u8>) -> MIMEHeader {
     let mut m: MIMEHeader = HashMap::new();
-    let mut strs: Vec<String> = vec![];
-    let lines = std::str::from_utf8(headerPart.as_slice()).unwrap();
+    let lines = std::str::from_utf8(headPart.as_slice()).unwrap();
 
     for kv in lines.split("\r\n").into_iter() {
         let mut i = strings::IndexByte(kv, b':');
@@ -976,15 +979,18 @@ fn parseHeader(headerPart: Vec<u8>) -> MIMEHeader {
             i += 1;
         }
         let mut vv = Vec::<String>::new();
-        let value = string(&kv.as_bytes()[i as usize..]);
+        let value = strings::TrimFunc(string(&kv.as_bytes()[i as usize..]).trim(), |x| {
+            x == '\"' as u32
+        })
+        .to_string();
+
         if let Some(mut v) = m.get(&key) {
             vv = v.to_owned();
             vv.push(value);
             m.insert(key, vv.to_owned());
         } else {
-            if len!(strs) > 0 {
-                vv = strs.as_slice()[..1].to_vec();
-                strs = strs.get(1..).unwrap().to_vec();
+            if len!(value) > 0 {
+                vv.push(value);
                 m.insert(key, vv.clone());
             }
         }
