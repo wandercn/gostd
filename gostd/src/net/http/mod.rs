@@ -878,21 +878,13 @@ impl persistConn {
             req.extra = Some(hd);
         }
         let r = req.Req.Write()?;
-        conn.set_nonblocking(false)?;
         conn.set_nodelay(true)?;
-        conn.write(r.as_bytes());
+        conn.set_read_timeout(Some(std::time::Duration::new(1, 0)))?;
+        conn.write(r.as_bytes())?;
         let mut reader = BufReader::new(&conn);
-        conn.shutdown(Shutdown::Write)?; // 这里不关闭链接，下面读取就会阻塞,待以后研究。
+        // conn.shutdown(Shutdown::Write)?; 这里不关闭链接，下面读取就会阻塞,待以后研究。
         let resp = ReadResponse(reader, &req.Req)?;
-        /* loop {
-            let count = reader.read_line(&mut line).expect("read_line failed!");
-            buf.WriteString(line.as_str())?;
-            line.clear();
-            if count == 0 {
-                break;
-            }
-        }
-        println!("response: {}", buf.String()); */
+
         Ok(resp)
     }
 }
