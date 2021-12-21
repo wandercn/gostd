@@ -762,8 +762,7 @@ impl Transport {
     }
 
     fn dial(&mut self, network: &str, addr: &str) -> Result<TcpConn, Error> {
-        let mut stream = net::TcpStream::connect(addr)?;
-        stream.try_clone()
+        net::TcpStream::connect(addr)
     }
 
     fn connectMethodForRequest(&mut self, treq: &transportRequest) -> Result<connectMethod, Error> {
@@ -879,21 +878,13 @@ impl persistConn {
             req.extra = Some(hd);
         }
         let r = req.Req.Write()?;
-        conn.write(r.as_bytes());
-        conn.shutdown(Shutdown::Write)?; // 这里不关闭链接，下面读取就会阻塞,待以后研究。
+        conn.set_nodelay(true)?;
+        conn.set_read_timeout(Some(std::time::Duration::new(1, 0)))?;
+        conn.write(r.as_bytes())?;
         let mut reader = BufReader::new(&conn);
-        let mut line = String::new();
-        let mut buf = strings::Builder::new();
+        // conn.shutdown(Shutdown::Write)?; 这里不关闭链接，下面读取就会阻塞,待以后研究。
         let resp = ReadResponse(reader, &req.Req)?;
-        /* loop {
-            let count = reader.read_line(&mut line).expect("read_line failed!");
-            buf.WriteString(line.as_str())?;
-            line.clear();
-            if count == 0 {
-                break;
-            }
-        }
-        println!("response: {}", buf.String()); */
+
         Ok(resp)
     }
 }
@@ -938,7 +929,8 @@ pub fn ReadResponse<'a>(mut r: BufReader<&TcpConn>, req: &'a Request) -> HttpRes
     r.read_to_end(&mut response);
     let startIndex = startIndexOfBody(&response).unwrap();
     let headPart: Vec<u8> = response[..(startIndex - 2_usize)].to_vec();
-    let bodyPart: Vec<u8> = response[startIndex..].to_vec();
+    let bodyPart: Vec<u8> = response[startIndex + 1..].to_vec();
+    println!("bodyPart_len: {}", bodyPart.len());
     // parse headPart
     resp.Header = Header::NewWithHashMap(parseHeader(headPart));
     fixPragmaCacheControl(&mut resp.Header);
