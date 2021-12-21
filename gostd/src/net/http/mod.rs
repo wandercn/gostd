@@ -879,17 +879,16 @@ impl persistConn {
         }
         let r = req.Req.Write()?;
         conn.set_nodelay(true)?;
-        conn.set_read_timeout(Some(std::time::Duration::new(1, 0)))?;
+        conn.set_write_timeout(Some(std::time::Duration::new(1, 100)))?;
+        conn.set_read_timeout(Some(std::time::Duration::new(1, 100)))?;
         conn.write(r.as_bytes())?;
         let mut reader = BufReader::new(&conn);
-        // conn.shutdown(Shutdown::Write)?; 这里不关闭链接，下面读取就会阻塞,待以后研究。
         let resp = ReadResponse(reader, &req.Req)?;
 
         Ok(resp)
     }
 }
 use std::io::ErrorKind;
-const EOF: &str = "0";
 
 pub fn ReadResponse<'a>(mut r: BufReader<&TcpConn>, req: &'a Request) -> HttpResult {
     let mut resp = Response::default();
@@ -927,10 +926,24 @@ pub fn ReadResponse<'a>(mut r: BufReader<&TcpConn>, req: &'a Request) -> HttpRes
     let mut response: Vec<u8> = vec![];
     // split Response to headpart and bodyPart
     r.read_to_end(&mut response);
+    /* loop {
+        if let Ok(buf) = r.fill_buf() {
+            response.extend_from_slice(&buf);
+            let length = buf.len();
+            println!("length: {} {}", length, crate::time::Now());
+            if length == 0 {
+                println!("length: {} {}", length, crate::time::Now());
+                break;
+            }
+            r.consume(length);
+        } else {
+            break;
+        }
+    } */
     let startIndex = startIndexOfBody(&response).unwrap();
     let headPart: Vec<u8> = response[..(startIndex - 2_usize)].to_vec();
     let bodyPart: Vec<u8> = response[startIndex + 1..].to_vec();
-    println!("bodyPart_len: {}", bodyPart.len());
+    // println!("bodyPart_len: {}", bodyPart.len());
     // parse headPart
     resp.Header = Header::NewWithHashMap(parseHeader(headPart));
     fixPragmaCacheControl(&mut resp.Header);
