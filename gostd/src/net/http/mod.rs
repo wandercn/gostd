@@ -962,7 +962,7 @@ pub fn ReadResponse<'a>(mut r: BufReader<&TcpConn>, req: &'a Request) -> HttpRes
     fixPragmaCacheControl(&mut resp.Header);
     // set Body
     if resp.Header.Get("Transfer-Encoding").as_str() == "chunked" {
-        resp.Body.replace(parseBodyChunkeds(&bodyPart));
+        resp.Body.replace(parseChunkedBody(&bodyPart));
     } else {
         resp.Body = Some(bodyPart);
     }
@@ -970,25 +970,26 @@ pub fn ReadResponse<'a>(mut r: BufReader<&TcpConn>, req: &'a Request) -> HttpRes
     Ok(resp)
 }
 
-fn parseBodyChunkeds(chunkedBody: &Vec<u8>) -> Vec<u8> {
+fn parseChunkedBody(chunkedBody: &Vec<u8>) -> Vec<u8> {
     let mut body: Vec<u8> = Vec::new();
     let mut lineSep: Vec<u8> = Vec::new();
-    let mut IsSizeLine = true;
+    let mut isSizeLine = true;
     for &b in chunkedBody {
         if b == b'\r' || b == b'\n' || b == b'0' {
             lineSep.push(b);
         } else {
-            if !IsSizeLine {
+            if !isSizeLine {
                 body.push(b);
             }
             lineSep.clear();
         }
         if lineSep.as_slice() == b"\r\n" || lineSep.as_slice() == b"\r\n0" {
-            IsSizeLine = false;
+            isSizeLine = false;
         }
     }
     body
 }
+
 pub type MIMEHeader = HashMap<String, Vec<String>>;
 
 fn fixPragmaCacheControl(header: &mut Header) {
