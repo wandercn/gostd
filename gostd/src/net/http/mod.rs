@@ -355,7 +355,7 @@ pub struct Request {
     Proto: String,
     ProtoMajor: int,
     ProtoMinor: int,
-    Header: Header,
+    pub Header: Header,
     // Body io.ReadCloser
     // GetBody func() (io.ReadCloser, error)
     ContentLength: int64,
@@ -416,8 +416,22 @@ impl Request {
         buf.WriteString(format!("{} {} HTTP/1.1\r\n", self.Method.as_str(), ruri).as_str());
         buf.WriteString(format!("Host: {}\r\n", host).as_str());
         buf.WriteString(format!("User-Agent: {}\r\n", userAgent).as_str());
+        buf.WriteString(self.writeHeader().as_str());
         buf.WriteString("\r\n");
         Ok(buf.String())
+    }
+
+    fn writeHeader(&self) -> String {
+        let mut buf = strings::Builder::new();
+        for (k, v) in &self.Header.0 {
+            if len!(v) > 1 {
+                let value = strings::Join(v.iter().map(|x| x.as_str()).collect(), ",");
+                buf.WriteString(format!("{}: {}\r\n", k.as_str(), value.as_str()).as_str());
+            } else {
+                buf.WriteString(format!("{}: {}\r\n", k.as_str(), v[0].as_str()).as_str());
+            }
+        }
+        buf.String()
     }
 }
 #[derive(Default, Debug, Clone)]
@@ -879,8 +893,7 @@ impl persistConn {
         }
         let r = req.Req.Write()?;
         conn.set_nodelay(true)?;
-        conn.set_write_timeout(Some(std::time::Duration::new(1, 100)))?;
-        conn.set_read_timeout(Some(std::time::Duration::new(1, 100)))?;
+        conn.set_read_timeout(Some(std::time::Duration::new(5, 100)))?;
         conn.write(r.as_bytes())?;
         let mut reader = BufReader::new(&conn);
         let resp = ReadResponse(reader, &req.Req)?;
@@ -948,8 +961,33 @@ pub fn ReadResponse<'a>(mut r: BufReader<&TcpConn>, req: &'a Request) -> HttpRes
     resp.Header = Header::NewWithHashMap(parseHeader(headPart));
     fixPragmaCacheControl(&mut resp.Header);
     // set Body
-    resp.Body = Some(bodyPart);
+    if resp.Header.Get("Transfer-Encoding").as_str() == "chunked" {
+        resp.Body.replace(parseBodyChunkeds(&bodyPart));
+    } else {
+        resp.Body = Some(bodyPart);
+    }
+    resp.ContentLength = len!(&resp.Body.as_ref().unwrap()) as i64;
     Ok(resp)
+}
+
+fn parseBodyChunkeds(chunkedBody: &Vec<u8>) -> Vec<u8> {
+    let mut body: Vec<u8> = Vec::new();
+    let mut lineSep: Vec<u8> = Vec::new();
+    let mut IsSizeLine = true;
+    for &b in chunkedBody {
+        if b == b'\r' || b == b'\n' || b == b'0' {
+            lineSep.push(b);
+        } else {
+            if !IsSizeLine {
+                body.push(b);
+            }
+            lineSep.clear();
+        }
+        if lineSep.as_slice() == b"\r\n" || lineSep.as_slice() == b"\r\n0" {
+            IsSizeLine = false;
+        }
+    }
+    body
 }
 pub type MIMEHeader = HashMap<String, Vec<String>>;
 
