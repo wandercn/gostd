@@ -212,7 +212,7 @@ pub fn Head(url: &str) -> HttpResult {
     Client::New().Head(url)
 }
 
-pub fn Post(url: &str, contentType: &str, body: Box<dyn Reader>) -> HttpResult {
+pub fn Post(url: &str, contentType: &str, body: Option<Vec<u8>>) -> HttpResult {
     Client::New().Post(url, contentType, body)
 }
 
@@ -220,11 +220,11 @@ pub fn PostForm(url: &str, data: url::Values) -> HttpResult {
     Client::New().PostForm(url, data)
 }
 
-pub fn Patch(url: &str, body: Box<dyn Reader>) -> HttpResult {
+pub fn Patch(url: &str, body: Option<Vec<u8>>) -> HttpResult {
     Client::New().Patch(url, body)
 }
 
-pub fn Put(url: &str, body: Box<dyn Reader>) -> HttpResult {
+pub fn Put(url: &str, body: Option<Vec<u8>>) -> HttpResult {
     Client::New().Put(url, body)
 }
 
@@ -250,12 +250,12 @@ impl Client {
     }
 
     pub fn Get(&mut self, url: &str) -> HttpResult {
-        let mut req = Request::New(Method::Get, url)?;
+        let mut req = Request::New(Method::Get, url, None)?;
         self.Do(&req)
     }
 
-    pub fn Post(&mut self, url: &str, contentType: &str, body: Box<dyn Reader>) -> HttpResult {
-        let mut req = Request::NewWithBody(Method::Post, url, body)?;
+    pub fn Post(&mut self, url: &str, contentType: &str, body: Option<Vec<u8>>) -> HttpResult {
+        let mut req = Request::New(Method::Post, url, body)?;
         req.Header.Set("Content-Type", contentType);
         self.Do(&req)
     }
@@ -264,27 +264,27 @@ impl Client {
         self.Post(
             url,
             "application/x-www-form-urlencoded",
-            Box::new(strings::Reader::new(data.Encode().as_str())),
+            Some(data.Encode().as_bytes().to_vec()),
         )
     }
 
     pub fn Head(&mut self, url: &str) -> HttpResult {
-        let mut req = Request::New(Method::Head, url)?;
+        let mut req = Request::New(Method::Head, url, None)?;
         self.Do(&req)
     }
 
-    pub fn Patch(&mut self, url: &str, body: Box<dyn Reader>) -> HttpResult {
-        let mut req = Request::NewWithBody(Method::Patch, url, body)?;
+    pub fn Patch(&mut self, url: &str, body: Option<Vec<u8>>) -> HttpResult {
+        let mut req = Request::New(Method::Patch, url, body)?;
         self.Do(&req)
     }
 
-    pub fn Put(&mut self, url: &str, body: Box<dyn Reader>) -> HttpResult {
-        let mut req = Request::NewWithBody(Method::Put, url, body)?;
+    pub fn Put(&mut self, url: &str, body: Option<Vec<u8>>) -> HttpResult {
+        let mut req = Request::New(Method::Put, url, body)?;
         self.Do(&req)
     }
 
     pub fn Delete(&mut self, url: &str) -> HttpResult {
-        let mut req = Request::New(Method::Delete, url)?;
+        let mut req = Request::New(Method::Delete, url, None)?;
         self.Do(&req)
     }
 
@@ -356,7 +356,7 @@ pub struct Request {
     ProtoMajor: int,
     ProtoMinor: int,
     pub Header: Header,
-    // Body io.ReadCloser
+    pub Body: Option<Vec<u8>>,
     // GetBody func() (io.ReadCloser, error)
     ContentLength: int64,
     TransferEncoding: Vec<String>,
@@ -374,11 +374,11 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn New(method: Method, url: &str) -> Result<Request, Error> {
+    pub fn New(method: Method, url: &str, body: Option<Vec<u8>>) -> Result<Request, Error> {
         let mut u = url::Parse(url)?;
 
         u.Host = removeEmptyPort(u.Host.as_str()).to_string();
-        let req = Request {
+        let mut req = Request {
             Method: method.String().to_owned(),
             URL: u.clone(),
             Proto: "HTTP/1.1".to_string(),
@@ -393,15 +393,13 @@ impl Request {
             Trailer: Header::default(),
             RemoteAddr: "".to_string(),
             RequestURI: "".to_string(),
-
-            // Body: None,
+            Body: None,
             Host: u.Host.to_owned(),
         };
+        if let Some(buf) = body {
+            req.Body = Some(buf);
+        }
         Ok(req)
-    }
-
-    pub fn NewWithBody(method: Method, url: &str, body: Box<dyn Reader>) -> Result<Request, Error> {
-        todo!()
     }
 
     pub fn Write(&self) -> Result<String, Error> {
