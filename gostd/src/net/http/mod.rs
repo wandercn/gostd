@@ -387,7 +387,7 @@ impl Request {
             Header: Header::default(),
             ContentLength: 0,
             TransferEncoding: Vec::<String>::new(),
-            Close: false,
+            Close: true,
             Form: url::Values::default(),
             PostForm: url::Values::default(),
             Trailer: Header::default(),
@@ -886,12 +886,14 @@ impl persistConn {
             requestedGzip = true;
             req.extra = Some(req.Req.Header.clone());
             let mut hd = req.extra.take().unwrap();
-            hd.Set("Accept-Encoding", "gzip");
-            req.extra = Some(hd);
+            // hd.Set("Accept-Encoding", "gzip");
+            if req.Req.Close {
+                hd.Set("Connection", "close");
+            }
+            req.extra = Some(hd.clone());
+            req.Req.Header = hd;
         }
         let r = req.Req.Write()?;
-        conn.set_nodelay(true)?;
-        conn.set_read_timeout(Some(std::time::Duration::new(5, 100)))?;
         conn.write(r.as_bytes())?;
         let mut reader = BufReader::new(&conn);
         let resp = ReadResponse(reader, &req.Req)?;
@@ -937,13 +939,12 @@ pub fn ReadResponse<'a>(mut r: BufReader<&TcpConn>, req: &'a Request) -> HttpRes
     let mut response: Vec<u8> = vec![];
     // split Response to headpart and bodyPart
     r.read_to_end(&mut response);
+    // 下面的loop 跟read_to_end功能一样
     /* loop {
         if let Ok(buf) = r.fill_buf() {
             response.extend_from_slice(&buf);
             let length = buf.len();
-            println!("length: {} {}", length, crate::time::Now());
             if length == 0 {
-                println!("length: {} {}", length, crate::time::Now());
                 break;
             }
             r.consume(length);
