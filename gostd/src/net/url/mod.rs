@@ -91,8 +91,34 @@ use std::io::ErrorKind;
 pub struct Values(HashMap<String, Vec<String>>);
 
 impl Values {
+    pub fn new(m: HashMap<String, Vec<String>>) -> Values {
+        Values(m)
+    }
     pub fn Encode(&self) -> String {
-        todo!()
+        let v = &self.0.clone();
+        if v.len() == 0 {
+            return "".to_string();
+        }
+        let mut buf = strings::Builder::new();
+        let mut keys: Vec<String> = Vec::with_capacity(len!(self.0));
+        for k in v.keys() {
+            keys.push(k.to_string());
+        }
+        keys.sort();
+        for k in keys.iter() {
+            let vs = v.get(k).unwrap();
+            let keyEscaped = QueryEscape(k.as_str());
+            for v in vs.into_iter() {
+                if buf.Len() > 0 {
+                    buf.WriteByte(b'&');
+                }
+                buf.WriteString(keyEscaped.as_str());
+                buf.WriteByte(b'=');
+                buf.WriteString(QueryEscape(v).as_str());
+            }
+        }
+        println!("{}", buf.String());
+        buf.String()
     }
 }
 use crate::strings;
