@@ -397,16 +397,17 @@ impl Request {
             Host: u.Host.to_owned(),
         };
         if let Some(buf) = body {
+            req.ContentLength = len!(buf) as i64;
             req.Body = Some(buf);
         }
         Ok(req)
     }
 
-    pub fn Write(&self) -> Result<String, Error> {
+    pub fn Write(&self) -> Result<Vec<u8>, Error> {
         self.write(false)
     }
 
-    fn write(&self, usingProxy: bool) -> Result<String, Error> {
+    fn write(&self, usingProxy: bool) -> Result<Vec<u8>, Error> {
         let mut buf = strings::Builder::new();
         let host = self.Host.clone();
         let ruri = self.URL.RequestURI();
@@ -416,7 +417,11 @@ impl Request {
         buf.WriteString(format!("User-Agent: {}\r\n", userAgent).as_str());
         buf.WriteString(self.writeHeader().as_str());
         buf.WriteString("\r\n");
-        Ok(buf.String())
+        if let Some(body) = &self.Body {
+            buf.Write(body.to_vec())?;
+            buf.WriteString("\r\n");
+        }
+        Ok(buf.Bytes())
     }
 
     fn writeHeader(&self) -> String {
@@ -428,6 +433,9 @@ impl Request {
             } else {
                 buf.WriteString(format!("{}: {}\r\n", k.as_str(), v[0].as_str()).as_str());
             }
+        }
+        if self.ContentLength > 0 {
+            buf.WriteString(format!("Content-Length: {}\r\n", self.ContentLength).as_str());
         }
         buf.String()
     }
@@ -894,7 +902,8 @@ impl persistConn {
             req.Req.Header = hd;
         }
         let r = req.Req.Write()?;
-        conn.write(r.as_bytes())?;
+        // println!("{}", string(r.clone().as_slice()));
+        conn.write(r.as_slice())?;
         let mut reader = BufReader::new(&conn);
         let resp = ReadResponse(reader, &req.Req)?;
 
