@@ -117,7 +117,6 @@ impl Values {
                 buf.WriteString(QueryEscape(v).as_str());
             }
         }
-        println!("{}", buf.String());
         buf.String()
     }
 }
