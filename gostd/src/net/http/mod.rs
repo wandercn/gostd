@@ -212,7 +212,7 @@ pub fn Head(url: &str) -> HttpResult {
     Client::New().Head(url)
 }
 
-pub fn Post(url: &str, contentType: &str, body: Box<dyn Reader>) -> HttpResult {
+pub fn Post(url: &str, contentType: &str, body: Option<Vec<u8>>) -> HttpResult {
     Client::New().Post(url, contentType, body)
 }
 
@@ -220,11 +220,11 @@ pub fn PostForm(url: &str, data: url::Values) -> HttpResult {
     Client::New().PostForm(url, data)
 }
 
-pub fn Patch(url: &str, body: Box<dyn Reader>) -> HttpResult {
+pub fn Patch(url: &str, body: Option<Vec<u8>>) -> HttpResult {
     Client::New().Patch(url, body)
 }
 
-pub fn Put(url: &str, body: Box<dyn Reader>) -> HttpResult {
+pub fn Put(url: &str, body: Option<Vec<u8>>) -> HttpResult {
     Client::New().Put(url, body)
 }
 
@@ -250,12 +250,12 @@ impl Client {
     }
 
     pub fn Get(&mut self, url: &str) -> HttpResult {
-        let mut req = Request::New(Method::Get, url)?;
+        let mut req = Request::New(Method::Get, url, None)?;
         self.Do(&req)
     }
 
-    pub fn Post(&mut self, url: &str, contentType: &str, body: Box<dyn Reader>) -> HttpResult {
-        let mut req = Request::NewWithBody(Method::Post, url, body)?;
+    pub fn Post(&mut self, url: &str, contentType: &str, body: Option<Vec<u8>>) -> HttpResult {
+        let mut req = Request::New(Method::Post, url, body)?;
         req.Header.Set("Content-Type", contentType);
         self.Do(&req)
     }
@@ -264,27 +264,27 @@ impl Client {
         self.Post(
             url,
             "application/x-www-form-urlencoded",
-            Box::new(strings::Reader::new(data.Encode().as_str())),
+            Some(data.Encode().as_bytes().to_vec()),
         )
     }
 
     pub fn Head(&mut self, url: &str) -> HttpResult {
-        let mut req = Request::New(Method::Head, url)?;
+        let mut req = Request::New(Method::Head, url, None)?;
         self.Do(&req)
     }
 
-    pub fn Patch(&mut self, url: &str, body: Box<dyn Reader>) -> HttpResult {
-        let mut req = Request::NewWithBody(Method::Patch, url, body)?;
+    pub fn Patch(&mut self, url: &str, body: Option<Vec<u8>>) -> HttpResult {
+        let mut req = Request::New(Method::Patch, url, body)?;
         self.Do(&req)
     }
 
-    pub fn Put(&mut self, url: &str, body: Box<dyn Reader>) -> HttpResult {
-        let mut req = Request::NewWithBody(Method::Put, url, body)?;
+    pub fn Put(&mut self, url: &str, body: Option<Vec<u8>>) -> HttpResult {
+        let mut req = Request::New(Method::Put, url, body)?;
         self.Do(&req)
     }
 
     pub fn Delete(&mut self, url: &str) -> HttpResult {
-        let mut req = Request::New(Method::Delete, url)?;
+        let mut req = Request::New(Method::Delete, url, None)?;
         self.Do(&req)
     }
 
@@ -356,7 +356,7 @@ pub struct Request {
     ProtoMajor: int,
     ProtoMinor: int,
     pub Header: Header,
-    // Body io.ReadCloser
+    pub Body: Option<Vec<u8>>,
     // GetBody func() (io.ReadCloser, error)
     ContentLength: int64,
     TransferEncoding: Vec<String>,
@@ -374,11 +374,11 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn New(method: Method, url: &str) -> Result<Request, Error> {
+    pub fn New(method: Method, url: &str, body: Option<Vec<u8>>) -> Result<Request, Error> {
         let mut u = url::Parse(url)?;
 
         u.Host = removeEmptyPort(u.Host.as_str()).to_string();
-        let req = Request {
+        let mut req = Request {
             Method: method.String().to_owned(),
             URL: u.clone(),
             Proto: "HTTP/1.1".to_string(),
@@ -387,28 +387,27 @@ impl Request {
             Header: Header::default(),
             ContentLength: 0,
             TransferEncoding: Vec::<String>::new(),
-            Close: false,
+            Close: true,
             Form: url::Values::default(),
             PostForm: url::Values::default(),
             Trailer: Header::default(),
             RemoteAddr: "".to_string(),
             RequestURI: "".to_string(),
-
-            // Body: None,
+            Body: None,
             Host: u.Host.to_owned(),
         };
+        if let Some(buf) = body {
+            req.ContentLength = len!(buf) as i64;
+            req.Body = Some(buf);
+        }
         Ok(req)
     }
 
-    pub fn NewWithBody(method: Method, url: &str, body: Box<dyn Reader>) -> Result<Request, Error> {
-        todo!()
-    }
-
-    pub fn Write(&self) -> Result<String, Error> {
+    pub fn Write(&self) -> Result<Vec<u8>, Error> {
         self.write(false)
     }
 
-    fn write(&self, usingProxy: bool) -> Result<String, Error> {
+    fn write(&self, usingProxy: bool) -> Result<Vec<u8>, Error> {
         let mut buf = strings::Builder::new();
         let host = self.Host.clone();
         let ruri = self.URL.RequestURI();
@@ -418,7 +417,11 @@ impl Request {
         buf.WriteString(format!("User-Agent: {}\r\n", userAgent).as_str());
         buf.WriteString(self.writeHeader().as_str());
         buf.WriteString("\r\n");
-        Ok(buf.String())
+        if let Some(body) = &self.Body {
+            buf.Write(body.to_vec())?;
+            buf.WriteString("\r\n");
+        }
+        Ok(buf.Bytes())
     }
 
     fn writeHeader(&self) -> String {
@@ -430,6 +433,9 @@ impl Request {
             } else {
                 buf.WriteString(format!("{}: {}\r\n", k.as_str(), v[0].as_str()).as_str());
             }
+        }
+        if self.ContentLength > 0 {
+            buf.WriteString(format!("Content-Length: {}\r\n", self.ContentLength).as_str());
         }
         buf.String()
     }
@@ -888,13 +894,16 @@ impl persistConn {
             requestedGzip = true;
             req.extra = Some(req.Req.Header.clone());
             let mut hd = req.extra.take().unwrap();
-            hd.Set("Accept-Encoding", "gzip");
-            req.extra = Some(hd);
+            // hd.Set("Accept-Encoding", "gzip");
+            if req.Req.Close {
+                hd.Set("Connection", "close");
+            }
+            req.extra = Some(hd.clone());
+            req.Req.Header = hd;
         }
         let r = req.Req.Write()?;
-        conn.set_nodelay(true)?;
-        conn.set_read_timeout(Some(std::time::Duration::new(5, 100)))?;
-        conn.write(r.as_bytes())?;
+        // println!("{}", string(r.clone().as_slice()));
+        conn.write(r.as_slice())?;
         let mut reader = BufReader::new(&conn);
         let resp = ReadResponse(reader, &req.Req)?;
 
@@ -939,13 +948,12 @@ pub fn ReadResponse<'a>(mut r: BufReader<&TcpConn>, req: &'a Request) -> HttpRes
     let mut response: Vec<u8> = vec![];
     // split Response to headpart and bodyPart
     r.read_to_end(&mut response);
+    // 下面的loop 跟read_to_end功能一样
     /* loop {
         if let Ok(buf) = r.fill_buf() {
             response.extend_from_slice(&buf);
             let length = buf.len();
-            println!("length: {} {}", length, crate::time::Now());
             if length == 0 {
-                println!("length: {} {}", length, crate::time::Now());
                 break;
             }
             r.consume(length);
@@ -962,7 +970,7 @@ pub fn ReadResponse<'a>(mut r: BufReader<&TcpConn>, req: &'a Request) -> HttpRes
     fixPragmaCacheControl(&mut resp.Header);
     // set Body
     if resp.Header.Get("Transfer-Encoding").as_str() == "chunked" {
-        resp.Body.replace(parseBodyChunkeds(&bodyPart));
+        resp.Body.replace(parseChunkedBody(&bodyPart));
     } else {
         resp.Body = Some(bodyPart);
     }
@@ -970,25 +978,26 @@ pub fn ReadResponse<'a>(mut r: BufReader<&TcpConn>, req: &'a Request) -> HttpRes
     Ok(resp)
 }
 
-fn parseBodyChunkeds(chunkedBody: &Vec<u8>) -> Vec<u8> {
+fn parseChunkedBody(chunkedBody: &Vec<u8>) -> Vec<u8> {
     let mut body: Vec<u8> = Vec::new();
     let mut lineSep: Vec<u8> = Vec::new();
-    let mut IsSizeLine = true;
+    let mut isSizeLine = true;
     for &b in chunkedBody {
         if b == b'\r' || b == b'\n' || b == b'0' {
             lineSep.push(b);
         } else {
-            if !IsSizeLine {
+            if !isSizeLine {
                 body.push(b);
             }
             lineSep.clear();
         }
         if lineSep.as_slice() == b"\r\n" || lineSep.as_slice() == b"\r\n0" {
-            IsSizeLine = false;
+            isSizeLine = false;
         }
     }
     body
 }
+
 pub type MIMEHeader = HashMap<String, Vec<String>>;
 
 fn fixPragmaCacheControl(header: &mut Header) {

@@ -1218,6 +1218,10 @@ impl Builder {
         self.buf.clear()
     }
 
+    pub fn Bytes(self) -> Vec<byte> {
+        self.buf.clone()
+    }
+
     /// String returns the accumulated string.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
