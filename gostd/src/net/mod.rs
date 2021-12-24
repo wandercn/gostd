@@ -1,4 +1,4 @@
-//! This module is waiting to be developed.
+//! Package net provides a portable interface for network I/O, including TCP/IP, UDP, domain name resolution, and Unix domain sockets.
 #![allow(unused)]
 // #![allow(dead_code)]
 #![allow(non_upper_case_globals)]
