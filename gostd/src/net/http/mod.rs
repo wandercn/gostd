@@ -914,99 +914,19 @@ impl persistConn {
             req.extra = Some(hd.clone());
             req.Req.Header = hd;
         }
+
         let r = req.Req.Write()?;
+
         if req.Req.isTLS {
-            let mut clientRootCert = rustls::RootCertStore::empty();
-            clientRootCert.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.0.iter().map(
-                |ta| {
-                    rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
-                        ta.subject,
-                        ta.spki,
-                        ta.name_constraints,
-                    )
-                },
-            ));
-            let tlsconfig = rustls::ClientConfig::builder()
-                .with_safe_defaults()
-                .with_root_certificates(clientRootCert)
-                .with_no_client_auth();
-            let serverName =
-                rustls::ServerName::try_from(req.Req.Host.as_str()).expect("url error");
-            let mut tlsClient = ClientConnection::new(Arc::new(tlsconfig), serverName).unwrap();
-            let mut tlsConn = StreamOwned::new(tlsClient, conn);
+            let mut tlsConn = getTLSConn(req.Req.Host.as_str(), conn);
             tlsConn.write(r.as_slice())?;
-            let mut r = BufReader::new(&mut tlsConn);
-
-            let mut resp = Response::default();
-            resp.Request = req.Req.clone();
-            // parse status line。
-            let mut line = String::new();
-            r.read_line(&mut line)?;
-            let i = strings::IndexByte(line.as_str(), b' ');
-            if i == -1 {
-                return Err(Error::new(ErrorKind::Other, "malformed HTTP response"));
-            }
-            resp.Proto = line.get(..i as usize).unwrap().to_string();
-            resp.Status =
-                strings::TrimLeft(&line.as_str()[i as usize + 1..len!(line) - 2], " ").to_string();
-            let mut statusCode = resp.Status.as_str();
-            let i = strings::IndexByte(resp.Status.as_str(), b' ');
-            if i != -1 {
-                statusCode = &resp.Status.as_str()[..i as usize];
-            }
-            if len!(statusCode) != 3 {
-                return Err(Error::new(ErrorKind::Other, "malformed HTTP status code"));
-            }
-            resp.StatusCode = statusCode.parse::<int>().unwrap();
-            if resp.StatusCode < 0 {
-                return Err(Error::new(ErrorKind::Other, "malformed HTTP status code"));
-            }
-
-            let vers = ParseHTTPVersion(resp.Proto.as_str());
-            let ok = vers.2;
-            if !ok {
-                return Err(Error::new(ErrorKind::Other, "malformed HTTP version"));
-            }
-            resp.ProtoMajor = vers.0;
-            resp.ProtoMinor = vers.1;
-            let mut response: Vec<u8> = vec![];
-            // split Response to headpart and bodyPart
-            r.read_to_end(&mut response);
-            // 下面的loop 跟read_to_end功能一样
-            /* loop {
-                if let Ok(buf) = r.fill_buf() {
-                    response.extend_from_slice(&buf);
-                    let length = buf.len();
-                    if length == 0 {
-                        break;
-                    }
-                    r.consume(length);
-                } else {
-                    break;
-                }
-            } */
-            let startIndex = startIndexOfBody(&response).unwrap();
-            let headPart: Vec<u8> = response[..(startIndex - 2_usize)].to_vec();
-            let bodyPart: Vec<u8> = response[startIndex + 1..].to_vec();
-            // println!("bodyPart_len: {}", bodyPart.len());
-            // parse headPart
-            resp.Header = Header::NewWithHashMap(parseHeader(headPart));
-            fixPragmaCacheControl(&mut resp.Header);
-            // set Body
-            if resp.Header.Get("Transfer-Encoding").as_str() == "chunked" {
-                resp.Body.replace(parseChunkedBody(&bodyPart));
-            } else {
-                resp.Body = Some(bodyPart);
-            }
-            resp.ContentLength = len!(&resp.Body.as_ref().unwrap()) as i64;
+            let mut reader = BufReader::new(tlsConn);
+            let resp = ReadResponse(reader, &req.Req)?;
             Ok(resp)
         } else {
-            // println!("{}", string(r.clone().as_slice()));
             conn.write(r.as_slice())?;
-
-            let mut reader = BufReader::new(&conn);
+            let mut reader = BufReader::new(conn);
             let resp = ReadResponse(reader, &req.Req)?;
-
             Ok(resp)
         }
     }
@@ -1027,13 +947,13 @@ fn getTLSConn(dnsName: &str, socket: TcpConn) -> StreamOwned<ClientConnection, T
         .with_safe_defaults()
         .with_root_certificates(clientRootCert)
         .with_no_client_auth();
-    let serverName = rustls::ServerName::try_from(dnsName).expect("url error");
+    let serverName = rustls::ServerName::try_from(dnsName.as_ref()).expect("url error");
     let mut tlsClient = ClientConnection::new(Arc::new(tlsconfig), serverName).unwrap();
     let mut tlsConn = StreamOwned::new(tlsClient, socket);
     tlsConn
 }
 
-pub fn ReadResponse<'a>(mut r: impl BufRead, req: &'a Request) -> HttpResult {
+pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
     let mut resp = Response::default();
     resp.Request = req.clone();
     // parse status line。
