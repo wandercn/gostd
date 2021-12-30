@@ -251,13 +251,13 @@ impl Client {
 
     pub fn Get(&mut self, url: &str) -> HttpResult {
         let mut req = Request::New(Method::Get, url, None)?;
-        self.Do(&req)
+        self.Do(&mut req)
     }
 
     pub fn Post(&mut self, url: &str, contentType: &str, body: Option<Vec<u8>>) -> HttpResult {
         let mut req = Request::New(Method::Post, url, body)?;
         req.Header.Set("Content-Type", contentType);
-        self.Do(&req)
+        self.Do(&mut req)
     }
 
     pub fn PostForm(&mut self, url: &str, data: url::Values) -> HttpResult {
@@ -270,38 +270,38 @@ impl Client {
 
     pub fn Head(&mut self, url: &str) -> HttpResult {
         let mut req = Request::New(Method::Head, url, None)?;
-        self.Do(&req)
+        self.Do(&mut req)
     }
 
     pub fn Patch(&mut self, url: &str, body: Option<Vec<u8>>) -> HttpResult {
         let mut req = Request::New(Method::Patch, url, body)?;
-        self.Do(&req)
+        self.Do(&mut req)
     }
 
     pub fn Put(&mut self, url: &str, body: Option<Vec<u8>>) -> HttpResult {
         let mut req = Request::New(Method::Put, url, body)?;
-        self.Do(&req)
+        self.Do(&mut req)
     }
 
     pub fn Delete(&mut self, url: &str) -> HttpResult {
         let mut req = Request::New(Method::Delete, url, None)?;
-        self.Do(&req)
+        self.Do(&mut req)
     }
 
-    pub fn Do(&mut self, req: &Request) -> HttpResult {
+    pub fn Do(&mut self, req: &mut Request) -> HttpResult {
         self.done(req)
     }
 
     fn send(
         &mut self,
-        req: &Request,
+        req: &mut Request,
         deadline: time::Time,
     ) -> Result<(Response, fn() -> bool), Error> {
         let (resp, didTimeout) = send(req, self.transport(), deadline)?;
         Ok((resp, didTimeout))
     }
 
-    fn done(&mut self, req: &Request) -> HttpResult {
+    fn done(&mut self, req: &mut Request) -> HttpResult {
         let deadline = self.deadline();
         let (resp, didTimeout) = self.send(req, deadline)?;
         Ok(resp)
@@ -320,15 +320,52 @@ impl Client {
 }
 
 fn send(
-    ireq: &Request,
+    ireq: &mut Request,
     mut rt: Box<dyn RoundTripper>,
     deadline: time::Time,
 ) -> Result<(Response, fn() -> bool), Error> {
-    let resp = rt.RoundTrip(ireq)?;
+    let mut resp = Response::default();
     fn didTimeout() -> bool {
         return false;
     };
-    Ok((resp, didTimeout)) //didTimeout待修改
+    loop {
+        let mut resp = rt.RoundTrip(ireq)?;
+        let mut loc = resp.Header.Get("Location");
+        let (redirectMethod, shouldRedirect, includeBody) =
+            redirectBehavior(ireq.Method.as_str(), &resp, ireq);
+        if !shouldRedirect {
+            return Ok((resp, didTimeout));
+        }
+        let mut host = "".to_string();
+        let mut u = url::Parse(loc.as_str())?;
+        if u.Scheme == "".to_string() {
+            host = ireq.Host.clone();
+        }
+        ireq.Method = redirectMethod.clone();
+        ireq.URL = u.clone();
+        ireq.Host = host;
+        let urlRef = refererForURL(&ireq.URL, &u);
+        ireq.Header.Set("Referer", urlRef.as_str());
+    }
+}
+
+fn redirectBehavior(reqMethod: &str, resp: &Response, ireq: &Request) -> (String, bool, bool) {
+    let mut shouldRedirect = false;
+    let mut includeBody = false;
+    match resp.StatusCode {
+        301 | 302 | 303 => return (Method::Get.String().to_string(), true, false),
+        307 | 308 => {
+            if resp.Header.Get("Location") == "" {
+                shouldRedirect = true;
+                includeBody = false;
+            }
+            if ireq.Body.is_none() && ireq.ContentLength != 0 {
+                shouldRedirect = false;
+            }
+        }
+        _ => (),
+    }
+    (reqMethod.to_string(), shouldRedirect, includeBody)
 }
 
 pub trait RoundTripper {
