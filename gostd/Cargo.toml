@@ -17,6 +17,9 @@ opt-level = 0
 
 opt-level = 3
 [dependencies]
+
+webpki-roots = "0.22.1"
+rustls = "0.20.2"
 gostd_derive = "0.0.3"
 gostd_builtin = { version = "=1.0.4", optional = false, path = "../builtin"}
 gostd_time= { version = "=1.0.6", optional = false, path = "../time"}

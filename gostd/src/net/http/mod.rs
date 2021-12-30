@@ -368,6 +368,7 @@ pub struct Request {
     Trailer: Header,
     RemoteAddr: String,
     RequestURI: String,
+    isTLS: bool,
     // TLS *tls.ConnectionState,
     // Cancel <-chan struct{}
     // ctx context.Context
@@ -395,10 +396,14 @@ impl Request {
             RequestURI: "".to_string(),
             Body: None,
             Host: u.Host.to_owned(),
+            isTLS: false,
         };
         if let Some(buf) = body {
             req.ContentLength = len!(buf) as i64;
             req.Body = Some(buf);
+        }
+        if strings::HasPrefix(url, "https://") {
+            req.isTLS = true
         }
         Ok(req)
     }
@@ -752,6 +757,8 @@ impl Transport {
         };
         let cm = self.connectMethodForRequest(treq)?;
         let (mut pconn, mut conn) = self.getConn(treq, cm)?;
+        // conn.set_write_timeout(Some(std::time::Duration::new(5, 0)));
+        // conn.set_read_timeout(Some(std::time::Duration::new(5, 0)));
 
         pconn.roundTrip(treq, conn)
     }
@@ -879,9 +886,15 @@ struct persistConn {
     reused: bool,
 }
 
+use rustls::ClientConnection;
+use rustls::StreamOwned;
+use std::convert::TryFrom;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::net::Shutdown;
+use std::net::TcpStream;
+use std::rc::Rc;
+use std::sync::Arc;
 impl persistConn {
     fn roundTrip(&mut self, req: &mut transportRequest, mut conn: TcpConn) -> HttpResult {
         self.numExpectedResponses += 1;
@@ -901,18 +914,46 @@ impl persistConn {
             req.extra = Some(hd.clone());
             req.Req.Header = hd;
         }
-        let r = req.Req.Write()?;
-        // println!("{}", string(r.clone().as_slice()));
-        conn.write(r.as_slice())?;
-        let mut reader = BufReader::new(&conn);
-        let resp = ReadResponse(reader, &req.Req)?;
 
-        Ok(resp)
+        let r = req.Req.Write()?;
+
+        if req.Req.isTLS {
+            let mut tlsConn = getTLSConn(req.Req.Host.as_str(), conn);
+            tlsConn.write(r.as_slice())?;
+            let mut reader = BufReader::new(tlsConn);
+            let resp = ReadResponse(reader, &req.Req)?;
+            Ok(resp)
+        } else {
+            conn.write(r.as_slice())?;
+            let mut reader = BufReader::new(conn);
+            let resp = ReadResponse(reader, &req.Req)?;
+            Ok(resp)
+        }
     }
 }
+
 use std::io::ErrorKind;
 
-pub fn ReadResponse<'a>(mut r: BufReader<&TcpConn>, req: &'a Request) -> HttpResult {
+fn getTLSConn(dnsName: &str, socket: TcpConn) -> StreamOwned<ClientConnection, TcpConn> {
+    let mut clientRootCert = rustls::RootCertStore::empty();
+    clientRootCert.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.0.iter().map(|ta| {
+        rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
+            ta.subject,
+            ta.spki,
+            ta.name_constraints,
+        )
+    }));
+    let tlsconfig = rustls::ClientConfig::builder()
+        .with_safe_defaults()
+        .with_root_certificates(clientRootCert)
+        .with_no_client_auth();
+    let serverName = rustls::ServerName::try_from(dnsName.as_ref()).expect("url error");
+    let mut tlsClient = ClientConnection::new(Arc::new(tlsconfig), serverName).unwrap();
+    let mut tlsConn = StreamOwned::new(tlsClient, socket);
+    tlsConn
+}
+
+pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
     let mut resp = Response::default();
     resp.Request = req.clone();
     // parse status line。
