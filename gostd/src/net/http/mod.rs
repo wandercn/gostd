@@ -368,6 +368,7 @@ pub struct Request {
     Trailer: Header,
     RemoteAddr: String,
     RequestURI: String,
+    isTLS: bool,
     // TLS *tls.ConnectionState,
     // Cancel <-chan struct{}
     // ctx context.Context
@@ -395,10 +396,14 @@ impl Request {
             RequestURI: "".to_string(),
             Body: None,
             Host: u.Host.to_owned(),
+            isTLS: false,
         };
         if let Some(buf) = body {
             req.ContentLength = len!(buf) as i64;
             req.Body = Some(buf);
+        }
+        if strings::HasPrefix(url, "https://") {
+            req.isTLS = true
         }
         Ok(req)
     }
@@ -752,6 +757,8 @@ impl Transport {
         };
         let cm = self.connectMethodForRequest(treq)?;
         let (mut pconn, mut conn) = self.getConn(treq, cm)?;
+        // conn.set_write_timeout(Some(std::time::Duration::new(5, 0)));
+        // conn.set_read_timeout(Some(std::time::Duration::new(5, 0)));
 
         pconn.roundTrip(treq, conn)
     }
@@ -879,9 +886,15 @@ struct persistConn {
     reused: bool,
 }
 
+use rustls::ClientConnection;
+use rustls::StreamOwned;
+use std::convert::TryFrom;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::net::Shutdown;
+use std::net::TcpStream;
+use std::rc::Rc;
+use std::sync::Arc;
 impl persistConn {
     fn roundTrip(&mut self, req: &mut transportRequest, mut conn: TcpConn) -> HttpResult {
         self.numExpectedResponses += 1;
@@ -902,15 +915,105 @@ impl persistConn {
             req.Req.Header = hd;
         }
         let r = req.Req.Write()?;
-        // println!("{}", string(r.clone().as_slice()));
-        conn.write(r.as_slice())?;
-        let mut reader = BufReader::new(&conn);
-        let resp = ReadResponse(reader, &req.Req)?;
+        if req.Req.isTLS {
+            let mut clientRootCert = rustls::RootCertStore::empty();
+            clientRootCert.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.0.iter().map(
+                |ta| {
+                    rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
+                        ta.subject,
+                        ta.spki,
+                        ta.name_constraints,
+                    )
+                },
+            ));
+            let tlsconfig = rustls::ClientConfig::builder()
+                .with_safe_defaults()
+                .with_root_certificates(clientRootCert)
+                .with_no_client_auth();
+            let serverName =
+                rustls::ServerName::try_from(req.Req.Host.as_str()).expect("url error");
+            let mut tlsClient = ClientConnection::new(Arc::new(tlsconfig), serverName).unwrap();
+            let mut tlsConn = StreamOwned::new(tlsClient, conn);
+            tlsConn.write(r.as_slice())?;
+            let mut r = BufReader::new(&mut tlsConn);
 
-        Ok(resp)
+            let mut resp = Response::default();
+            resp.Request = req.Req.clone();
+            // parse status line。
+            let mut line = String::new();
+            r.read_line(&mut line)?;
+            let i = strings::IndexByte(line.as_str(), b' ');
+            if i == -1 {
+                return Err(Error::new(ErrorKind::Other, "malformed HTTP response"));
+            }
+            resp.Proto = line.get(..i as usize).unwrap().to_string();
+            resp.Status =
+                strings::TrimLeft(&line.as_str()[i as usize + 1..len!(line) - 2], " ").to_string();
+            let mut statusCode = resp.Status.as_str();
+            let i = strings::IndexByte(resp.Status.as_str(), b' ');
+            if i != -1 {
+                statusCode = &resp.Status.as_str()[..i as usize];
+            }
+            if len!(statusCode) != 3 {
+                return Err(Error::new(ErrorKind::Other, "malformed HTTP status code"));
+            }
+            resp.StatusCode = statusCode.parse::<int>().unwrap();
+            if resp.StatusCode < 0 {
+                return Err(Error::new(ErrorKind::Other, "malformed HTTP status code"));
+            }
+
+            let vers = ParseHTTPVersion(resp.Proto.as_str());
+            let ok = vers.2;
+            if !ok {
+                return Err(Error::new(ErrorKind::Other, "malformed HTTP version"));
+            }
+            resp.ProtoMajor = vers.0;
+            resp.ProtoMinor = vers.1;
+            let mut response: Vec<u8> = vec![];
+            // split Response to headpart and bodyPart
+            r.read_to_end(&mut response);
+            // 下面的loop 跟read_to_end功能一样
+            /* loop {
+                if let Ok(buf) = r.fill_buf() {
+                    response.extend_from_slice(&buf);
+                    let length = buf.len();
+                    if length == 0 {
+                        break;
+                    }
+                    r.consume(length);
+                } else {
+                    break;
+                }
+            } */
+            let startIndex = startIndexOfBody(&response).unwrap();
+            let headPart: Vec<u8> = response[..(startIndex - 2_usize)].to_vec();
+            let bodyPart: Vec<u8> = response[startIndex + 1..].to_vec();
+            // println!("bodyPart_len: {}", bodyPart.len());
+            // parse headPart
+            resp.Header = Header::NewWithHashMap(parseHeader(headPart));
+            fixPragmaCacheControl(&mut resp.Header);
+            // set Body
+            if resp.Header.Get("Transfer-Encoding").as_str() == "chunked" {
+                resp.Body.replace(parseChunkedBody(&bodyPart));
+            } else {
+                resp.Body = Some(bodyPart);
+            }
+            resp.ContentLength = len!(&resp.Body.as_ref().unwrap()) as i64;
+            Ok(resp)
+        } else {
+            // println!("{}", string(r.clone().as_slice()));
+            conn.write(r.as_slice())?;
+
+            let mut reader = BufReader::new(&conn);
+            let resp = ReadResponse(reader, &req.Req)?;
+
+            Ok(resp)
+        }
     }
 }
+
 use std::io::ErrorKind;
+use std::net::ToSocketAddrs;
 
 pub fn ReadResponse<'a>(mut r: BufReader<&TcpConn>, req: &'a Request) -> HttpResult {
     let mut resp = Response::default();
