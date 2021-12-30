@@ -1013,9 +1013,27 @@ impl persistConn {
 }
 
 use std::io::ErrorKind;
-use std::net::ToSocketAddrs;
 
-pub fn ReadResponse<'a>(mut r: BufReader<&TcpConn>, req: &'a Request) -> HttpResult {
+fn getTLSConn(dnsName: &str, socket: TcpConn) -> StreamOwned<ClientConnection, TcpConn> {
+    let mut clientRootCert = rustls::RootCertStore::empty();
+    clientRootCert.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.0.iter().map(|ta| {
+        rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
+            ta.subject,
+            ta.spki,
+            ta.name_constraints,
+        )
+    }));
+    let tlsconfig = rustls::ClientConfig::builder()
+        .with_safe_defaults()
+        .with_root_certificates(clientRootCert)
+        .with_no_client_auth();
+    let serverName = rustls::ServerName::try_from(dnsName).expect("url error");
+    let mut tlsClient = ClientConnection::new(Arc::new(tlsconfig), serverName).unwrap();
+    let mut tlsConn = StreamOwned::new(tlsClient, socket);
+    tlsConn
+}
+
+pub fn ReadResponse<'a>(mut r: impl BufRead, req: &'a Request) -> HttpResult {
     let mut resp = Response::default();
     resp.Request = req.clone();
     // parse status line。
