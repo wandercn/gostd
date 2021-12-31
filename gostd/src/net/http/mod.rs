@@ -336,16 +336,10 @@ fn send(
         if !shouldRedirect {
             return Ok((resp, didTimeout));
         }
-        let mut host = "".to_string();
         let mut u = ireq.URL.Parse(loc.as_str())?;
-        if u.Scheme == "".to_string() {
-            host = ireq.Host.clone();
-        }
+        let urlRef = refererForURL(&ireq.URL, &u);
         ireq.Method = redirectMethod.clone();
         ireq.URL = u.clone();
-        ireq.URL.Path = u.Path.to_string();
-        ireq.Host = host;
-        let urlRef = refererForURL(&ireq.URL, &u);
         ireq.Header.Set("Referer", urlRef.as_str());
     }
 }
@@ -866,7 +860,6 @@ fn canonicalAddr(url: &url::URL) -> String {
     let addr = url.Hostname().to_string();
     let mut port = url.Port().to_string();
     if port == "" {
-        println!("debug: {:?}", url);
         port = portMap.get(url.Scheme.as_str()).unwrap().to_string();
     }
     strings::Join(vec![addr.as_str(), port.as_str()], ":")

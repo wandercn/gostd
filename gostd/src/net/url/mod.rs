@@ -187,7 +187,7 @@ impl URL {
         url.setPath(
             resolvePath(self.EscapedPath().as_str(), refurl.EscapedPath().as_str()).as_str(),
         );
-        return url;
+        url
     }
     pub fn RequestURI(&self) -> String {
         let mut result = self.Opaque.clone();
@@ -229,7 +229,7 @@ fn resolvePath(base: &str, refurl: &str) -> String {
     let mut first = true;
     let mut remaining = full;
     while i >= 0 {
-        let i = strings::IndexByte(remaining.as_str(), b'/');
+        i = strings::IndexByte(remaining.as_str(), b'/');
         if i < 0 {
             last = remaining.to_string();
             elem = remaining.to_string();
@@ -266,8 +266,11 @@ fn resolvePath(base: &str, refurl: &str) -> String {
     if last == "." || last == ".." {
         dst.WriteByte(b'/');
     }
-
-    "/".to_string() + strings::TrimPrefix(dst.String().as_str(), "/")
+    let mut r = dst.String();
+    if len!(r) > 1 && r.as_bytes()[1] == b'/' {
+        r = r.as_str()[1..].to_string();
+    }
+    r
 }
 use std::collections::HashMap;
 use std::io::Error;
