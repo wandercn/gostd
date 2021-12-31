@@ -852,6 +852,7 @@ impl Transport {
         4 << 10
     }
 }
+
 fn canonicalAddr(url: &url::URL) -> String {
     let portMap: HashMap<String, String> = [
         ("http".to_string(), "80".to_string()),

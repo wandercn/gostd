@@ -89,35 +89,43 @@ impl URL {
     }
 
     pub fn EscapedFragment(&self) -> String {
-        let u = self;
-
-        if u.RawFragment != "" && validEncoded(u.RawFragment.as_str(), Encoding::encodeFragment) {
-            if let Ok(f) = unescape(u.RawFragment.as_str(), Encoding::encodeFragment) {
-                if f == u.Fragment {
-                    return u.RawFragment.to_string();
+        if self.RawFragment != ""
+            && validEncoded(self.RawFragment.as_str(), Encoding::encodeFragment)
+        {
+            if let Ok(f) = unescape(self.RawFragment.as_str(), Encoding::encodeFragment) {
+                if f == self.Fragment {
+                    return self.RawFragment.to_string();
                 }
             }
         }
-        escape(u.Fragment.as_str(), Encoding::encodeFragment)
+        escape(self.Fragment.as_str(), Encoding::encodeFragment)
     }
 
     pub fn EscapedPath(&self) -> String {
-        let u = self;
-        if u.RawPath != "" && validEncoded(u.RawPath.as_str(), Encoding::encodePath) {
-            if let Ok(p) = unescape(u.RawPath.as_str(), Encoding::encodePath) {
-                if p == u.Path {
-                    return u.RawPath.to_string();
+        if self.RawPath != "" && validEncoded(self.RawPath.as_str(), Encoding::encodePath) {
+            if let Ok(p) = unescape(self.RawPath.as_str(), Encoding::encodePath) {
+                if p == self.Path {
+                    return self.RawPath.to_string();
                 }
             }
         }
-        if u.Path == "*" {
+        if self.Path == "*" {
             return "*".to_string(); // don't escape (Issue 11202)
         }
-        escape(u.Path.as_str(), Encoding::encodePath)
+        escape(self.Path.as_str(), Encoding::encodePath)
     }
 
     fn setFragment(&mut self, f: &str) -> Result<(), Error> {
-        todo!()
+        let frag = unescape(f, Encoding::encodeFragment)?;
+        self.Fragment = frag.to_string();
+        let escf = escape(frag.as_str(), Encoding::encodeFragment);
+        if f == escf {
+            // Default encoding is fine.
+            self.RawFragment = "".to_string();
+        } else {
+            self.RawFragment = f.to_string();
+        }
+        Ok(())
     }
 
     fn setPath(&mut self, p: &str) -> Result<(), Error> {
