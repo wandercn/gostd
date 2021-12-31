@@ -144,6 +144,7 @@ use gostd::vendor
 - [x] strings模块，字符串处理函数已完成。除了Reader相关方法还没全实现。(version >=0.2.3)
 - [x] strings模块, 完成剩余的方法实现。(version >=0.2.4)
 - [x] io模块,完成部分接口例如Reader，Writer等。(version >=0.2.4)
+- [x] http模块的client客户端功能，支持http和https。(version >=0.2.6)
 
 # 独立发布包
  
@@ -152,6 +153,124 @@ use gostd::vendor
 独立发布gostd_builtin, 代码等价于 use gostd::builtin 。 
 
 # 使用例子
+
+## http模块
+
+### client客户端
+
+1. POST
+
+```rust
+
+use gostd::net::http;
+fn main() -> Result<(), std::io::Error> {
+    let url = "https://petstore.swagger.io/v2/pet";
+    let postbody = r#"{"id":0,"category":{"id":0,"name":"string"},"name":"doggie","photoUrls":["string"],"tags":[{"id":0,"name":"string"}],"status":"available"}"#
+   .as_bytes()
+   .to_vec();
+    let response = http::Post(url, "application/json", Some(postbody))?;
+
+    println!(
+        "{}",
+        String::from_utf8(response.Body.expect("return body error")).unwrap()
+    );
+
+    Ok(())
+}
+
+```
+或者 
+
+```rust
+use gostd::net::http::{Client, Method, Request};
+
+fn main() -> Result<(), std::io::Error> {
+
+    let url = "https://petstore.swagger.io/v2/pet";
+
+    let postbody = r#"{
+      "id": 0,
+      "category": {
+        "id": 0,
+        "name": "string"
+      },
+      "name": "doggie",
+      "photoUrls": [
+        "string"
+      ],
+      "tags": [
+        {
+          "id": 0,
+          "name": "string"
+        }
+      ],
+      "status": "available"
+    }"#
+    .as_bytes()
+    .to_vec();
+
+    let mut req = Request::New(Method::Post, url, Some(postbody))?;
+
+    req.Header.Set("accept", "application/json");
+    req.Header.Set("Content-Type", "application/json");
+    let mut client = Client::New();
+    let response = client.Do(&mut req)?;
+
+    println!(
+        "{}",
+        String::from_utf8(response.Body.expect("return body error")).unwrap()
+    );
+
+    Ok(())
+}
+
+// output
+// {"id":92233723685477587,"category":{"id":,"name":"string"},"name":"doggie","photoUrls":["string"],"tags":[{"id":,"name":"string"}],"status":"available"}
+
+```
+
+2. GET
+
+```rust
+use gostd::net::http;
+
+fn main() -> Result<(), std::io::Error> {
+    let url = "https://petstore.swagger.io/v2/pet/findByStatus?status=available";
+    let response = http::Get(url)?;
+
+    println!(
+        "{}",
+        String::from_utf8(response.Body.expect("return body error")).unwrap()
+    );
+
+    Ok(())
+}
+
+``` 
+或者 
+
+```rust
+use gostd::net::http::{Client, Method, Request};
+
+fn main() -> Result<(), std::io::Error> {
+
+    let url = "https://petstore.swagger.io/v2/pet/findByStatus?status=available";
+    let mut req = Request::New(Method::Get, url, None)?;
+    req.Header.Set("Content-Type", "application/json");
+
+    let mut client = Client::New();
+
+    let response = client.Do(&mut req)?;
+    println!(
+        "{}",
+        String::from_utf8(response.Body.expect("return body error")).unwrap()
+    );
+
+    Ok(())
+}
+
+```
+
 
 ## strings模块
 
