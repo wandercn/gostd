@@ -150,6 +150,45 @@ impl URL {
         port.to_string()
     }
 
+    pub fn Parse(&self, url: &str) -> Result<URL, Error> {
+        let refurl = Parse(url)?;
+        Ok(self.ResolveReference(refurl))
+    }
+
+    pub fn ResolveReference(&self, refurl: URL) -> URL {
+        let mut url = refurl.clone();
+        if refurl.Scheme == "" {
+            url.Scheme = self.Scheme.to_owned();
+        }
+        if refurl.Scheme != "" || refurl.Host != "" {
+            // || refurl.User != nil
+            // The "absoluteURI" or "net_path" cases.
+            // We can ignore the error from setPath since we know we provided a
+            // validly-escaped path.
+            url.setPath(resolvePath(refurl.EscapedPath().as_str(), "").as_str());
+            return url;
+        }
+        if refurl.Opaque != "" {
+            // url.User = nil;
+            url.Host = "".to_string();
+            url.Path = "".to_string();
+            return url;
+        }
+        if refurl.Path == "" && refurl.RawQuery == "" {
+            url.RawQuery = self.RawQuery.to_string();
+            if refurl.Fragment == "" {
+                url.Fragment = self.Fragment.to_string();
+                url.RawFragment = self.RawFragment.to_string();
+            }
+        }
+        // The "abs_path" or "rel_path" cases.
+        url.Host = self.Host.to_string();
+        // url.User = self.User;
+        url.setPath(
+            resolvePath(self.EscapedPath().as_str(), refurl.EscapedPath().as_str()).as_str(),
+        );
+        return url;
+    }
     pub fn RequestURI(&self) -> String {
         let mut result = self.Opaque.clone();
         if result == "" {
@@ -167,6 +206,68 @@ impl URL {
         }
         result
     }
+}
+
+fn resolvePath(base: &str, refurl: &str) -> String {
+    let mut full = String::new();
+    if refurl == "" {
+        full = base.to_string();
+    } else if refurl.as_bytes()[0] != b'/' {
+        let i = strings::LastIndex(base, "/");
+        full = strings::Join(vec![&base[..i as usize + 1], refurl], "").to_owned();
+    } else {
+        full = refurl.to_string();
+    }
+    if full == "" {
+        return "".to_string();
+    }
+
+    let mut last = String::new();
+    let mut elem = String::new();
+    let mut i: int = 0;
+    let mut dst = strings::Builder::new();
+    let mut first = true;
+    let mut remaining = full;
+    while i >= 0 {
+        let i = strings::IndexByte(remaining.as_str(), b'/');
+        if i < 0 {
+            last = remaining.to_string();
+            elem = remaining.to_string();
+            remaining = "".to_string();
+        } else {
+            elem = remaining.as_str()[..i as usize].to_string();
+            remaining = remaining.as_str()[i as usize + 1..].to_string();
+        }
+        if elem == "." {
+            first = false;
+            // drop
+            continue;
+        }
+
+        if elem == ".." {
+            let strs = dst.String();
+            let index = strings::LastIndexByte(strs.as_str(), b'/');
+
+            dst.Reset();
+            if index == -1 {
+                first = true;
+            } else {
+                dst.WriteString(&strs.as_str()[..index as usize]);
+            }
+        } else {
+            if !first {
+                dst.WriteByte(b'/');
+            }
+            dst.WriteString(elem.as_str());
+            first = false;
+        }
+    }
+
+    if last == "." || last == ".." {
+        dst.WriteByte(b'/');
+    }
+
+    "/".to_string() + strings::TrimPrefix(dst.String().as_str(), "/")
 }
 use std::collections::HashMap;
 use std::io::Error;
