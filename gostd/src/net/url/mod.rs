@@ -37,11 +37,95 @@ pub struct Userinfo {
 
 impl URL {
     pub fn String(&self) -> String {
-        todo!()
+        let mut buf = strings::Builder::new();
+        if self.Scheme != "" {
+            buf.WriteString(self.Scheme.as_str());
+            buf.WriteByte(b':');
+        }
+        if self.Opaque != "" {
+            buf.WriteString(self.Opaque.as_str());
+        } else {
+            if self.Scheme != "" || self.Host != "" {
+                if self.Host != "" || self.Path != "" {
+                    buf.WriteString("//");
+                }
+                /* let ui = u.User;
+                if ui != nil {
+                    buf.WriteString(ui.String());
+                    buf.WriteByte('@');
+                } */
+                let h = self.Host.to_string();
+                if h != "" {
+                    buf.WriteString(escape(h.as_str(), Encoding::encodeHost).as_str());
+                }
+            }
+            let mut path = self.EscapedPath();
+            if path != "" && path.as_bytes()[0] != b'/' && self.Host != "" {
+                buf.WriteByte(b'/');
+            }
+            if buf.Len() == 0 {
+                // RFC 3986 §4.2
+                // A path segment that contains a colon character (e.g., "this:that")
+                // cannot be used as the first segment of a relative-path reference, as
+                // it would be mistaken for a scheme name. Such a segment must be
+                // preceded by a dot-segment (e.g., "./this:that") to make a relative-
+                // path reference.
+                let i = strings::IndexByte(path.as_str(), b':');
+                if i > -1 && strings::IndexByte(&path[..i as usize], b'/') == -1 {
+                    buf.WriteString("./");
+                }
+            }
+            buf.WriteString(path.as_str());
+        }
+        if self.ForceQuery || self.RawQuery != "" {
+            buf.WriteByte(b'?');
+            buf.WriteString(self.RawQuery.as_str());
+        }
+        if self.Fragment != "" {
+            buf.WriteByte(b'#');
+            buf.WriteString(self.EscapedFragment().as_str());
+        }
+        return buf.String();
+    }
+
+    pub fn EscapedFragment(&self) -> String {
+        if self.RawFragment != ""
+            && validEncoded(self.RawFragment.as_str(), Encoding::encodeFragment)
+        {
+            if let Ok(f) = unescape(self.RawFragment.as_str(), Encoding::encodeFragment) {
+                if f == self.Fragment {
+                    return self.RawFragment.to_string();
+                }
+            }
+        }
+        escape(self.Fragment.as_str(), Encoding::encodeFragment)
+    }
+
+    pub fn EscapedPath(&self) -> String {
+        if self.RawPath != "" && validEncoded(self.RawPath.as_str(), Encoding::encodePath) {
+            if let Ok(p) = unescape(self.RawPath.as_str(), Encoding::encodePath) {
+                if p == self.Path {
+                    return self.RawPath.to_string();
+                }
+            }
+        }
+        if self.Path == "*" {
+            return "*".to_string(); // don't escape (Issue 11202)
+        }
+        escape(self.Path.as_str(), Encoding::encodePath)
     }
 
     fn setFragment(&mut self, f: &str) -> Result<(), Error> {
-        todo!()
+        let frag = unescape(f, Encoding::encodeFragment)?;
+        self.Fragment = frag.to_string();
+        let escf = escape(frag.as_str(), Encoding::encodeFragment);
+        if f == escf {
+            // Default encoding is fine.
+            self.RawFragment = "".to_string();
+        } else {
+            self.RawFragment = f.to_string();
+        }
+        Ok(())
     }
 
     fn setPath(&mut self, p: &str) -> Result<(), Error> {
@@ -66,6 +150,45 @@ impl URL {
         port.to_string()
     }
 
+    pub fn Parse(&self, url: &str) -> Result<URL, Error> {
+        let refurl = Parse(url)?;
+        Ok(self.ResolveReference(refurl))
+    }
+
+    pub fn ResolveReference(&self, refurl: URL) -> URL {
+        let mut url = refurl.clone();
+        if refurl.Scheme == "" {
+            url.Scheme = self.Scheme.to_owned();
+        }
+        if refurl.Scheme != "" || refurl.Host != "" {
+            // || refurl.User != nil
+            // The "absoluteURI" or "net_path" cases.
+            // We can ignore the error from setPath since we know we provided a
+            // validly-escaped path.
+            url.setPath(resolvePath(refurl.EscapedPath().as_str(), "").as_str());
+            return url;
+        }
+        if refurl.Opaque != "" {
+            // url.User = nil;
+            url.Host = "".to_string();
+            url.Path = "".to_string();
+            return url;
+        }
+        if refurl.Path == "" && refurl.RawQuery == "" {
+            url.RawQuery = self.RawQuery.to_string();
+            if refurl.Fragment == "" {
+                url.Fragment = self.Fragment.to_string();
+                url.RawFragment = self.RawFragment.to_string();
+            }
+        }
+        // The "abs_path" or "rel_path" cases.
+        url.Host = self.Host.to_string();
+        // url.User = self.User;
+        url.setPath(
+            resolvePath(self.EscapedPath().as_str(), refurl.EscapedPath().as_str()).as_str(),
+        );
+        url
+    }
     pub fn RequestURI(&self) -> String {
         let mut result = self.Opaque.clone();
         if result == "" {
@@ -83,6 +206,71 @@ impl URL {
         }
         result
     }
+}
+
+fn resolvePath(base: &str, refurl: &str) -> String {
+    let mut full = String::new();
+    if refurl == "" {
+        full = base.to_string();
+    } else if refurl.as_bytes()[0] != b'/' {
+        let i = strings::LastIndex(base, "/");
+        full = strings::Join(vec![&base[..i as usize + 1], refurl], "").to_owned();
+    } else {
+        full = refurl.to_string();
+    }
+    if full == "" {
+        return "".to_string();
+    }
+
+    let mut last = String::new();
+    let mut elem = String::new();
+    let mut i: int = 0;
+    let mut dst = strings::Builder::new();
+    let mut first = true;
+    let mut remaining = full;
+    while i >= 0 {
+        i = strings::IndexByte(remaining.as_str(), b'/');
+        if i < 0 {
+            last = remaining.to_string();
+            elem = remaining.to_string();
+            remaining = "".to_string();
+        } else {
+            elem = remaining.as_str()[..i as usize].to_string();
+            remaining = remaining.as_str()[i as usize + 1..].to_string();
+        }
+        if elem == "." {
+            first = false;
+            // drop
+            continue;
+        }
+
+        if elem == ".." {
+            let strs = dst.String();
+            let index = strings::LastIndexByte(strs.as_str(), b'/');
+
+            dst.Reset();
+            if index == -1 {
+                first = true;
+            } else {
+                dst.WriteString(&strs.as_str()[..index as usize]);
+            }
+        } else {
+            if !first {
+                dst.WriteByte(b'/');
+            }
+            dst.WriteString(elem.as_str());
+            first = false;
+        }
+    }
+
+    if last == "." || last == ".." {
+        dst.WriteByte(b'/');
+    }
+    let mut r = dst.String();
+    if len!(r) > 1 && r.as_bytes()[1] == b'/' {
+        r = r.as_str()[1..].to_string();
+    }
+    r
 }
 use std::collections::HashMap;
 use std::io::Error;
@@ -406,6 +594,33 @@ fn unescape(mut s: &str, mode: Encoding) -> Result<String, Error> {
         }
     }
     Ok(t.String())
+}
+
+fn validEncoded(s: &str, mode: Encoding) -> bool {
+    for i in 0..len!(s) {
+        // RFC 3986, Appendix A.
+        // pchar = unreserved / pct-encoded / sub-delims / ":" / "@".
+        // shouldEscape is not quite compliant with the RFC,
+        // so we check the sub-delims ourselves and let
+        // shouldEscape handle the others.
+        match s.as_bytes()[i] as char {
+            '!' | '$' | '&' | '\'' | '(' | ')' | '*' | '+' | ',' | ';' | '=' | ':' | '@' => (),
+            // ok
+            '[' | ']' =>
+            // ok - not specified in RFC 3986 but left alone by modern browsers
+            {
+                ()
+            }
+            '%' => (),
+            // ok - percent encoded, will decode
+            _ => {
+                if shouldEscape(s.as_bytes()[i], mode) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
 }
 
 fn shouldEscape(c: byte, mode: Encoding) -> bool {
