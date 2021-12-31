@@ -37,17 +37,16 @@ pub struct Userinfo {
 
 impl URL {
     pub fn String(&self) -> String {
-        let u = self;
-        let buf = strings::Builder::new();
-        if u.Scheme != "" {
-            buf.WriteString(u.Scheme.as_str());
+        let mut buf = strings::Builder::new();
+        if self.Scheme != "" {
+            buf.WriteString(self.Scheme.as_str());
             buf.WriteByte(b':');
         }
-        if u.Opaque != "" {
-            buf.WriteString(u.Opaque.as_str());
+        if self.Opaque != "" {
+            buf.WriteString(self.Opaque.as_str());
         } else {
-            if u.Scheme != "" || u.Host != "" {
-                if u.Host != "" || u.Path != "" {
+            if self.Scheme != "" || self.Host != "" {
+                if self.Host != "" || self.Path != "" {
                     buf.WriteString("//");
                 }
                 /* let ui = u.User;
@@ -55,13 +54,13 @@ impl URL {
                     buf.WriteString(ui.String());
                     buf.WriteByte('@');
                 } */
-                let h = u.Host;
+                let h = self.Host.to_string();
                 if h != "" {
                     buf.WriteString(escape(h.as_str(), Encoding::encodeHost).as_str());
                 }
             }
-            let mut path = u.EscapedPath();
-            if path != "" && path[0] != '/' && u.Host != "" {
+            let mut path = self.EscapedPath();
+            if path != "" && path.as_bytes()[0] != b'/' && self.Host != "" {
                 buf.WriteByte(b'/');
             }
             if buf.Len() == 0 {
@@ -71,30 +70,43 @@ impl URL {
                 // it would be mistaken for a scheme name. Such a segment must be
                 // preceded by a dot-segment (e.g., "./this:that") to make a relative-
                 // path reference.
-                let i = strings::IndexByte(path, b':');
-                if i > -1 && strings::IndexByte(path[..i], b'/') == -1 {
+                let i = strings::IndexByte(path.as_str(), b':');
+                if i > -1 && strings::IndexByte(&path[..i as usize], b'/') == -1 {
                     buf.WriteString("./");
                 }
             }
-            buf.WriteString(path);
+            buf.WriteString(path.as_str());
         }
-        if u.ForceQuery || u.RawQuery != "" {
+        if self.ForceQuery || self.RawQuery != "" {
             buf.WriteByte(b'?');
-            buf.WriteString(u.RawQuery.as_str());
+            buf.WriteString(self.RawQuery.as_str());
         }
-        if u.Fragment != "" {
+        if self.Fragment != "" {
             buf.WriteByte(b'#');
-            buf.WriteString(u.EscapedFragment());
+            buf.WriteString(self.EscapedFragment().as_str());
         }
         return buf.String();
     }
 
-    fn EscapedPath(&mut self) -> String {
+    pub fn EscapedFragment(&self) -> String {
+        let u = self;
+
+        if u.RawFragment != "" && validEncoded(u.RawFragment.as_str(), Encoding::encodeFragment) {
+            if let Ok(f) = unescape(u.RawFragment.as_str(), Encoding::encodeFragment) {
+                if f == u.Fragment {
+                    return u.RawFragment.to_string();
+                }
+            }
+        }
+        escape(u.Fragment.as_str(), Encoding::encodeFragment)
+    }
+
+    pub fn EscapedPath(&self) -> String {
         let u = self;
         if u.RawPath != "" && validEncoded(u.RawPath.as_str(), Encoding::encodePath) {
             if let Ok(p) = unescape(u.RawPath.as_str(), Encoding::encodePath) {
                 if p == u.Path {
-                    return u.RawPath;
+                    return u.RawPath.to_string();
                 }
             }
         }
