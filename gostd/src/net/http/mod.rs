@@ -203,7 +203,36 @@ use crate::strings;
 use crate::time;
 use std::collections::HashMap;
 use std::io::Error;
-
+/// Get issues a GET to the specified URL. If the response is one of the following redirect codes, Get follows the redirect,up to a maximum of 10 redirects:
+/// ```text
+/// 301 (Moved Permanently)
+/// 302 (Found)
+/// 303 (See Other)
+/// 307 (Temporary Redirect)
+/// 308 (Permanent Redirect)
+/// ```
+/// Get is a wrapper around Client.Get.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Get向指定的URL发出一个GET请求，如果回应的状态码如下，Get会在调用c.CheckRedirect后执行重定向
+///Get是对包变量Client的Get方法的包装。
+/// </details>
+///
+/// # Example
+///
+/// ```
+/// use gostd::net::http;
+///
+/// fn main() -> Result<(), std::io::Error> {
+///     let url = "https://petstore.swagger.io/v2/pet/findByStatus?status=available";
+///     let response = http::Get(url)?;///
+///     println!(
+///         "{}",
+///         String::from_utf8(response.Body.expect("return body error")).unwrap()
+///     );
+///     Ok(())
+/// }
+/// ```
 pub fn Get(url: &str) -> HttpResult {
     Client::New().Get(url)
 }
@@ -212,6 +241,33 @@ pub fn Head(url: &str) -> HttpResult {
     Client::New().Head(url)
 }
 
+/// Post issues a POST to the specified URL. Post is a wrapper around DefaultClient.Post.
+/// To set custom headers, use Request::New and Client.Do.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Post向指定的URL发出一个POST请求。bodyType为POST数据的类型， body为POST数据，作为请求的主体
+/// </details>
+///
+/// # Example
+///
+/// ```
+/// use gostd::net::http;
+/// fn main() -> Result<(), std::io::Error> {
+///     let url = "https://petstore.swagger.io/v2/pet";
+///     let postbody = r#"{"id":0,"category":{"id":0,"name":"string"},"name":"doggie","photoUrls":["string"],"tags":[{"id":0,"name":"string"}],"status":"available"}"#
+///    .as_bytes()
+///    .to_vec();
+///    let response = http::Post(url, "application/json", Some(postbody))?;
+///
+///    println!(
+///        "{}",
+///        String::from_utf8(response.Body.expect("return body error")).unwrap()
+///    );
+///
+///    Ok(())
+/// }
+///
+/// ```
 pub fn Post(url: &str, contentType: &str, body: Option<Vec<u8>>) -> HttpResult {
     Client::New().Post(url, contentType, body)
 }
