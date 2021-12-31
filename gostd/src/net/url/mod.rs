@@ -37,7 +37,71 @@ pub struct Userinfo {
 
 impl URL {
     pub fn String(&self) -> String {
-        todo!()
+        let u = self;
+        let buf = strings::Builder::new();
+        if u.Scheme != "" {
+            buf.WriteString(u.Scheme.as_str());
+            buf.WriteByte(b':');
+        }
+        if u.Opaque != "" {
+            buf.WriteString(u.Opaque.as_str());
+        } else {
+            if u.Scheme != "" || u.Host != "" {
+                if u.Host != "" || u.Path != "" {
+                    buf.WriteString("//");
+                }
+                /* let ui = u.User;
+                if ui != nil {
+                    buf.WriteString(ui.String());
+                    buf.WriteByte('@');
+                } */
+                let h = u.Host;
+                if h != "" {
+                    buf.WriteString(escape(h.as_str(), Encoding::encodeHost).as_str());
+                }
+            }
+            let mut path = u.EscapedPath();
+            if path != "" && path[0] != '/' && u.Host != "" {
+                buf.WriteByte(b'/');
+            }
+            if buf.Len() == 0 {
+                // RFC 3986 §4.2
+                // A path segment that contains a colon character (e.g., "this:that")
+                // cannot be used as the first segment of a relative-path reference, as
+                // it would be mistaken for a scheme name. Such a segment must be
+                // preceded by a dot-segment (e.g., "./this:that") to make a relative-
+                // path reference.
+                let i = strings::IndexByte(path, b':');
+                if i > -1 && strings::IndexByte(path[..i], b'/') == -1 {
+                    buf.WriteString("./");
+                }
+            }
+            buf.WriteString(path);
+        }
+        if u.ForceQuery || u.RawQuery != "" {
+            buf.WriteByte(b'?');
+            buf.WriteString(u.RawQuery.as_str());
+        }
+        if u.Fragment != "" {
+            buf.WriteByte(b'#');
+            buf.WriteString(u.EscapedFragment());
+        }
+        return buf.String();
+    }
+
+    fn EscapedPath(&mut self) -> String {
+        let u = self;
+        if u.RawPath != "" && validEncoded(u.RawPath.as_str(), Encoding::encodePath) {
+            if let Ok(p) = unescape(u.RawPath.as_str(), Encoding::encodePath) {
+                if p == u.Path {
+                    return u.RawPath;
+                }
+            }
+        }
+        if u.Path == "*" {
+            return "*".to_string(); // don't escape (Issue 11202)
+        }
+        escape(u.Path.as_str(), Encoding::encodePath)
     }
 
     fn setFragment(&mut self, f: &str) -> Result<(), Error> {
@@ -406,6 +470,33 @@ fn unescape(mut s: &str, mode: Encoding) -> Result<String, Error> {
         }
     }
     Ok(t.String())
+}
+
+fn validEncoded(s: &str, mode: Encoding) -> bool {
+    for i in 0..len!(s) {
+        // RFC 3986, Appendix A.
+        // pchar = unreserved / pct-encoded / sub-delims / ":" / "@".
+        // shouldEscape is not quite compliant with the RFC,
+        // so we check the sub-delims ourselves and let
+        // shouldEscape handle the others.
+        match s.as_bytes()[i] as char {
+            '!' | '$' | '&' | '\'' | '(' | ')' | '*' | '+' | ',' | ';' | '=' | ':' | '@' => (),
+            // ok
+            '[' | ']' =>
+            // ok - not specified in RFC 3986 but left alone by modern browsers
+            {
+                ()
+            }
+            '%' => (),
+            // ok - percent encoded, will decode
+            _ => {
+                if shouldEscape(s.as_bytes()[i], mode) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
 }
 
 fn shouldEscape(c: byte, mode: Encoding) -> bool {
