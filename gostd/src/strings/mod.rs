@@ -1156,6 +1156,23 @@ pub fn TrimSuffix<'a>(s: &'a str, suffix: impl AsRef<str>) -> &'a str {
 /// # Example
 ///
 /// ```
+///  use gostd::io::*;
+///  use gostd::strings::Builder;
+///
+///  let mut buf = Builder::new();
+///  buf.WriteString("hello");
+///  buf.WriteByte(b' ');
+///  buf.WriteString("world");
+///  buf.WriteByte(b'!');
+///
+///  assert_eq!("hello world!", buf.String());
+///
+///  buf.Reset(); // clear 清空数据
+///  for i in 'a'..='z' {
+///   buf.WriteByte(i as u8);
+///  }
+///  assert_eq!("abcdefghijklmnopqrstuvwxyz", buf.String());
+///
 ///
 /// ```
 #[derive(Default, PartialEq, PartialOrd, Debug, Clone, Fmt)]
@@ -1179,7 +1196,7 @@ impl Builder {
     /// Cap returns the capacity of the builder's underlying byte slice. It is the total space allocated for the string being built and includes any bytes already written.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// Cap返回构建器底层字节切片的容量。它是为正在生成的字符串分配的总空间，包括已写入的所有字节。
     /// </details>
     pub fn Cap(&self) -> int {
         int!(self.buf.capacity())
@@ -1225,7 +1242,11 @@ impl Builder {
         self.addr = Box::new(None);
         self.buf.clear()
     }
-
+    /// String returns the accumulated string.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 返回累积的字节序列
+    /// </details>
     pub fn Bytes(self) -> Vec<byte> {
         self.buf.clone()
     }
