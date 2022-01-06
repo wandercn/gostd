@@ -990,8 +990,8 @@ pub fn ToUpper(s: impl AsRef<str>) -> String {
 /// assert_eq!("Hello, 中国",strings::Trim("¡¡¡Hello, 中国!!!", "!¡"));
 ///
 /// ```
-pub fn Trim<'a>(mut s: &'a str, cutset: &str) -> &'a str {
-    s.trim_matches(|x| cutset.contains(x))
+pub fn Trim<'a>(mut s: &'a str, cutset: impl AsRef<str>) -> &'a str {
+    s.trim_matches(|x| cutset.as_ref().contains(x))
 }
 
 /// TrimFunc returns a slice of the string s with all leading and trailing Unicode code points c satisfying f(c) removed.
