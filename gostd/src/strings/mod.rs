@@ -32,15 +32,15 @@ use gostd_derive::Fmt;
 /// use gostd::strings;
 ///
 ///    assert_eq!(-1, strings::Compare("a", "b"));
-///    assert_eq!(0, strings::Compare("a", "a"));
+///    assert_eq!(0, strings::Compare("a", "a".to_string()));
 ///    assert_eq!(1, strings::Compare("b", "a"));
 ///
 /// ```
-pub fn Compare(a: &str, b: &str) -> int {
-    if a == b {
+pub fn Compare(a: impl AsRef<str>, b: impl AsRef<str>) -> int {
+    if a.as_ref() == b.as_ref() {
         return 0;
     }
-    if a < b {
+    if a.as_ref() < b.as_ref() {
         return -1;
     }
     1
@@ -61,8 +61,8 @@ pub fn Compare(a: &str, b: &str) -> int {
 /// assert_eq!(true,strings::Contains("seafood", ""));
 /// assert_eq!(true,strings::Contains("", ""));
 /// ```
-pub fn Contains(s: &str, substr: &str) -> bool {
-    s.contains(substr)
+pub fn Contains(s: impl AsRef<str>, substr: impl AsRef<str>) -> bool {
+    s.as_ref().contains(substr.as_ref())
 }
 
 /// ContainsAny reports whether any Unicode code points in chars are within s.
@@ -83,9 +83,9 @@ pub fn Contains(s: &str, substr: &str) -> bool {
 ///    assert_eq!(true, strings::ContainsAny("你好,中国", "hello,好"));
 ///
 /// ```
-pub fn ContainsAny(s: &str, chars: &str) -> bool {
-    for c in chars.chars() {
-        if s.contains(c) {
+pub fn ContainsAny(s: impl AsRef<str>, chars: impl AsRef<str>) -> bool {
+    for c in chars.as_ref().chars() {
+        if s.as_ref().contains(c) {
             return true;
         }
     }
@@ -108,8 +108,8 @@ pub fn ContainsAny(s: &str, chars: &str) -> bool {
 /// assert_eq!(true, strings::ContainsRune("hello中国!", 0x4e2d));
 /// assert_eq!(false, strings::ContainsRune("hello世界!", 0x4e2d));
 /// ```
-pub fn ContainsRune(s: &str, r: rune) -> bool {
-    s.contains(char::from_u32(r).unwrap())
+pub fn ContainsRune(s: impl AsRef<str>, r: rune) -> bool {
+    s.as_ref().contains(char::from_u32(r).unwrap())
 }
 
 /// Count counts the number of non-overlapping instances of substr in s. If substr is an empty string, Count returns 1 + the number of Unicode code points in s.
@@ -126,14 +126,14 @@ pub fn ContainsRune(s: &str, r: rune) -> bool {
 ///     assert_eq!(5, strings::Count("five", ""));
 ///     assert_eq!(4, strings::Count("台湾人香港人澳门人都是中国人", "人"));
 /// ```
-pub fn Count(mut s: &str, substr: &str) -> int {
-    if len!(substr) == 0 {
+pub fn Count(mut s: &str, substr: impl AsRef<str>) -> int {
+    if len!(substr.as_ref()) == 0 {
         return int!(s.chars().count() + 1);
     }
 
-    if len!(substr) == 1 {
+    if len!(substr.as_ref()) == 1 {
         let mut c: int = 0;
-        let s1 = substr.bytes().nth(0).unwrap();
+        let s1 = substr.as_ref().bytes().nth(0).unwrap();
         for v in s.bytes() {
             if v == s1 {
                 c += 1
@@ -144,12 +144,12 @@ pub fn Count(mut s: &str, substr: &str) -> int {
 
     let mut n: int = 0;
     loop {
-        let i = Index(s, substr);
+        let i = Index(s, substr.as_ref());
         if i == -1 {
             return n;
         }
         n += 1;
-        s = &s[uint!(i) + len!(substr)..];
+        s = &s[uint!(i) + len!(substr.as_ref())..];
     }
 }
 
@@ -169,8 +169,8 @@ pub fn Count(mut s: &str, substr: &str) -> int {
 ///    assert_eq!(true, strings::EqualFold("RUST-LANG", "rust-lang"));
 ///    assert_eq!(true, strings::EqualFold("Go", "go"));
 /// ```
-pub fn EqualFold(s: &str, t: &str) -> bool {
-    s.to_lowercase() == t.to_lowercase()
+pub fn EqualFold(s: impl AsRef<str>, t: impl AsRef<str>) -> bool {
+    s.as_ref().to_lowercase() == t.as_ref().to_lowercase()
 }
 
 /// Fields splits the string s around each instance of one or more consecutive white space characters, as defined by unicode.IsSpace, returning a slice of substrings of s or an empty slice if s contains only white space.
@@ -276,8 +276,8 @@ pub fn FieldsFunc(s: &str, f: fn(rune) -> bool) -> Vec<&str> {
 /// assert_eq!(true,strings::HasPrefix("Gopher","Go"));
 ///
 /// ```
-pub fn HasPrefix(s: &str, prefix: &str) -> bool {
-    s.starts_with(prefix)
+pub fn HasPrefix(s: impl AsRef<str>, prefix: impl AsRef<str>) -> bool {
+    s.as_ref().starts_with(prefix.as_ref())
 }
 
 /// HasSuffix tests whether the string s ends with suffix.
@@ -296,8 +296,8 @@ pub fn HasPrefix(s: &str, prefix: &str) -> bool {
 /// assert_eq!(false,strings::HasSuffix("Amirust","Ami"));
 /// assert_eq!(true,strings::HasSuffix("Amirust",""));
 /// ```
-pub fn HasSuffix(s: &str, suffix: &str) -> bool {
-    s.ends_with(suffix)
+pub fn HasSuffix(s: impl AsRef<str>, suffix: impl AsRef<str>) -> bool {
+    s.as_ref().ends_with(suffix.as_ref())
 }
 
 /// Cut slices s around the first instance of sep,
@@ -346,11 +346,11 @@ pub fn Cut<'a>(s: &'a str, sep: &str) -> (&'a str, &'a str, bool) {
 /// assert_eq!(4,strings::Index("chicken", "ken"));
 /// assert_eq!(-1,strings::Index("chicken", "dmr"));
 /// ```
-pub fn Index(s: &str, substr: &str) -> int {
-    if substr == "" {
+pub fn Index(s: impl AsRef<str>, substr: impl AsRef<str>) -> int {
+    if substr.as_ref() == "" {
         return -1;
     }
-    if let Some(i) = s.find(substr) {
+    if let Some(i) = s.as_ref().find(substr.as_ref()) {
         return int!(i);
     } else {
         -1
@@ -372,12 +372,12 @@ pub fn Index(s: &str, substr: &str) -> int {
 /// assert_eq!(strings::IndexAny("crwth", "aeiouy"),-1);
 ///
 /// ```
-pub fn IndexAny(s: &str, chars: &str) -> int {
-    if chars == "" || s == "" {
+pub fn IndexAny(s: impl AsRef<str>, chars: impl AsRef<str>) -> int {
+    if chars.as_ref() == "" || s.as_ref() == "" {
         return -1;
     }
-    for (idx, r) in s.chars().enumerate() {
-        if IndexRune(chars, r as u32) != -1 {
+    for (idx, r) in s.as_ref().chars().enumerate() {
+        if IndexRune(chars.as_ref(), r as u32) != -1 {
             return int!(idx);
         }
     }
@@ -398,11 +398,11 @@ pub fn IndexAny(s: &str, chars: &str) -> int {
 ///
 /// assert_eq!(0,strings::IndexByte("rustlang",b'r'));
 /// assert_eq!(3,strings::IndexByte("gophers",b'h'));
-/// assert_eq!(-1,strings::IndexByte("gophers",b'x'));
+/// assert_eq!(-1,strings::IndexByte("gophers".to_string(),b'x'));
 ///
 /// ```
-pub fn IndexByte(s: &str, c: byte) -> int {
-    for (i, v) in s.bytes().enumerate() {
+pub fn IndexByte(s: impl AsRef<str>, c: byte) -> int {
+    for (i, v) in s.as_ref().bytes().enumerate() {
         if v == c {
             return int!(i);
         }
@@ -434,8 +434,8 @@ pub fn IndexByte(s: &str, c: byte) -> int {
 ///    assert_eq!(-1, strings::IndexFunc("Hello, world", f));
 ///
 /// ```
-pub fn IndexFunc(s: &str, f: fn(rune) -> bool) -> int {
-    for (i, r) in s.chars().enumerate() {
+pub fn IndexFunc(s: impl AsRef<str>, f: fn(rune) -> bool) -> int {
+    for (i, r) in s.as_ref().chars().enumerate() {
         if f(r as u32) == true {
             return int!(i);
         }
@@ -462,8 +462,8 @@ pub fn IndexFunc(s: &str, f: fn(rune) -> bool) -> int {
 /// assert_eq!(-1,strings::IndexRune("chicken", 100_u32));
 ///
 /// ```
-pub fn IndexRune(s: &str, r: rune) -> int {
-    if let Some(i) = s.find(|c: char| c == char::from_u32(r).unwrap()) {
+pub fn IndexRune(s: impl AsRef<str>, r: rune) -> int {
+    if let Some(i) = s.as_ref().find(|c: char| c == char::from_u32(r).unwrap()) {
         return int!(i);
     }
     -1
@@ -485,25 +485,25 @@ pub fn IndexRune(s: &str, r: rune) -> int {
 /// assert_eq!("foo, bar, baz",strings::Join(s,", "));
 ///
 /// ```
-pub fn Join<'a>(elems: Vec<&'a str>, sep: &'a str) -> String {
+pub fn Join(elems: Vec<impl AsRef<str>>, sep: impl AsRef<str>) -> String {
     match len!(elems) {
         0 => return "".to_owned(),
-        1 => return elems[0].to_string(),
+        1 => return elems[0].as_ref().to_string(),
         _ => (),
     }
 
-    let mut n = len!(sep) * (len!(elems) - 1);
+    let mut n = len!(sep.as_ref()) * (len!(elems) - 1);
     for i in 0..len!(elems) {
-        n += len!(elems[i]);
+        n += len!(elems[i].as_ref());
     }
 
     let mut b = Builder::new();
 
     b.Grow(int!(n));
-    b.WriteString(elems[0]);
+    b.WriteString(elems[0].as_ref());
     for s in elems.get(1..).unwrap() {
-        b.WriteString(sep);
-        b.WriteString(s);
+        b.WriteString(sep.as_ref());
+        b.WriteString(s.as_ref());
     }
     b.String()
 }
@@ -524,11 +524,11 @@ pub fn Join<'a>(elems: Vec<&'a str>, sep: &'a str) -> String {
 /// assert_eq!(-1,strings::LastIndex("rust rustacean","go"));
 ///
 /// ```
-pub fn LastIndex(s: &str, substr: &str) -> int {
-    if substr == "" {
+pub fn LastIndex(s: impl AsRef<str>, substr: impl AsRef<str>) -> int {
+    if substr.as_ref() == "" {
         return -1;
     }
-    if let Some(i) = s.rfind(substr) {
+    if let Some(i) = s.as_ref().rfind(substr.as_ref()) {
         return int!(i);
     }
     -1
@@ -550,13 +550,13 @@ pub fn LastIndex(s: &str, substr: &str) -> int {
 /// assert_eq!(-1,strings::LastIndexAny("go gopher", "fail"));
 ///
 /// ```
-pub fn LastIndexAny(s: &str, chars: &str) -> int {
-    if chars == "" {
+pub fn LastIndexAny(s: impl AsRef<str>, chars: impl AsRef<str>) -> int {
+    if chars.as_ref() == "" {
         return -1;
     }
-    for r in s.chars().rev() {
-        if chars.contains(r) {
-            return int!(s.rfind(r).unwrap());
+    for r in s.as_ref().chars().rev() {
+        if chars.as_ref().contains(r) {
+            return int!(s.as_ref().rfind(r).unwrap());
         }
     }
     -1
@@ -578,8 +578,8 @@ pub fn LastIndexAny(s: &str, chars: &str) -> int {
 /// assert_eq!(8,strings::LastIndexByte("Hello, world", b'o'));
 /// assert_eq!(-1,strings::LastIndexByte("Hello, world", b'x'));
 /// ```
-pub fn LastIndexByte(s: &str, c: byte) -> int {
-    if let Some(i) = s.rfind(c as char) {
+pub fn LastIndexByte(s: impl AsRef<str>, c: byte) -> int {
+    if let Some(i) = s.as_ref().rfind(c as char) {
         return int!(i);
     }
     -1
@@ -602,10 +602,10 @@ pub fn LastIndexByte(s: &str, c: byte) -> int {
 ///    assert_eq!(2, strings::LastIndexFunc("123 go", f));
 ///    assert_eq!(-1, strings::LastIndexFunc("go", f));
 /// ```
-pub fn LastIndexFunc(s: &str, f: fn(rune) -> bool) -> int {
-    for (i, r) in s.chars().rev().enumerate() {
+pub fn LastIndexFunc(s: impl AsRef<str>, f: fn(rune) -> bool) -> int {
+    for (i, r) in s.as_ref().chars().rev().enumerate() {
         if f(r as u32) == true {
-            return int!(s.rfind(r).unwrap());
+            return int!(s.as_ref().rfind(r).unwrap());
         }
     }
     -1
@@ -638,10 +638,10 @@ pub fn LastIndexFunc(s: &str, f: fn(rune) -> bool) -> int {
 ///    );
 ///
 /// ```
-pub fn Map(mapping: fn(rune) -> rune, mut s: &str) -> String {
+pub fn Map(mapping: fn(rune) -> rune, mut s: impl AsRef<str>) -> String {
     let mut b = Builder::new();
-    b.Grow(int!(len!(s)));
-    for (idx, v) in s.chars().enumerate() {
+    b.Grow(int!(len!(s.as_ref())));
+    for (idx, v) in s.as_ref().chars().enumerate() {
         let r = mapping(v as u32);
         if r > 0 {
             b.WriteRune(r);
@@ -673,18 +673,18 @@ pub fn Map(mapping: fn(rune) -> rune, mut s: &str) -> String {
 /// ```text
 /// 121212
 /// ```
-pub fn Repeat(s: &str, count: uint) -> String {
+pub fn Repeat(s: impl AsRef<str>, count: uint) -> String {
     if count == 0 {
         return "".to_owned();
     }
 
-    if len!(s) * count / count != len!(s) {
+    if len!(s.as_ref()) * count / count != len!(s.as_ref()) {
         panic!("strings: Repeat count causes overflow")
     }
-    let mut n = len!(s) * count;
+    let mut n = len!(s.as_ref()) * count;
     let mut b = Builder::new();
     b.Grow(int!(n));
-    b.WriteString(s);
+    b.WriteString(s.as_ref());
     while (b.Len() < int!(n)) {
         if b.Len() <= int!(n) / 2 {
             b.WriteString(b.String().as_str());
@@ -712,11 +712,11 @@ pub fn Repeat(s: &str, count: uint) -> String {
 /// assert_eq!("moo moo moo",strings::Replace("oink oink oink", "oink", "moo", -1));
 ///
 /// ```
-pub fn Replace<'a>(s: &'a str, old: &str, new: &str, n: int) -> String {
+pub fn Replace(s: impl AsRef<str>, old: impl AsRef<str>, new: impl AsRef<str>, n: int) -> String {
     if n < 0 {
-        return s.replace(old, new);
+        return s.as_ref().replace(old.as_ref(), new.as_ref());
     }
-    s.replacen(old, new, uint!(n))
+    s.as_ref().replacen(old.as_ref(), new.as_ref(), uint!(n))
 }
 
 /// ReplaceAll returns a copy of the string s with all non-overlapping instances of old replaced by new. If old is empty, it matches at the beginning of the string and after each UTF-8 sequence, yielding up to k+1 replacements for a k-rune string.
@@ -733,8 +733,8 @@ pub fn Replace<'a>(s: &'a str, old: &str, new: &str, n: int) -> String {
 /// assert_eq!("moo moo moo",strings::ReplaceAll("oink oink oink", "oink", "moo"));
 ///
 /// ```
-pub fn ReplaceAll<'a>(s: &'a str, old: &'a str, new: &'a str) -> String {
-    s.replace(old, new)
+pub fn ReplaceAll(s: impl AsRef<str>, old: impl AsRef<str>, new: impl AsRef<str>) -> String {
+    s.as_ref().replace(old.as_ref(), new.as_ref())
 }
 
 /// Split slices s into all substrings separated by sep and returns a slice of the substrings between those separators.
@@ -759,8 +759,8 @@ pub fn ReplaceAll<'a>(s: &'a str, old: &'a str, new: &'a str) -> String {
 /// assert_eq!(vec![""," ", "x", "y", "z", " ",""],strings::Split(" xyz ", ""));
 /// assert_eq!(vec![""],strings::Split("", "Bernardo O'Higgins"));
 /// ```
-pub fn Split<'a>(s: &'a str, sep: &'a str) -> Vec<&'a str> {
-    s.split(sep).collect()
+pub fn Split(s: &str, sep: impl AsRef<str>) -> Vec<&str> {
+    s.split(sep.as_ref()).collect()
 }
 
 /// SplitAfter slices s into all substrings after each instance of sep and returns a slice of those substrings.
@@ -782,8 +782,8 @@ pub fn Split<'a>(s: &'a str, sep: &'a str) -> Vec<&'a str> {
 ///
 /// assert_eq!(vec!["a,", "b,", "c"],strings::SplitAfter("a,b,c", ","));
 /// ```
-pub fn SplitAfter<'a>(s: &'a str, sep: &str) -> Vec<&'a str> {
-    s.split_inclusive(sep).collect()
+pub fn SplitAfter(s: &str, sep: impl AsRef<str>) -> Vec<&str> {
+    s.split_inclusive(sep.as_ref()).collect()
 }
 
 /// SplitAfterN slices s into substrings after each instance of sep and returns a slice of those substrings.
@@ -825,11 +825,15 @@ pub fn SplitAfter<'a>(s: &'a str, sep: &str) -> Vec<&'a str> {
 ///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", 5));
 ///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", 10));
 /// ```
-pub fn SplitAfterN<'a>(s: &'a str, sep: &str, n: int) -> Vec<String> {
+pub fn SplitAfterN(s: impl AsRef<str>, sep: impl AsRef<str>, n: int) -> Vec<String> {
     let mut n = n;
-    let length = len!(s);
+    let length = len!(s.as_ref());
     if n < 0 || uint!(n) > length - 1 {
-        return s.split_inclusive(sep).map(|x| x.to_string()).collect();
+        return s
+            .as_ref()
+            .split_inclusive(sep.as_ref())
+            .map(|x| x.to_string())
+            .collect();
     }
 
     if n == 0 {
@@ -837,17 +841,21 @@ pub fn SplitAfterN<'a>(s: &'a str, sep: &str, n: int) -> Vec<String> {
     }
 
     if n == 1 {
-        return vec![s.to_string()];
+        return vec![s.as_ref().to_string()];
     }
 
-    let mut list: Vec<String> = s.splitn(n as usize, sep).map(|x| x.to_string()).collect();
+    let mut list: Vec<String> = s
+        .as_ref()
+        .splitn(n as usize, sep.as_ref())
+        .map(|x| x.to_string())
+        .collect();
 
     let list_len = list.len();
     if n > int!(list_len - 1) {
         n = int!(list_len - 1);
     }
     for i in 0..n as usize {
-        list.get_mut(i).unwrap().push_str(sep);
+        list.get_mut(i).unwrap().push_str(sep.as_ref());
     }
     list
 }
@@ -899,21 +907,21 @@ pub fn SplitAfterN<'a>(s: &'a str, sep: &str, n: int) -> Vec<String> {
 ///    );
 ///
 /// ```
-pub fn SplitN<'a>(s: &'a str, sep: &str, n: int) -> Vec<&'a str> {
+pub fn SplitN<'a>(s: &'a str, sep: impl AsRef<str>, n: int) -> Vec<&'a str> {
     let mut n = n;
     if n == 0 {
         return vec![];
     }
     if n < 0 {
-        return s.split(sep).collect();
+        return s.split(sep.as_ref()).collect();
     }
 
-    let list: Vec<&'a str> = s.split(sep).collect();
+    let list: Vec<&'a str> = s.split(sep.as_ref()).collect();
     let length = list.len();
     if n > int!(length) {
         n = int!(length);
     }
-    s.splitn(n as usize, sep).collect()
+    s.splitn(n as usize, sep.as_ref()).collect()
 }
 
 /// ToLower returns s with all Unicode letters mapped to their lower case.
@@ -929,8 +937,8 @@ pub fn SplitN<'a>(s: &'a str, sep: &str, n: int) -> Vec<&'a str> {
 ///
 /// assert_eq!("gopher",strings::ToLower("Gopher"));
 /// ```
-pub fn ToLower(s: &str) -> String {
-    s.to_lowercase()
+pub fn ToLower(s: impl AsRef<str>) -> String {
+    s.as_ref().to_lowercase()
 }
 
 /// ToTitle returns a copy of the string s with all Unicode letters mapped to their Unicode title case.
@@ -947,8 +955,8 @@ pub fn ToLower(s: &str) -> String {
 /// assert_eq!("LOUD NOISES",strings::ToTitle("loud noises"));
 /// assert_eq!("ХЛЕБ",strings::ToTitle("хлеб"));
 /// ```
-pub fn ToTitle(s: &str) -> String {
-    s.to_uppercase()
+pub fn ToTitle(s: impl AsRef<str>) -> String {
+    s.as_ref().to_uppercase()
 }
 
 /// ToUpper returns s with all Unicode letters mapped to their upper case.
@@ -964,8 +972,8 @@ pub fn ToTitle(s: &str) -> String {
 ///
 /// assert_eq!("GOPHER",strings::ToUpper("Gopher"));
 /// ```
-pub fn ToUpper(s: &str) -> String {
-    s.to_uppercase()
+pub fn ToUpper(s: impl AsRef<str>) -> String {
+    s.as_ref().to_uppercase()
 }
 
 /// Trim returns a slice of the string s with all leading and trailing Unicode code points contained in cutset removed.
@@ -982,8 +990,8 @@ pub fn ToUpper(s: &str) -> String {
 /// assert_eq!("Hello, 中国",strings::Trim("¡¡¡Hello, 中国!!!", "!¡"));
 ///
 /// ```
-pub fn Trim<'a>(mut s: &'a str, cutset: &str) -> &'a str {
-    s.trim_matches(|x| cutset.contains(x))
+pub fn Trim<'a>(mut s: &'a str, cutset: impl AsRef<str>) -> &'a str {
+    s.trim_matches(|x| cutset.as_ref().contains(x))
 }
 
 /// TrimFunc returns a slice of the string s with all leading and trailing Unicode code points c satisfying f(c) removed.
@@ -1019,8 +1027,8 @@ pub fn TrimFunc(s: &str, f: fn(rune) -> bool) -> &str {
 ///
 /// assert_eq!("Hello, Gophers!!!",strings::TrimLeft("¡¡¡Hello, Gophers!!!", "!¡"))
 /// ```
-pub fn TrimLeft<'a>(s: &'a str, cutset: &str) -> &'a str {
-    s.trim_start_matches(|x| cutset.contains(x))
+pub fn TrimLeft<'a>(s: &'a str, cutset: impl AsRef<str>) -> &'a str {
+    s.trim_start_matches(|x| cutset.as_ref().contains(x))
 }
 
 /// TrimLeftFunc returns a slice of the string s with all leading Unicode code points c satisfying f(c) removed.
@@ -1057,8 +1065,8 @@ pub fn TrimLeftFunc(s: &str, f: fn(rune) -> bool) -> &str {
 /// assert_eq!("Hello, Rust!xxx",strings::TrimPrefix("xxxHello, Rust!xxx","xxx"));
 ///
 /// ```
-pub fn TrimPrefix<'a>(s: &'a str, prefix: &str) -> &'a str {
-    s.trim_start_matches(prefix)
+pub fn TrimPrefix<'a>(s: &'a str, prefix: impl AsRef<str>) -> &'a str {
+    s.trim_start_matches(prefix.as_ref())
 }
 
 /// TrimRight returns a slice of the string s, with all trailing Unicode code points contained in cutset removed.
@@ -1076,8 +1084,8 @@ pub fn TrimPrefix<'a>(s: &'a str, prefix: &str) -> &'a str {
 /// assert_eq!("¡¡¡Hello, Gophers",strings::TrimRight("¡¡¡Hello, Gophers!!!", "!¡"));
 ///
 /// ```
-pub fn TrimRight<'a>(s: &'a str, cutset: &str) -> &'a str {
-    s.trim_end_matches(|x| cutset.contains(x))
+pub fn TrimRight<'a>(s: &'a str, cutset: impl AsRef<str>) -> &'a str {
+    s.trim_end_matches(|x| cutset.as_ref().contains(x))
 }
 
 /// TrimRightFunc returns a slice of the string s with all trailing Unicode code points c satisfying f(c) removed.
@@ -1133,8 +1141,8 @@ pub fn TrimSpace(s: &str) -> &str {
 /// assert_eq!("test",strings::TrimSuffix("test.rs",".rs"))
 ///
 /// ```
-pub fn TrimSuffix<'a>(s: &'a str, suffix: &str) -> &'a str {
-    s.trim_end_matches(suffix)
+pub fn TrimSuffix<'a>(s: &'a str, suffix: impl AsRef<str>) -> &'a str {
+    s.trim_end_matches(suffix.as_ref())
 }
 
 // Builder Begin
@@ -1148,6 +1156,23 @@ pub fn TrimSuffix<'a>(s: &'a str, suffix: &str) -> &'a str {
 /// # Example
 ///
 /// ```
+///  use gostd::io::*;
+///  use gostd::strings::Builder;
+///
+///  let mut buf = Builder::new();
+///  buf.WriteString("hello");
+///  buf.WriteByte(b' ');
+///  buf.WriteString("world");
+///  buf.WriteByte(b'!');
+///
+///  assert_eq!("hello world!", buf.String());
+///
+///  buf.Reset(); // clear 清空数据
+///  for i in 'a'..='z' {
+///   buf.WriteByte(i as u8);
+///  }
+///  assert_eq!("abcdefghijklmnopqrstuvwxyz", buf.String());
+///
 ///
 /// ```
 #[derive(Default, PartialEq, PartialOrd, Debug, Clone, Fmt)]
@@ -1171,7 +1196,7 @@ impl Builder {
     /// Cap returns the capacity of the builder's underlying byte slice. It is the total space allocated for the string being built and includes any bytes already written.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    ///
+    /// Cap返回构建器底层字节切片的容量。它是为正在生成的字符串分配的总空间，包括已写入的所有字节。
     /// </details>
     pub fn Cap(&self) -> int {
         int!(self.buf.capacity())
@@ -1217,7 +1242,11 @@ impl Builder {
         self.addr = Box::new(None);
         self.buf.clear()
     }
-
+    /// String returns the accumulated string.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 返回累积的字节序列
+    /// </details>
     pub fn Bytes(self) -> Vec<byte> {
         self.buf.clone()
     }
@@ -1227,7 +1256,7 @@ impl Builder {
     /// <summary class="docblock">zh-cn</summary>
     /// 返回累积的字符串。
     /// </details>
-    pub fn String<'a>(&self) -> String {
+    pub fn String(&self) -> String {
         String::from_utf8(self.buf.clone()).unwrap()
     }
 
