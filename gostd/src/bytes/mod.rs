@@ -107,7 +107,8 @@ pub fn ContainsAny(s: impl AsRef<[byte]>, chars: impl AsRef<[byte]>) -> bool {
 /// use gostd::bytes;
 ///
 /// // '中' as rune = 20013 or 0x4e2d
-/// assert_eq!(true, bytes::ContainsRune("hello中国!", 20013));
+/// assert_eq!(true, bytes::ContainsRune("hello中国!".as_bytes(), 20013));
+/// assert_eq!(true, bytes::ContainsRune("hello中国!".to_string(), 0x4e2d));
 /// assert_eq!(true, bytes::ContainsRune("hello中国!", 0x4e2d));
 /// assert_eq!(false, bytes::ContainsRune("hello世界!", 0x4e2d));
 /// ```
