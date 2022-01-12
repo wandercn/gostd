@@ -367,10 +367,10 @@ pub fn Cut<'a>(s: &'a [byte], sep: &[byte]) -> (&'a [byte], &'a [byte], bool) {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!(4,strings::Index("chicken", "ken"));
-/// assert_eq!(-1,strings::Index("chicken", "dmr"));
+/// assert_eq!(4,bytes::Index("chkcken", "ken"));
+/// assert_eq!(-1,bytes::Index("chicken", "dmr"));
 /// ```
 pub fn Index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
     let n = len!(substr.as_ref());
@@ -393,24 +393,25 @@ pub fn Index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
             } else {
                 let mut has_len = 0;
                 let mut find_byte: Vec<byte> = Vec::new();
-                for v in substr.as_ref().iter() {
-                    if s.as_ref().contains(v) {
+                let mut s = s.as_ref();
+                let mut index = 0;
+                for (index, v) in s.as_ref().iter().enumerate() {
+                    if substr.as_ref().contains(v) {
                         find_byte.push(v.to_owned());
                         has_len += 1;
+                        if n == has_len {
+                            if substr.as_ref() == find_byte.as_slice() {
+                                return (index - n + 1) as int;
+                            } else {
+                                return -1;
+                            }
+                        }
                     } else {
                         find_byte.clear();
                         has_len = 0;
                     }
                 }
-                if n == has_len {
-                    if substr.as_ref() == find_byte.as_slice() {
-                        IndexByte(s.as_ref(), find_byte[0])
-                    } else {
-                        return -1;
-                    }
-                } else {
-                    return -1;
-                }
+                return -1;
             }
         }
     }
