@@ -112,14 +112,15 @@ pub fn ContainsAny(s: impl AsRef<[byte]>, chars: impl AsRef<[byte]>) -> bool {
 /// assert_eq!(false, bytes::ContainsRune("hello世界!", 0x4e2d));
 /// ```
 pub fn ContainsRune(s: impl AsRef<[byte]>, r: rune) -> bool {
-    let bytes = r.to_ne_bytes();
+    let c = char::from_u32(r).unwrap();
+    let bytes = c.to_string();
     let mut is_contain = false;
     let mut b: Vec<byte> = Vec::new();
-    for v in bytes {
+    for v in bytes.bytes() {
         if s.as_ref().contains(&v) {
             is_contain = true;
             b.push(v);
-            if b.as_slice() == bytes.as_slice() {
+            if b.as_slice() == bytes.as_bytes() {
                 return is_contain;
             }
         } else {
