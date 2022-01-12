@@ -1,3 +1,6 @@
 /target
 Cargo.lock
 .hotbuild.toml
+.idea/vcs.xml
+.idea/gostd.iml
+.idea/modules.xml
