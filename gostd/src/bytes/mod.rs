@@ -426,10 +426,10 @@ pub fn Index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!(strings::IndexAny("chicken", "aeiouy"),2);
-/// assert_eq!(strings::IndexAny("crwth", "aeiouy"),-1);
+/// assert_eq!(bytes::IndexAny("chicken", "aeiouy"),2);
+/// assert_eq!(bytes::IndexAny("crwth", "aeiouy"),-1);
 ///
 /// ```
 pub fn IndexAny(s: impl AsRef<[byte]>, chars: impl AsRef<str>) -> int {
@@ -512,20 +512,25 @@ pub fn IndexFunc(s: impl AsRef<[byte]>, f: fn(rune) -> bool) -> int {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!(4,strings::IndexRune("chicken", 'k' as u32));
-/// assert_eq!(4,strings::IndexRune("chicken", 0x6b));
-/// assert_eq!(4,strings::IndexRune("chicken", 107_u32));
-/// assert_eq!(-1,strings::IndexRune("chicken", 'd' as u32));
-/// assert_eq!(-1,strings::IndexRune("chicken", 0x64));
-/// assert_eq!(-1,strings::IndexRune("chicken", 100_u32));
+/// assert_eq!(4,bytes::IndexRune("chicken", 'k' as u32));
+/// assert_eq!(4,bytes::IndexRune("chicken", 0x6b));
+/// assert_eq!(4,bytes::IndexRune("chicken", 107_u32));
+/// assert_eq!(-1,bytes::IndexRune("chicken", 'd' as u32));
+/// assert_eq!(-1,bytes::IndexRune("chicken", 0x64));
+/// assert_eq!(-1,bytes::IndexRune("chicken", 100_u32));
 ///
 /// ```
 pub fn IndexRune(s: impl AsRef<[byte]>, r: rune) -> int {
+    let c = char::from_u32(r).unwrap();
+    let bytes = c.to_string();
+    let n = bytes.as_bytes().len();
     for (i, &x) in s.as_ref().iter().enumerate() {
-        if x == r as byte {
-            return i as int;
+        if bytes.as_bytes()[0] == s.as_ref()[i] {
+            if &s.as_ref()[i..i + n] == bytes.as_bytes() {
+                return i as int;
+            }
         }
     }
     -1
