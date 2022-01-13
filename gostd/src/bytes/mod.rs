@@ -400,14 +400,14 @@ pub fn Index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
                     find_byte.push(v.to_owned());
                     has_len += 1;
                     if n == has_len && substr.as_ref() == find_byte.as_slice() {
-                        return (index + 1_usize - n) as int;
+                        return int!(index + 1_usize - n);
                     }
                 } else {
                     find_byte.clear();
                     has_len = 0;
                 }
             }
-            return -1;
+            -1
         }
     }
 }
@@ -431,12 +431,11 @@ pub fn IndexAny(s: impl AsRef<[byte]>, chars: impl AsRef<str>) -> int {
     if chars.as_ref().is_empty() || s.as_ref().is_empty() {
         return -1;
     }
-    for (idx, r) in s.as_ref().iter().enumerate() {
-        if IndexRune(chars.as_ref(), r.to_owned() as u32) != -1 {
-            return int!(idx);
+    for (i, v) in s.as_ref().iter().enumerate() {
+        if IndexRune(chars.as_ref(), v.to_owned() as u32) != -1 {
+            return int!(i);
         }
     }
-
     -1
 }
 
@@ -493,7 +492,7 @@ pub fn IndexByte(s: impl AsRef<[byte]>, c: byte) -> int {
 /// ```
 pub fn IndexFunc(s: impl AsRef<[byte]>, f: fn(rune) -> bool) -> int {
     for (i, r) in s.as_ref().iter().enumerate() {
-        if f(*r as u32) == true {
+        if f(*r as u32) {
             return int!(i);
         }
     }
@@ -526,7 +525,7 @@ pub fn IndexRune(s: impl AsRef<[byte]>, r: rune) -> int {
     for (i, &x) in s.as_ref().iter().enumerate() {
         if bytes.as_bytes()[0] == s.as_ref()[i] {
             if &s.as_ref()[i..i + n] == bytes.as_bytes() {
-                return i as int;
+                return int!(i);
             }
         }
     }
@@ -620,20 +619,21 @@ pub fn LastIndex(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> int {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!(4,strings::LastIndexAny("go gopher", "go"));
-/// assert_eq!(8,strings::LastIndexAny("go gopher", "ordent"));
-/// assert_eq!(-1,strings::LastIndexAny("go gopher", "fail"));
+/// assert_eq!(4,bytes::LastIndexAny("go gopher", "go"));
+/// assert_eq!(8,bytes::LastIndexAny("go gopher", "ordent"));
+/// assert_eq!(-1,bytes::LastIndexAny("go gopher", "fail"));
 ///
 /// ```
 pub fn LastIndexAny(s: impl AsRef<[byte]>, chars: impl AsRef<str>) -> int {
-    if chars.as_ref() == "" {
+    let n = len!(s.as_ref());
+    if chars.as_ref().is_empty() {
         return -1;
     }
     for (i, &r) in s.as_ref().iter().enumerate().rev() {
-        if chars.as_ref().contains(|x| x == r as char) {
-            return len!(s.as_ref()) as int - i as int;
+        if chars.as_ref().contains(|x| x == (r as char)) {
+            return int!(i);
         }
     }
     -1
@@ -658,7 +658,7 @@ pub fn LastIndexAny(s: impl AsRef<[byte]>, chars: impl AsRef<str>) -> int {
 pub fn LastIndexByte(s: impl AsRef<[byte]>, c: byte) -> int {
     for (i, &v) in s.as_ref().iter().enumerate().rev() {
         if v == c {
-            return len!(s.as_ref()) as int - i as int;
+            return int!(i);
         }
     }
     -1
@@ -684,7 +684,7 @@ pub fn LastIndexByte(s: impl AsRef<[byte]>, c: byte) -> int {
 pub fn LastIndexFunc(s: impl AsRef<[byte]>, f: fn(rune) -> bool) -> int {
     for (i, &r) in s.as_ref().iter().rev().enumerate() {
         if f(r as u32) == true {
-            return len!(s.as_ref()) as int - i as int;
+            return int!(i);
         }
     }
     -1
