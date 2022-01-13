@@ -400,7 +400,7 @@ pub fn Index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
                     find_byte.push(v.to_owned());
                     has_len += 1;
                     if n == has_len && substr.as_ref() == find_byte.as_slice() {
-                        return ((index + 1_usize - n) as int);
+                        return (index + 1_usize - n) as int;
                     }
                 } else {
                     find_byte.clear();
