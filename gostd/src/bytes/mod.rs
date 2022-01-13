@@ -368,7 +368,8 @@ pub fn Cut<'a>(s: &'a [byte], sep: &[byte]) -> (&'a [byte], &'a [byte], bool) {
 ///
 /// ```
 /// use gostd::bytes;
-///
+/// assert_eq!(4,bytes::Index("rust社区 rust社区acean".to_string(),"社区".to_string()));
+/// assert_eq!(4,bytes::Index("rust社区 rust社区acean".as_bytes(),"社区".as_bytes()));
 /// assert_eq!(4,bytes::Index("chkcken", "ken"));
 /// assert_eq!(-1,bytes::Index("chicken", "dmr"));
 /// ```
@@ -448,11 +449,11 @@ pub fn IndexAny(s: impl AsRef<[byte]>, chars: impl AsRef<str>) -> int {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!(0,strings::IndexByte("rustlang",b'r'));
-/// assert_eq!(3,strings::IndexByte("gophers",b'h'));
-/// assert_eq!(-1,strings::IndexByte("gophers".to_string(),b'x'));
+/// assert_eq!(0,bytes::IndexByte("rustlang",b'r'));
+/// assert_eq!(3,bytes::IndexByte("gophers",b'h'));
+/// assert_eq!(-1,bytes::IndexByte("gophers".to_string(),b'x'));
 ///
 /// ```
 pub fn IndexByte(s: impl AsRef<[byte]>, c: byte) -> int {
@@ -473,7 +474,7 @@ pub fn IndexByte(s: impl AsRef<[byte]>, c: byte) -> int {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
 ///    /* fn f(c: u32) -> bool {
 ///        let s = char::from_u32(c).unwrap();
@@ -484,8 +485,10 @@ pub fn IndexByte(s: impl AsRef<[byte]>, c: byte) -> int {
 ///        let s = char::from_u32(c).unwrap();
 ///        !s.is_ascii()
 ///    };
-///    assert_eq!(7, strings::IndexFunc("Hello, 世界", f));
-///    assert_eq!(-1, strings::IndexFunc("Hello, world", f));
+///    assert_eq!(7, bytes::IndexFunc("Hello, 世界", f));
+///    assert_eq!(-1, bytes::IndexFunc("Hello, world", f));
+///    assert_eq!(7, bytes::IndexFunc("Hello, 世界".as_bytes(), f));
+///    assert_eq!(-1, bytes::IndexFunc("Hello, world".to_string(), f));
 ///
 /// ```
 pub fn IndexFunc(s: impl AsRef<[byte]>, f: fn(rune) -> bool) -> int {
@@ -544,6 +547,7 @@ pub fn IndexRune(s: impl AsRef<[byte]>, r: rune) -> int {
 /// let s = vec!["foo".as_bytes(), "bar".as_bytes(), "baz".as_bytes()];
 ///
 /// assert_eq!("foo, bar, baz".as_bytes(),bytes::Join(s,", "));
+///
 /// let list: Vec<&[u8]> = [[1, 2], [3, 4]].iter().map(|x|x.as_slice()).collect();
 /// assert_eq!(bytes::Join(list.clone(),&[0, 0][..]), [1, 2, 0, 0, 3, 4]);
 /// assert_eq!(bytes::Join(list,&[0, 0][..]), [1, 2, 0, 0, 3, 4].as_slice());
@@ -564,9 +568,16 @@ pub fn Join(elems: Vec<&[byte]>, sep: impl AsRef<[byte]>) -> Vec<byte> {
 /// ```
 /// use gostd::bytes;
 ///
-/// assert_eq!(0,bytes::Index("rust rustacean","rust"));
+/// assert_eq!(4,bytes::Index("rust社区 rust社区acean","社区"));
+/// assert_eq!(15,bytes::LastIndex("rust社区 rust社区acean","社区"));
+/// assert_eq!(4,bytes::Index("rust社区 rust社区acean".to_string(),"社区".to_string()));
+/// assert_eq!(15,bytes::LastIndex("rust社区 rust社区acean".as_bytes(),"社区".as_bytes()));
 /// assert_eq!(5,bytes::LastIndex("rust rustacean","rust"));
 /// assert_eq!(-1,bytes::LastIndex("rust rustacean","go"));
+/// // 以下例子只适用于ASCII字符串
+/// assert_eq!(0,bytes::Index(b"rust rustacean",b"rust"));
+/// assert_eq!(5,bytes::LastIndex(b"rust rustacean",b"rust"));
+/// assert_eq!(-1,bytes::LastIndex(b"rust rustacean",b"go"));
 ///
 /// ```
 pub fn LastIndex(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> int {
