@@ -374,7 +374,7 @@ pub fn Cut<'a>(s: &'a [byte], sep: &[byte]) -> (&'a [byte], &'a [byte], bool) {
 /// ```
 pub fn Index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
     let n = len!(substr.as_ref());
-    let slen = len!(s.as_ref());
+    let length = len!(s.as_ref());
     match n {
         0 => {
             return 0 as int;
@@ -382,37 +382,31 @@ pub fn Index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
         1 => IndexByte(s.as_ref(), substr.as_ref()[0]),
 
         _ => {
-            if slen == n {
+            if length == n {
                 if s.as_ref() == substr.as_ref() {
                     return 0 as int;
                 }
                 return -1;
             }
-            if n > slen {
-                return -1;
-            } else {
-                let mut has_len = 0;
-                let mut find_byte: Vec<byte> = Vec::new();
-                let mut s = s.as_ref();
-                let mut index = 0;
-                for (index, v) in s.as_ref().iter().enumerate() {
-                    if substr.as_ref().contains(v) {
-                        find_byte.push(v.to_owned());
-                        has_len += 1;
-                        if n == has_len {
-                            if substr.as_ref() == find_byte.as_slice() {
-                                return (index - n + 1) as int;
-                            } else {
-                                return -1;
-                            }
-                        }
-                    } else {
-                        find_byte.clear();
-                        has_len = 0;
-                    }
-                }
+            if n > length {
                 return -1;
             }
+            let mut has_len = 0;
+            let mut find_byte: Vec<byte> = Vec::new();
+            let mut s = s.as_ref();
+            for (index, v) in s.as_ref().iter().enumerate() {
+                if substr.as_ref().contains(v) {
+                    find_byte.push(v.to_owned());
+                    has_len += 1;
+                    if n == has_len && substr.as_ref() == find_byte.as_slice() {
+                        return ((index + 1_usize - n) as int);
+                    }
+                } else {
+                    find_byte.clear();
+                    has_len = 0;
+                }
+            }
+            return -1;
         }
     }
 }
@@ -545,11 +539,14 @@ pub fn IndexRune(s: impl AsRef<[byte]>, r: rune) -> int {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// let s = vec!["foo", "bar", "baz"];
+/// let s = vec!["foo".as_bytes(), "bar".as_bytes(), "baz".as_bytes()];
 ///
-/// assert_eq!("foo, bar, baz",strings::Join(s,", "));
+/// assert_eq!("foo, bar, baz".as_bytes(),bytes::Join(s,", "));
+/// let list: Vec<&[u8]> = [[1, 2], [3, 4]].iter().map(|x|x.as_slice()).collect();
+/// assert_eq!(bytes::Join(list.clone(),&[0, 0][..]), [1, 2, 0, 0, 3, 4]);
+/// assert_eq!(bytes::Join(list,&[0, 0][..]), [1, 2, 0, 0, 3, 4].as_slice());
 ///
 /// ```
 pub fn Join(elems: Vec<&[byte]>, sep: impl AsRef<[byte]>) -> Vec<byte> {
@@ -565,11 +562,11 @@ pub fn Join(elems: Vec<&[byte]>, sep: impl AsRef<[byte]>) -> Vec<byte> {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!(0,strings::Index("rust rustacean","rust"));
-/// assert_eq!(5,strings::LastIndex("rust rustacean","rust"));
-/// assert_eq!(-1,strings::LastIndex("rust rustacean","go"));
+/// assert_eq!(0,bytes::Index("rust rustacean","rust"));
+/// assert_eq!(5,bytes::LastIndex("rust rustacean","rust"));
+/// assert_eq!(-1,bytes::LastIndex("rust rustacean","go"));
 ///
 /// ```
 pub fn LastIndex(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> int {
@@ -592,12 +589,12 @@ pub fn LastIndex(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> int {
             }
         }
     }
-    let mut i = len!(s.as_ref()) - n;
+    let mut i = len!(s.as_ref()) - 1 - n;
     while i > 0 {
-        i -= 1;
         if &s.as_ref()[i..i + n] == sep.as_ref() {
             return int!(i);
         }
+        i -= 1;
     }
 
     -1
