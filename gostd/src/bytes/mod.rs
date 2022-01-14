@@ -380,7 +380,7 @@ pub fn Index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
         0 => {
             return 0 as int;
         }
-        1 => IndexByte(s.as_ref(), substr.as_ref()[0]),
+        1 => return IndexByte(s.as_ref(), substr.as_ref()[0]),
 
         _ => {
             if length == n {
@@ -392,24 +392,29 @@ pub fn Index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
             if n > length {
                 return -1;
             }
-            let mut has_len = 0;
-            let mut find_byte: Vec<byte> = Vec::new();
-            let mut s = s.as_ref();
-            for (index, v) in s.as_ref().iter().enumerate() {
-                if substr.as_ref().contains(v) {
-                    find_byte.push(v.to_owned());
-                    has_len += 1;
-                    if n == has_len && substr.as_ref() == find_byte.as_slice() {
-                        return int!(index + 1_usize - n);
-                    }
-                } else {
-                    find_byte.clear();
-                    has_len = 0;
-                }
-            }
-            -1
         }
     }
+    index(s, substr)
+}
+
+fn index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
+    let n: usize = len!(substr.as_ref());
+    let mut count = 0;
+    let mut find_bytes: Vec<byte> = Vec::new();
+    let mut s = s.as_ref();
+    for (index, v) in s.as_ref().iter().enumerate() {
+        if substr.as_ref().contains(v) {
+            find_bytes.push(v.to_owned());
+            count += 1;
+            if n == count && substr.as_ref() == find_bytes.as_slice() {
+                return int!(index + 1_usize - n);
+            }
+        } else {
+            find_bytes.clear();
+            count = 0;
+        }
+    }
+    -1
 }
 
 /// IndexAny returns the index of the first instance of any Unicode code point from chars in s, or -1 if no Unicode code point from chars is present in s.
@@ -425,6 +430,8 @@ pub fn Index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
 ///
 /// assert_eq!(bytes::IndexAny("chicken", "aeiouy"),2);
 /// assert_eq!(bytes::IndexAny("crwth", "aeiouy"),-1);
+/// assert_eq!(bytes::IndexAny("chicken".as_bytes(), "aeiouy"),2);
+/// assert_eq!(bytes::IndexAny("crwth".as_bytes(), "aeiouy"),-1);
 ///
 /// ```
 pub fn IndexAny(s: impl AsRef<[byte]>, chars: impl AsRef<str>) -> int {
@@ -452,6 +459,8 @@ pub fn IndexAny(s: impl AsRef<[byte]>, chars: impl AsRef<str>) -> int {
 ///
 /// assert_eq!(0,bytes::IndexByte("rustlang",b'r'));
 /// assert_eq!(3,bytes::IndexByte("gophers",b'h'));
+/// assert_eq!(0,bytes::IndexByte("rustlang".as_bytes(),b'r'));
+/// assert_eq!(3,bytes::IndexByte("gophers".as_bytes(),b'h'));
 /// assert_eq!(-1,bytes::IndexByte("gophers".to_string(),b'x'));
 ///
 /// ```
@@ -523,10 +532,8 @@ pub fn IndexRune(s: impl AsRef<[byte]>, r: rune) -> int {
     let bytes = c.to_string();
     let n = bytes.as_bytes().len();
     for (i, &x) in s.as_ref().iter().enumerate() {
-        if bytes.as_bytes()[0] == s.as_ref()[i] {
-            if &s.as_ref()[i..i + n] == bytes.as_bytes() {
-                return int!(i);
-            }
+        if bytes.as_bytes()[0] == s.as_ref()[i] && &s.as_ref()[i..i + n] == bytes.as_bytes() {
+            return int!(i);
         }
     }
     -1
@@ -624,6 +631,9 @@ pub fn LastIndex(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> int {
 /// assert_eq!(4,bytes::LastIndexAny("go gopher", "go"));
 /// assert_eq!(8,bytes::LastIndexAny("go gopher", "ordent"));
 /// assert_eq!(-1,bytes::LastIndexAny("go gopher", "fail"));
+/// assert_eq!(4,bytes::LastIndexAny("go gopher".as_bytes(), "go"));
+/// assert_eq!(8,bytes::LastIndexAny("go gopher".as_bytes(), "ordent"));
+/// assert_eq!(-1,bytes::LastIndexAny("go gopher".as_bytes(), "fail"));
 ///
 /// ```
 pub fn LastIndexAny(s: impl AsRef<[byte]>, chars: impl AsRef<str>) -> int {
@@ -649,11 +659,13 @@ pub fn LastIndexAny(s: impl AsRef<[byte]>, chars: impl AsRef<str>) -> int {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!(10,strings::LastIndexByte("Hello, world", b'l'));
-/// assert_eq!(8,strings::LastIndexByte("Hello, world", b'o'));
-/// assert_eq!(-1,strings::LastIndexByte("Hello, world", b'x'));
+/// assert_eq!(10,bytes::LastIndexByte("Hello, world", b'l'));
+/// assert_eq!(8,bytes::LastIndexByte("Hello, world", b'o'));
+/// assert_eq!(10,bytes::LastIndexByte("Hello, world".as_bytes(), b'l'));
+/// assert_eq!(8,bytes::LastIndexByte(vec!['H','e','l','l','o',',',' ','w','o','r','l','d'].iter().map(|c| *c as u8).collect::<Vec<_>>(), b'o'));
+/// assert_eq!(-1,bytes::LastIndexByte("Hello, world", b'x'));
 /// ```
 pub fn LastIndexByte(s: impl AsRef<[byte]>, c: byte) -> int {
     for (i, &v) in s.as_ref().iter().enumerate().rev() {
@@ -673,16 +685,19 @@ pub fn LastIndexByte(s: impl AsRef<[byte]>, c: byte) -> int {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
 ///    let f = |x: u32| char::from_u32(x).unwrap().is_ascii_digit();
 ///
-///    assert_eq!(5, strings::LastIndexFunc("go 123", f));
-///    assert_eq!(2, strings::LastIndexFunc("123 go", f));
-///    assert_eq!(-1, strings::LastIndexFunc("go", f));
+///    assert_eq!(5, bytes::LastIndexFunc("go 123", f));
+///    assert_eq!(2, bytes::LastIndexFunc("123 go", f));
+///    assert_eq!(-1, bytes::LastIndexFunc("go", f));
+///    assert_eq!(5, bytes::LastIndexFunc("go 123".as_bytes(), f));
+///    assert_eq!(2, bytes::LastIndexFunc("123 go".to_string(), f));
+///    assert_eq!(-1, bytes::LastIndexFunc(vec![b'g',b'o'], f));
 /// ```
 pub fn LastIndexFunc(s: impl AsRef<[byte]>, f: fn(rune) -> bool) -> int {
-    for (i, &r) in s.as_ref().iter().rev().enumerate() {
+    for (i, &r) in s.as_ref().iter().enumerate().rev() {
         if f(r as u32) == true {
             return int!(i);
         }
@@ -752,29 +767,31 @@ pub fn Map(mapping: fn(rune) -> rune, mut s: impl AsRef<[byte]>) -> String {
 /// ```text
 /// 121212
 /// ```
-// pub fn Repeat(s: impl AsRef<[byte]>, count: uint) -> String {
-//     if count == 0 {
-//         return "".to_owned();
-//     }
-//
-//     if len!(s.as_ref()) * count / count != len!(s.as_ref()) {
-//         panic!("strings: Repeat count causes overflow")
-//     }
-//     let mut n = len!(s.as_ref()) * count;
-//     let mut b = Builder::new();
-//     b.Grow(int!(n));
-//     b.WriteString(s.as_ref());
-//     while (b.Len() < int!(n)) {
-//         if b.Len() <= int!(n) / 2 {
-//             b.WriteString(b.String().as_str());
-//         } else {
-//             b.WriteString(b.String().get(..(n - b.Len() as usize)).unwrap());
-//             break;
-//         }
-//     }
-//     b.String()
-// }
 
+/*
+pub fn Repeat(s: impl AsRef<[byte]>, count: uint) -> String {
+    if count == 0 {
+        return "".to_owned();
+    }
+
+    if len!(s.as_ref()) * count / count != len!(s.as_ref()) {
+        panic!("strings: Repeat count causes overflow")
+    }
+    let mut n = len!(s.as_ref()) * count;
+    let mut b = Builder::new();
+    b.Grow(int!(n));
+    b.WriteString(s.as_ref());
+    while (b.Len() < int!(n)) {
+        if b.Len() <= int!(n) / 2 {
+            b.WriteString(b.String().as_str());
+        } else {
+            b.WriteString(b.String().get(..(n - b.Len() as usize)).unwrap());
+            break;
+        }
+    }
+    b.String()
+}
+*/
 /// Replace returns a copy of the string s with the first n non-overlapping instances of old replaced by new. If old is empty, it matches at the beginning of the string and after each UTF-8 sequence, yielding up to k+1 replacements for a k-rune string. If n < 0, there is no limit on the number of replacements.
 /// It panics if count is negative or if the result of (len!(s) * count) overflows.
 /// <details class="rustdoc-toggle top-doc">
@@ -791,17 +808,6 @@ pub fn Map(mapping: fn(rune) -> rune, mut s: impl AsRef<[byte]>) -> String {
 /// assert_eq!("moo moo moo",strings::Replace("oink oink oink", "oink", "moo", -1));
 ///
 /// ```
-// pub fn Replace(
-//     s: impl AsRef<[byte]>,
-//     old: impl AsRef<[byte]>,
-//     new: impl AsRef<[byte]>,
-//     n: int,
-// ) -> String {
-//     if n < 0 {
-//         return s.as_ref().replace(old.as_ref(), new.as_ref());
-//     }
-//     s.as_ref().replacen(old.as_ref(), new.as_ref(), uint!(n))
-// }
 
 /// ReplaceAll returns a copy of the string s with all non-overlapping instances of old replaced by new. If old is empty, it matches at the beginning of the string and after each UTF-8 sequence, yielding up to k+1 replacements for a k-rune string.
 /// <details class="rustdoc-toggle top-doc">
@@ -817,13 +823,6 @@ pub fn Map(mapping: fn(rune) -> rune, mut s: impl AsRef<[byte]>) -> String {
 /// assert_eq!("moo moo moo",strings::ReplaceAll("oink oink oink", "oink", "moo"));
 ///
 /// ```
-// pub fn ReplaceAll(
-//     s: impl AsRef<[byte]>,
-//     old: impl AsRef<[byte]>,
-//     new: impl AsRef<[byte]>,
-// ) -> String {
-//     s.as_ref().replace(old.as_ref(), new.as_ref())
-// }
 
 /// Split slices s into all substrings separated by sep and returns a slice of the substrings between those separators.
 ///
@@ -840,16 +839,39 @@ pub fn Map(mapping: fn(rune) -> rune, mut s: impl AsRef<[byte]>) -> String {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!(vec!["a","b","c"],strings::Split("a,b,c", ","));
-/// assert_eq!(vec!["", "man ", "plan ", "canal panama"],strings::Split("a man a plan a canal panama", "a "));
-/// assert_eq!(vec![""," ", "x", "y", "z", " ",""],strings::Split(" xyz ", ""));
-/// assert_eq!(vec![""],strings::Split("", "Bernardo O'Higgins"));
+/// assert_eq!(vec![[b'a'].to_vec(), [b'b'].to_vec(), [b'c'].to_vec()],bytes::Split("a,b,c".as_bytes(), ",".as_bytes()));
+/// assert_eq!(vec![b"".to_vec(), b"man ".to_vec(), b"plan ".to_vec(), b"canal panama".to_vec()],bytes::Split("a man a plan a canal panama".as_bytes(), "a ".as_bytes()));
+/// assert_eq!(vec![b"".to_vec(),b" ".to_vec(), b"x".to_vec(), b"y".to_vec(), b"z".to_vec(), b" ".to_vec(),b"".to_vec()],bytes::Split(" xyz ".as_bytes(), "".as_bytes()));
+/// assert_eq!(vec![b"".to_vec()],bytes::Split("".as_bytes(), "Bernardo O'Higgins".as_bytes()));
 /// ```
-pub fn Split(s: &[byte], sep: impl AsRef<[byte]>) -> Vec<&[byte]> {
-    s.split(|x| sep.as_ref().contains(x)).collect()
-}
+
+/* pub fn Split(s: &[byte], sep: impl AsRef<[byte]>) -> Vec<Vec<byte>> {
+    let n: usize = len!(sep.as_ref());
+    let mut result: Vec<Vec<byte>> = Vec::new();
+    let mut one: Vec<byte> = Vec::new();
+    let mut count: usize = 0;
+    for (i, v) in s.iter().enumerate() {
+        if *v == sep.as_ref()[0] && len!(s) >= i + n && &s[i..i + n] == sep.as_ref() {
+            count = n;
+            result.push(one.clone());
+            one.clear();
+        } else {
+            if count == 0 {
+                one.push(*v);
+            }
+            if count >= 1 {
+                count -= 1;
+            }
+        }
+        if len!(one) > 0 && i == len!(s) - 1 {
+            result.push(one.clone());
+        }
+    }
+
+    result
+} */
 
 /// SplitAfter slices s into all substrings after each instance of sep and returns a slice of those substrings.
 ///
@@ -1527,6 +1549,7 @@ impl Reader {
 
 use std::io::Error;
 use std::io::ErrorKind;
+
 impl io::Reader for Reader {
     /// Read implements the io.Reader interface.
     /// <details class="rustdoc-toggle top-doc">
