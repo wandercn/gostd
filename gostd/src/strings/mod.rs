@@ -992,7 +992,7 @@ pub fn ToUpper(s: impl AsRef<str>) -> String {
 /// assert_eq!("Hello, 中国",strings::Trim("¡¡¡Hello, 中国!!!", "!¡"));
 ///
 /// ```
-pub fn Trim<'a>(mut s: &'a str, cutset: impl AsRef<str>) -> &'a str {
+pub fn Trim(mut s: &str, cutset: impl AsRef<str>) -> &str {
     s.trim_matches(|x| cutset.as_ref().contains(x))
 }
 
