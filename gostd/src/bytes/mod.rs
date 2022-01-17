@@ -399,19 +399,14 @@ pub fn Index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
 
 fn index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
     let n: usize = len!(substr.as_ref());
-    let mut count = 0;
-    let mut find_bytes: Vec<byte> = Vec::new();
-    let mut s = s.as_ref();
-    for (index, v) in s.as_ref().iter().enumerate() {
-        if substr.as_ref().contains(v) {
-            find_bytes.push(v.to_owned());
-            count += 1;
-            if n == count && substr.as_ref() == find_bytes.as_slice() {
-                return int!(index + 1_usize - n);
-            }
-        } else {
-            find_bytes.clear();
-            count = 0;
+    let length = len!(s.as_ref());
+    let start_byte = substr.as_ref()[0];
+    for (index, &v) in s.as_ref().iter().enumerate() {
+        if start_byte == v
+            && index + n <= length
+            && substr.as_ref() == &s.as_ref()[index..index + n]
+        {
+            return int!(index);
         }
     }
     -1
@@ -841,37 +836,47 @@ pub fn Repeat(s: impl AsRef<[byte]>, count: uint) -> String {
 /// ```
 /// use gostd::bytes;
 ///
-/// assert_eq!(vec![[b'a'].to_vec(), [b'b'].to_vec(), [b'c'].to_vec()],bytes::Split("a,b,c".as_bytes(), ",".as_bytes()));
-/// assert_eq!(vec![b"".to_vec(), b"man ".to_vec(), b"plan ".to_vec(), b"canal panama".to_vec()],bytes::Split("a man a plan a canal panama".as_bytes(), "a ".as_bytes()));
-/// assert_eq!(vec![b"".to_vec(),b" ".to_vec(), b"x".to_vec(), b"y".to_vec(), b"z".to_vec(), b" ".to_vec(),b"".to_vec()],bytes::Split(" xyz ".as_bytes(), "".as_bytes()));
-/// assert_eq!(vec![b"".to_vec()],bytes::Split("".as_bytes(), "Bernardo O'Higgins".as_bytes()));
+/// assert_eq!(vec![b"a".to_vec(),b"b".to_vec(),b"c".to_vec()],bytes::Split("a,b,c".as_bytes(),b","));
+/// assert_eq!(vec![b"".to_vec(),b"man ".to_vec(),b"plan ".to_vec(),b"canal panama".to_vec()],bytes::Split("a man a plan a canal panama".as_bytes(),b"a "));
+/// assert_eq!(vec![b" ".to_vec(), b"x".to_vec(), b"y".to_vec(), b"z".to_vec(), b" ".to_vec()],bytes::Split(" xyz ".as_bytes(),""));
+/// assert_eq!(vec![b"".to_vec()],bytes::Split("".as_bytes(),"Bernardo O'Higgins".as_bytes()));
 /// ```
 
-/* pub fn Split(s: &[byte], sep: impl AsRef<[byte]>) -> Vec<Vec<byte>> {
-    let n: usize = len!(sep.as_ref());
-    let mut result: Vec<Vec<byte>> = Vec::new();
-    let mut one: Vec<byte> = Vec::new();
-    let mut count: usize = 0;
-    for (i, v) in s.iter().enumerate() {
-        if *v == sep.as_ref()[0] && len!(s) >= i + n && &s[i..i + n] == sep.as_ref() {
-            count = n;
-            result.push(one.clone());
-            one.clear();
-        } else {
-            if count == 0 {
-                one.push(*v);
-            }
-            if count >= 1 {
-                count -= 1;
-            }
-        }
-        if len!(one) > 0 && i == len!(s) - 1 {
-            result.push(one.clone());
-        }
-    }
+pub fn Split(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> Vec<Vec<byte>> {
+    genSplit(s, sep, 0, -1)
+}
 
-    result
-} */
+fn genSplit(
+    s: impl AsRef<[byte]>,
+    sep: impl AsRef<[byte]>,
+    sepSave: uint,
+    n: int,
+) -> Vec<Vec<byte>> {
+    let mut n = n;
+    let mut s = s.as_ref();
+    let sep_len = len!(sep.as_ref());
+
+    if sep.as_ref().is_empty() {
+        return s.iter().map(|&x| vec![x]).collect();
+    }
+    if n < 0 {
+        n = Count(s, sep.as_ref()) + 1;
+    }
+    let mut a: Vec<Vec<byte>> = Vec::new();
+    let mut i: int = 0;
+    while i < n - 1 {
+        let m = Index(s, sep.as_ref());
+        if m < 0 {
+            break;
+        }
+        let v = &s[..m as usize + sepSave];
+        a.push(v.to_vec());
+        s = &s[m as usize + sep_len..];
+        i += 1;
+    }
+    a.push(s.to_vec());
+    a
+}
 
 /// SplitAfter slices s into all substrings after each instance of sep and returns a slice of those substrings.
 ///
@@ -888,12 +893,12 @@ pub fn Repeat(s: impl AsRef<[byte]>, count: uint) -> String {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!(vec!["a,", "b,", "c"],strings::SplitAfter("a,b,c", ","));
+/// assert_eq!(vec!["a,".as_bytes().to_vec(), "b,".as_bytes().to_vec(), "c".as_bytes().to_vec()],bytes::SplitAfter("a,b,c".as_bytes(), ",".as_bytes()));
 /// ```
-pub fn SplitAfter(s: &[byte], sep: impl AsRef<[byte]>) -> Vec<&[byte]> {
-    s.split_inclusive(|x| sep.as_ref().contains(x)).collect()
+pub fn SplitAfter(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> Vec<Vec<byte>> {
+    genSplit(s, sep.as_ref(), len!(sep.as_ref()), -1)
 }
 
 /// SplitAfterN slices s into substrings after each instance of sep and returns a slice of those substrings.
@@ -936,40 +941,10 @@ pub fn SplitAfter(s: &[byte], sep: impl AsRef<[byte]>) -> Vec<&[byte]> {
 ///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", 10));
 /// ```
 pub fn SplitAfterN(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>, n: int) -> Vec<Vec<byte>> {
-    let mut n = n;
-    let length = len!(s.as_ref());
-    if n < 0 || (uint!(n) > length - 1) {
-        return s
-            .as_ref()
-            .split_inclusive(|x| sep.as_ref().contains(x))
-            .map(|x| x.to_vec())
-            .collect();
-    }
-
     if n == 0 {
         return vec![];
     }
-
-    if n == 1 {
-        return vec![s.as_ref().to_vec()];
-    }
-
-    let mut list: Vec<Vec<byte>> = s
-        .as_ref()
-        .splitn(n as usize, |x| sep.as_ref().contains(x))
-        .map(|x| x.to_vec())
-        .collect();
-
-    let list_len = list.len();
-    if n > int!(list_len - 1) {
-        n = int!(list_len - 1);
-    }
-    for i in 0..n as usize {
-        for &b in sep.as_ref() {
-            list.get_mut(i).unwrap().push(b)
-        }
-    }
-    list
+    genSplit(s, sep.as_ref(), len!(sep.as_ref()), n)
 }
 
 /// SplitN slices s into substrings separated by sep and returns a slice of the substrings between those separators.
@@ -995,46 +970,35 @@ pub fn SplitAfterN(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>, n: int) -> Ve
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-///    assert_eq!(Vec::<String>::new(), strings::SplitN(",a,b2,c", ",", 0));
-///    assert_eq!(vec![",a,b2,c"], strings::SplitN(",a,b2,c", ",", 1));
+///    assert_eq!(Vec::<Vec<u8>>::new(), bytes::SplitN(",a,b2,c".as_bytes(), ",", 0));
+///    assert_eq!(vec![",a,b2,c".as_bytes().to_vec()], bytes::SplitN(",a,b2,c".as_bytes(), ",", 1));
 ///    assert_eq!(
-///        vec!["", "a", "b2", "c"],
-///        strings::SplitN(",a,b2,c", ",", -1)
+///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<u8>>>(),  bytes::SplitN(",a,b2,c".as_bytes(), ",", -1)
 ///    );
-///    assert_eq!(vec!["", "a,b2,c"], strings::SplitN(",a,b2,c", ",", 2));
-///    assert_eq!(vec!["", "a", "b2,c"], strings::SplitN(",a,b2,c", ",", 3));
+///    assert_eq!(vec!["", "a,b2,c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<u8>>>(), bytes::SplitN(",a,b2,c".as_bytes(), ",", 2));
+///    assert_eq!(vec!["", "a", "b2,c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<u8>>>(), bytes::SplitN(",a,b2,c".as_bytes(), ",", 3));
 ///    assert_eq!(
-///        vec!["", "a", "b2", "c"],
-///        strings::SplitN(",a,b2,c", ",", 4)
-///    );
-///    assert_eq!(
-///        vec!["", "a", "b2", "c"],
-///        strings::SplitN(",a,b2,c", ",", 5)
+///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<u8>>>(),
+///        bytes::SplitN(",a,b2,c".as_bytes(), ",", 4)
 ///    );
 ///    assert_eq!(
-///        vec!["", "a", "b2", "c"],
-///        strings::SplitN(",a,b2,c", ",", 10)
+///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<u8>>>(),
+///        bytes::SplitN(",a,b2,c".as_bytes(), ",", 5)
+///    );
+///    assert_eq!(
+///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<u8>>>(),
+///        bytes::SplitN(",a,b2,c".as_bytes(), ",", 10)
 ///    );
 ///
 /// ```
-pub fn SplitN<'a>(s: &'a [byte], sep: impl AsRef<[byte]>, n: int) -> Vec<&'a [byte]> {
-    let mut n = n;
+pub fn SplitN(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>, n: int) -> Vec<Vec<byte>> {
     if n == 0 {
         return vec![];
+    } else {
+        genSplit(s, sep, 0, n)
     }
-    if n < 0 {
-        return s.split(|x| sep.as_ref().contains(x)).collect();
-    }
-
-    let list: Vec<&'a [byte]> = s.split(|x| sep.as_ref().contains(x)).map(|x| x).collect();
-
-    let length = list.len();
-    if n > int!(length) {
-        n = int!(length);
-    }
-    s.splitn(n as usize, |x| sep.as_ref().contains(x)).collect()
 }
 
 /// ToLower returns s with all Unicode letters mapped to their lower case.
@@ -1547,8 +1511,8 @@ impl Reader {
     }
 }
 
-use std::io::Error;
 use std::io::ErrorKind;
+use std::io::{Error, Read};
 
 impl io::Reader for Reader {
     /// Read implements the io.Reader interface.
