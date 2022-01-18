@@ -1128,12 +1128,17 @@ pub fn TrimLeft(s: &[byte], cutset: impl AsRef<[byte]>) -> &[byte] {
 ///
 /// ```
 pub fn TrimLeftFunc(s: &[byte], f: fn(rune) -> bool) -> &[byte] {
-    for &v in s {
-        if f(v as rune) {
-            s.strip_prefix(&[v]);
+    let mut isStart = true;
+    let mut i: usize = 0;
+    for &v in s.as_ref() {
+        if isStart && f(v as rune) {
+            i += 1;
+        } else {
+            isStart = false
         }
     }
-    s
+
+    &s[i..]
 }
 
 /// TrimPrefix returns s without the provided leading prefix string. If s doesn't start with prefix, s is returned unchanged.
