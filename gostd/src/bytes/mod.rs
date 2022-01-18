@@ -929,16 +929,18 @@ pub fn SplitAfter(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> Vec<Vec<byt
 ///
 /// ```
 /// use gostd::strings;
+/// use gostd::bytes;
+/// use gostd::builtin::*;
 /// // n == 0 返回 []
-///    assert_eq!(Vec::<String>::new(), strings::SplitAfterN(",a,b2,c", ",", 0));
-///    assert_eq!(vec![",a,b2,c"], strings::SplitAfterN(",a,b2,c", ",", 1));
-///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", -1));
-///    assert_eq!(vec![",", "a,b2,c"], strings::SplitAfterN(",a,b2,c", ",", 2));
-///    assert_eq!(vec![",", "a,", "b2,c"],strings::SplitAfterN(",a,b2,c", ",", 3));
-///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", 4));
+///    assert_eq!(Vec::<Vec<byte>>::new(), bytes::SplitAfterN(",a,b2,c".as_bytes(), ",".as_bytes(), 0));
+///    assert_eq!(vec![",a,b2,c".as_bytes()], bytes::SplitAfterN(",a,b2,c".as_bytes(), ",".as_bytes(), 1));
+///    assert_eq!(vec![",".as_bytes(), "a,".as_bytes(), b"b2,".as_ref(), b"c".as_ref()],bytes::SplitAfterN(",a,b2,c", ",", -1));
+///    assert_eq!(vec![b",".to_vec(), b"a,b2,c".to_vec()], bytes::SplitAfterN(",a,b2,c", ",", 2));
+///    assert_eq!(vec![",".as_bytes(), "a,".as_bytes(), "b2,c".as_bytes()],bytes::SplitAfterN(",a,b2,c".as_bytes(), ",".as_bytes(), 3));
+///    assert_eq!(vec![b",".as_ref(), b"a,".as_ref(), b"b2,".as_ref(), b"c".as_ref()],bytes::SplitAfterN(",a,b2,c".as_bytes(), ",".as_bytes(), 4));
 /// // 当n大于最大子串数量，也只返回最大值。
-///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", 5));
-///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", 10));
+///    assert_eq!(vec![b",".to_vec(), b"a,".to_vec(), b"b2,".to_vec(), b"c".to_vec()],bytes::SplitAfterN(",a,b2,c".as_bytes(), ",".as_bytes(), 5));
+///    assert_eq!(vec![",".as_bytes().to_vec(), "a,".as_bytes().to_vec(), "b2,".as_bytes().to_vec(), "c".as_bytes().to_vec()],bytes::SplitAfterN(",a,b2,c".as_bytes(), ",".as_bytes(), 10));
 /// ```
 pub fn SplitAfterN(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>, n: int) -> Vec<Vec<byte>> {
     if n == 0 {
