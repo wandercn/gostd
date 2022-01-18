@@ -815,9 +815,9 @@ pub fn Replace(
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!("moo moo moo",strings::ReplaceAll("oink oink oink", "oink", "moo"));
+/// assert_eq!("moo moo moo".as_bytes(),bytes::ReplaceAll("oink oink oink".as_bytes(), "oink".as_bytes(), "moo".as_bytes()));
 ///
 /// ```
 ///
