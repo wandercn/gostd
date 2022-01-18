@@ -928,7 +928,6 @@ pub fn SplitAfter(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> Vec<Vec<byt
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
 /// use gostd::bytes;
 /// use gostd::builtin::byte;
 /// // n == 0 返回 []
@@ -1013,30 +1012,13 @@ pub fn SplitN(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>, n: int) -> Vec<Vec
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!("gopher",strings::ToLower("Gopher"));
+/// assert_eq!("gopher".as_bytes().to_vec(),bytes::ToLower("Gopher"));
+/// assert_eq!("gopher".as_bytes(),bytes::ToLower("Gopher"));
 /// ```
 pub fn ToLower(s: impl AsRef<[byte]>) -> Vec<byte> {
     s.as_ref().to_ascii_lowercase()
-}
-
-/// ToTitle returns a copy of the string s with all Unicode letters mapped to their Unicode title case.
-/// <details class="rustdoc-toggle top-doc">
-/// <summary class="docblock">zh-cn</summary>
-/// 返回将所有字母都转为对应的标题版本的拷贝。
-/// </details>
-///
-/// # Example
-///
-/// ```
-/// use gostd::strings;
-///
-/// assert_eq!("LOUD NOISES",strings::ToTitle("loud noises"));
-/// assert_eq!("ХЛЕБ",strings::ToTitle("хлеб"));
-/// ```
-pub fn ToTitle(s: impl AsRef<[byte]>) -> Vec<byte> {
-    s.as_ref().to_ascii_uppercase()
 }
 
 /// ToUpper returns s with all Unicode letters mapped to their upper case.
@@ -1048,9 +1030,10 @@ pub fn ToTitle(s: impl AsRef<[byte]>) -> Vec<byte> {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!("GOPHER",strings::ToUpper("Gopher"));
+/// assert_eq!("GOPHER".as_bytes(),bytes::ToUpper("Gopher"));
+/// assert_eq!("GOPHER".as_bytes().to_vec(),bytes::ToUpper("Gopher"));
 /// ```
 pub fn ToUpper(s: impl AsRef<[byte]>) -> Vec<byte> {
     s.as_ref().to_ascii_uppercase()
