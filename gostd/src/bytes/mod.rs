@@ -485,7 +485,7 @@ pub fn IndexByte(s: impl AsRef<[byte]>, c: byte) -> int {
 ///    } */
 ///    // 用上面注释掉的函数也可以，用下面的匿名函数也可以。
 ///    let f = |c: u32| {
-///        let s = char::from_u32(c).unwrap();
+///        let s = char::from_u32(c).expect("u32 to char failed!");
 ///        !s.is_ascii()
 ///    };
 ///    assert_eq!(7, bytes::IndexFunc("Hello, 世界", f));
@@ -523,7 +523,7 @@ pub fn IndexFunc(s: impl AsRef<[byte]>, f: fn(rune) -> bool) -> int {
 ///
 /// ```
 pub fn IndexRune(s: impl AsRef<[byte]>, r: rune) -> int {
-    let c = char::from_u32(r).unwrap();
+    let c = char::from_u32(r).expect("IndexRune rune to char failed!");
     let bytes = c.to_string();
     let n = bytes.as_bytes().len();
     for (i, &x) in s.as_ref().iter().enumerate() {
@@ -752,9 +752,10 @@ pub fn Map(mapping: fn(rune) -> rune, mut s: impl AsRef<[byte]>) -> String {
 /// # Example
 ///
 /// ```
-///  use gostd::strings;
+///  use gostd::bytes;
 ///
-///  println!("{}",strings::Repeat("12",3));
+///  assert_eq!("121212".as_bytes(),bytes::Repeat("12",3));
+///  println!("{:?}",bytes::Repeat("12",3).as_slice());
 ///
 /// ```
 /// # Output
@@ -763,30 +764,10 @@ pub fn Map(mapping: fn(rune) -> rune, mut s: impl AsRef<[byte]>) -> String {
 /// 121212
 /// ```
 
-/*
-pub fn Repeat(s: impl AsRef<[byte]>, count: uint) -> String {
-    if count == 0 {
-        return "".to_owned();
-    }
-
-    if len!(s.as_ref()) * count / count != len!(s.as_ref()) {
-        panic!("strings: Repeat count causes overflow")
-    }
-    let mut n = len!(s.as_ref()) * count;
-    let mut b = Builder::new();
-    b.Grow(int!(n));
-    b.WriteString(s.as_ref());
-    while (b.Len() < int!(n)) {
-        if b.Len() <= int!(n) / 2 {
-            b.WriteString(b.String().as_str());
-        } else {
-            b.WriteString(b.String().get(..(n - b.Len() as usize)).unwrap());
-            break;
-        }
-    }
-    b.String()
+pub fn Repeat(s: impl AsRef<[byte]>, count: uint) -> Vec<byte> {
+    s.as_ref().repeat(count)
 }
-*/
+
 /// Replace returns a copy of the string s with the first n non-overlapping instances of old replaced by new. If old is empty, it matches at the beginning of the string and after each UTF-8 sequence, yielding up to k+1 replacements for a k-rune string. If n < 0, there is no limit on the number of replacements.
 /// It panics if count is negative or if the result of (len!(s) * count) overflows.
 /// <details class="rustdoc-toggle top-doc">
@@ -1194,10 +1175,10 @@ pub fn TrimRight(s: &[byte], cutset: impl AsRef<[byte]>) -> &[byte] {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
 /// let f = |x| x >= '1' as u32 && x <= '9' as u32;
-/// assert_eq!("123456Hello, Rust",strings::TrimRightFunc("123456Hello, Rust654321", f));
+/// assert_eq!("123456Hello, Rust".as_bytes(),bytes::TrimRightFunc("123456Hello, Rust654321".as_bytes(), f));
 ///
 /// ```
 pub fn TrimRightFunc(s: &[byte], f: fn(rune) -> bool) -> &[byte] {
