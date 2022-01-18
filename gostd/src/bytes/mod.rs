@@ -928,17 +928,18 @@ pub fn SplitAfter(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> Vec<Vec<byt
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
+/// use gostd::builtin::byte;
 /// // n == 0 返回 []
-///    assert_eq!(Vec::<String>::new(), strings::SplitAfterN(",a,b2,c", ",", 0));
-///    assert_eq!(vec![",a,b2,c"], strings::SplitAfterN(",a,b2,c", ",", 1));
-///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", -1));
-///    assert_eq!(vec![",", "a,b2,c"], strings::SplitAfterN(",a,b2,c", ",", 2));
-///    assert_eq!(vec![",", "a,", "b2,c"],strings::SplitAfterN(",a,b2,c", ",", 3));
-///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", 4));
+///    assert_eq!(Vec::<Vec<byte>>::new(), bytes::SplitAfterN(",a,b2,c".as_bytes(), ",".as_bytes(), 0));
+///    assert_eq!(vec![",a,b2,c".as_bytes()], bytes::SplitAfterN(",a,b2,c".as_bytes(), ",".as_bytes(), 1));
+///    assert_eq!(vec![",".as_bytes(), "a,".as_bytes(), b"b2,".as_ref(), b"c".as_ref()],bytes::SplitAfterN(",a,b2,c", ",", -1));
+///    assert_eq!(vec![b",".to_vec(), b"a,b2,c".to_vec()], bytes::SplitAfterN(",a,b2,c", ",", 2));
+///    assert_eq!(vec![",".as_bytes(), "a,".as_bytes(), "b2,c".as_bytes()],bytes::SplitAfterN(",a,b2,c".as_bytes(), ",".as_bytes(), 3));
+///    assert_eq!(vec![b",".as_ref(), b"a,".as_ref(), b"b2,".as_ref(), b"c".as_ref()],bytes::SplitAfterN(",a,b2,c".as_bytes(), ",".as_bytes(), 4));
 /// // 当n大于最大子串数量，也只返回最大值。
-///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", 5));
-///    assert_eq!(vec![",", "a,", "b2,", "c"],strings::SplitAfterN(",a,b2,c", ",", 10));
+///    assert_eq!(vec![b",".to_vec(), b"a,".to_vec(), b"b2,".to_vec(), b"c".to_vec()],bytes::SplitAfterN(",a,b2,c".as_bytes(), ",".as_bytes(), 5));
+///    assert_eq!(vec![",".as_bytes().to_vec(), "a,".as_bytes().to_vec(), "b2,".as_bytes().to_vec(), "c".as_bytes().to_vec()],bytes::SplitAfterN(",a,b2,c".as_bytes(), ",".as_bytes(), 10));
 /// ```
 pub fn SplitAfterN(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>, n: int) -> Vec<Vec<byte>> {
     if n == 0 {
@@ -971,24 +972,25 @@ pub fn SplitAfterN(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>, n: int) -> Ve
 ///
 /// ```
 /// use gostd::bytes;
+/// use gostd::builtin::byte;
 ///
-///    assert_eq!(Vec::<Vec<u8>>::new(), bytes::SplitN(",a,b2,c".as_bytes(), ",", 0));
+///    assert_eq!(Vec::<Vec<byte>>::new(), bytes::SplitN(",a,b2,c".as_bytes(), ",", 0));
 ///    assert_eq!(vec![",a,b2,c".as_bytes().to_vec()], bytes::SplitN(",a,b2,c".as_bytes(), ",", 1));
 ///    assert_eq!(
-///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<u8>>>(),  bytes::SplitN(",a,b2,c".as_bytes(), ",", -1)
+///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<byte>>>(),  bytes::SplitN(",a,b2,c".as_bytes(), ",", -1)
 ///    );
-///    assert_eq!(vec!["", "a,b2,c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<u8>>>(), bytes::SplitN(",a,b2,c".as_bytes(), ",", 2));
-///    assert_eq!(vec!["", "a", "b2,c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<u8>>>(), bytes::SplitN(",a,b2,c".as_bytes(), ",", 3));
+///    assert_eq!(vec!["", "a,b2,c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<byte>>>(), bytes::SplitN(",a,b2,c".as_bytes(), ",", 2));
+///    assert_eq!(vec!["", "a", "b2,c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<byte>>>(), bytes::SplitN(",a,b2,c".as_bytes(), ",", 3));
 ///    assert_eq!(
-///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<u8>>>(),
+///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<byte>>>(),
 ///        bytes::SplitN(",a,b2,c".as_bytes(), ",", 4)
 ///    );
 ///    assert_eq!(
-///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<u8>>>(),
+///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<byte>>>(),
 ///        bytes::SplitN(",a,b2,c".as_bytes(), ",", 5)
 ///    );
 ///    assert_eq!(
-///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<u8>>>(),
+///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<byte>>>(),
 ///        bytes::SplitN(",a,b2,c".as_bytes(), ",", 10)
 ///    );
 ///
@@ -1010,30 +1012,13 @@ pub fn SplitN(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>, n: int) -> Vec<Vec
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!("gopher",strings::ToLower("Gopher"));
+/// assert_eq!("gopher".as_bytes().to_vec(),bytes::ToLower("Gopher"));
+/// assert_eq!("gopher".as_bytes(),bytes::ToLower("Gopher"));
 /// ```
 pub fn ToLower(s: impl AsRef<[byte]>) -> Vec<byte> {
     s.as_ref().to_ascii_lowercase()
-}
-
-/// ToTitle returns a copy of the string s with all Unicode letters mapped to their Unicode title case.
-/// <details class="rustdoc-toggle top-doc">
-/// <summary class="docblock">zh-cn</summary>
-/// 返回将所有字母都转为对应的标题版本的拷贝。
-/// </details>
-///
-/// # Example
-///
-/// ```
-/// use gostd::strings;
-///
-/// assert_eq!("LOUD NOISES",strings::ToTitle("loud noises"));
-/// assert_eq!("ХЛЕБ",strings::ToTitle("хлеб"));
-/// ```
-pub fn ToTitle(s: impl AsRef<[byte]>) -> Vec<byte> {
-    s.as_ref().to_ascii_uppercase()
 }
 
 /// ToUpper returns s with all Unicode letters mapped to their upper case.
@@ -1045,9 +1030,10 @@ pub fn ToTitle(s: impl AsRef<[byte]>) -> Vec<byte> {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!("GOPHER",strings::ToUpper("Gopher"));
+/// assert_eq!("GOPHER".as_bytes(),bytes::ToUpper("Gopher"));
+/// assert_eq!("GOPHER".as_bytes().to_vec(),bytes::ToUpper("Gopher"));
 /// ```
 pub fn ToUpper(s: impl AsRef<[byte]>) -> Vec<byte> {
     s.as_ref().to_ascii_uppercase()
@@ -1062,18 +1048,14 @@ pub fn ToUpper(s: impl AsRef<[byte]>) -> Vec<byte> {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!("Hello, 中国",strings::Trim("¡¡¡Hello, 中国!!!", "!¡"));
+/// assert_eq!("Hello, 中国".as_bytes(),bytes::Trim("¡¡¡Hello, 中国!!!".as_bytes(), "!¡".as_bytes()));
 ///
 /// ```
 
 pub fn Trim(mut s: &[byte], cutset: impl AsRef<[byte]>) -> &[byte] {
-    for &v in cutset.as_ref().iter() {
-        s.strip_suffix(&[v]);
-        s.strip_prefix(&[v]);
-    }
-    s
+    TrimRight(TrimLeft(s, cutset.as_ref()), cutset.as_ref())
 }
 
 /// TrimFunc returns a slice of the string s with all leading and trailing Unicode code points c satisfying f(c) removed.
@@ -1091,13 +1073,7 @@ pub fn Trim(mut s: &[byte], cutset: impl AsRef<[byte]>) -> &[byte] {
 /// assert_eq!("Hello, Rust",strings::TrimFunc("2211345Hello, Rust1122345", f));
 /// ```
 pub fn TrimFunc(s: &[byte], f: fn(rune) -> bool) -> &[byte] {
-    for &v in s {
-        if f(v as rune) {
-            s.strip_prefix(&[v]);
-            s.strip_suffix(&[v]);
-        }
-    }
-    s
+    TrimRightFunc(TrimLeftFunc(s, f), f)
 }
 
 /// TrimLeft returns a slice of the string s with all leading Unicode code points contained in cutset removed.
@@ -1111,15 +1087,21 @@ pub fn TrimFunc(s: &[byte], f: fn(rune) -> bool) -> &[byte] {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!("Hello, Gophers!!!",strings::TrimLeft("¡¡¡Hello, Gophers!!!", "!¡"))
+/// assert_eq!("Hello, Gophers!!!".as_bytes(),bytes::TrimLeft("¡¡¡Hello, Gophers!!!".as_bytes(), "!¡".as_bytes()))
 /// ```
 pub fn TrimLeft(s: &[byte], cutset: impl AsRef<[byte]>) -> &[byte] {
-    for &v in cutset.as_ref() {
-        s.strip_prefix(&[v]);
+    let mut isStart = true;
+    let mut i: usize = 0;
+    for v in s.as_ref() {
+        if isStart && cutset.as_ref().contains(v) {
+            i += 1;
+        } else {
+            isStart = false
+        }
     }
-    s
+    &s[i..]
 }
 
 /// TrimLeftFunc returns a slice of the string s with all leading Unicode code points c satisfying f(c) removed.
@@ -1131,20 +1113,25 @@ pub fn TrimLeft(s: &[byte], cutset: impl AsRef<[byte]>) -> &[byte] {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
 /// let f = |x| x >= '1' as u32 && x <= '9' as u32;
-/// assert_eq!("Hello, Rust654321",strings::TrimLeftFunc("123456Hello, Rust654321", f));
+/// assert_eq!("Hello, Rust654321".as_bytes(),bytes::TrimLeftFunc("123456Hello, Rust654321".as_bytes(), f));
 ///
 ///
 /// ```
 pub fn TrimLeftFunc(s: &[byte], f: fn(rune) -> bool) -> &[byte] {
-    for &v in s {
-        if f(v as rune) {
-            s.strip_prefix(&[v]);
+    let mut isStart = true;
+    let mut i: usize = 0;
+    for &v in s.as_ref() {
+        if isStart && f(v as rune) {
+            i += 1;
+        } else {
+            isStart = false
         }
     }
-    s
+
+    &s[i..]
 }
 
 /// TrimPrefix returns s without the provided leading prefix string. If s doesn't start with prefix, s is returned unchanged.
@@ -1156,9 +1143,9 @@ pub fn TrimLeftFunc(s: &[byte], f: fn(rune) -> bool) -> &[byte] {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!("Hello, Rust!xxx",strings::TrimPrefix("xxxHello, Rust!xxx","xxx"));
+/// assert_eq!("Hello, Rust!xxx".as_bytes(),bytes::TrimPrefix("xxxHello, Rust!xxx".as_bytes(),"xxx".as_bytes()));
 ///
 /// ```
 pub fn TrimPrefix(s: &[byte], prefix: impl AsRef<[byte]>) -> &[byte] {
@@ -1179,15 +1166,23 @@ pub fn TrimPrefix(s: &[byte], prefix: impl AsRef<[byte]>) -> &[byte] {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
-/// assert_eq!("¡¡¡Hello, Gophers",strings::TrimRight("¡¡¡Hello, Gophers!!!", "!¡"));
+/// use gostd::bytes;
+/// assert_eq!("¡¡¡Hello, Gophers".as_bytes(),bytes::TrimRight("¡¡¡Hello, Gophers!!!".as_bytes(), "!¡".as_bytes()));
 ///
 /// ```
 pub fn TrimRight(s: &[byte], cutset: impl AsRef<[byte]>) -> &[byte] {
-    for &v in cutset.as_ref() {
-        s.strip_suffix(&[v]);
+    let mut isStart = true;
+    let mut i: usize = 0;
+    let n = len!(s);
+    for v in s.as_ref().iter().rev() {
+        if isStart && cutset.as_ref().contains(v) {
+            i += 1;
+        } else {
+            isStart = false
+        }
     }
-    s
+
+    &s[..n - i]
 }
 
 /// TrimRightFunc returns a slice of the string s with all trailing Unicode code points c satisfying f(c) removed.
@@ -1223,32 +1218,32 @@ pub fn TrimRightFunc(s: &[byte], f: fn(rune) -> bool) -> &[byte] {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!("Hello, Rust!",strings::TrimSpace("  Hello, Rust!  "));
-/// assert_eq!("Hello, Rust!",strings::TrimSpace("\nHello, Rust! \t "));
-/// assert_eq!("Hello, Rust!",strings::TrimSpace("\n\t Hello, Rust! \t\r "));
+/// assert_eq!("Hello, Rust!".as_bytes(),bytes::TrimSpace("  Hello, Rust!  ".as_bytes()));
+/// assert_eq!("Hello, Rust!".as_bytes(),bytes::TrimSpace("\nHello, Rust! \t ".as_bytes()));
+/// assert_eq!("Hello, Rust!".as_bytes(),bytes::TrimSpace("\n\t Hello, Rust! \t\r ".as_bytes()));
 ///
 /// ```
 pub fn TrimSpace(s: &[byte]) -> &[byte] {
-    let n = len!(s) - 1;
+    let n = len!(s);
     let mut start: usize = 0;
     let mut end: usize = n - 1;
-    for i in 0..=n {
+    for i in 0..n {
         if s[i].is_ascii_whitespace() || s[i] == 0x85 || s[i] == 0xA0 {
             start = i;
         } else {
             break;
         }
     }
-    for i in n..=0 {
-        if s[i].is_ascii_whitespace() || s[i] == 0x85 || s[i] == 0xA0 {
-            end = i;
+    while end > 0 {
+        if s[end].is_ascii_whitespace() || s[end] == 0x85 || s[end] == 0xA0 {
+            end -= 1;
         } else {
             break;
         }
     }
-    &s[start..end]
+    &s[start + 1..end + 1]
 }
 
 /// TrimSuffix returns s without the provided trailing suffix string. If s doesn't end with suffix, s is returned unchanged.
@@ -1260,9 +1255,9 @@ pub fn TrimSpace(s: &[byte]) -> &[byte] {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!("test",strings::TrimSuffix("test.rs",".rs"))
+/// assert_eq!("test".as_bytes(),bytes::TrimSuffix("test.rs".as_bytes(),".rs".as_bytes()))
 ///
 /// ```
 pub fn TrimSuffix(s: &[byte], suffix: impl AsRef<[byte]>) -> &[byte] {
