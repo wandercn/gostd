@@ -551,12 +551,13 @@ pub fn LastIndex(s: impl AsRef<str>, substr: impl AsRef<str>) -> int {
 ///
 /// ```
 pub fn LastIndexAny(s: impl AsRef<str>, chars: impl AsRef<str>) -> int {
+    let max = len!(s.as_ref()) - 1;
     if chars.as_ref() == "" {
         return -1;
     }
-    for r in s.as_ref().chars().rev() {
+    for (rindex, r) in s.as_ref().chars().rev().enumerate() {
         if chars.as_ref().contains(r) {
-            return int!(s.as_ref().rfind(r).unwrap());
+            return int!(max - rindex);
         }
     }
     -1
@@ -603,9 +604,10 @@ pub fn LastIndexByte(s: impl AsRef<str>, c: byte) -> int {
 ///    assert_eq!(-1, strings::LastIndexFunc("go", f));
 /// ```
 pub fn LastIndexFunc(s: impl AsRef<str>, f: fn(rune) -> bool) -> int {
-    for (i, r) in s.as_ref().chars().rev().enumerate() {
+    let max = len!(s.as_ref()) - 1;
+    for (rindex, r) in s.as_ref().chars().rev().enumerate() {
         if f(r as u32) == true {
-            return int!(s.as_ref().rfind(r).unwrap());
+            return int!(max - rindex);
         }
     }
     -1
@@ -685,7 +687,7 @@ pub fn Repeat(s: impl AsRef<str>, count: uint) -> String {
     let mut b = Builder::new();
     b.Grow(int!(n));
     b.WriteString(s.as_ref());
-    while (b.Len() < int!(n)) {
+    while b.Len() < int!(n) {
         if b.Len() <= int!(n) / 2 {
             b.WriteString(b.String().as_str());
         } else {
@@ -990,7 +992,7 @@ pub fn ToUpper(s: impl AsRef<str>) -> String {
 /// assert_eq!("Hello, 中国",strings::Trim("¡¡¡Hello, 中国!!!", "!¡"));
 ///
 /// ```
-pub fn Trim<'a>(mut s: &'a str, cutset: impl AsRef<str>) -> &'a str {
+pub fn Trim(mut s: &str, cutset: impl AsRef<str>) -> &str {
     s.trim_matches(|x| cutset.as_ref().contains(x))
 }
 
