@@ -930,7 +930,7 @@ pub fn SplitAfter(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> Vec<Vec<byt
 /// ```
 /// use gostd::strings;
 /// use gostd::bytes;
-/// use gostd::builtin::*;
+/// use gostd::builtin::byte;
 /// // n == 0 返回 []
 ///    assert_eq!(Vec::<Vec<byte>>::new(), bytes::SplitAfterN(",a,b2,c".as_bytes(), ",".as_bytes(), 0));
 ///    assert_eq!(vec![",a,b2,c".as_bytes()], bytes::SplitAfterN(",a,b2,c".as_bytes(), ",".as_bytes(), 1));
@@ -973,24 +973,25 @@ pub fn SplitAfterN(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>, n: int) -> Ve
 ///
 /// ```
 /// use gostd::bytes;
+/// use gostd::builtin::byte;
 ///
-///    assert_eq!(Vec::<Vec<u8>>::new(), bytes::SplitN(",a,b2,c".as_bytes(), ",", 0));
+///    assert_eq!(Vec::<Vec<byte>>::new(), bytes::SplitN(",a,b2,c".as_bytes(), ",", 0));
 ///    assert_eq!(vec![",a,b2,c".as_bytes().to_vec()], bytes::SplitN(",a,b2,c".as_bytes(), ",", 1));
 ///    assert_eq!(
-///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<u8>>>(),  bytes::SplitN(",a,b2,c".as_bytes(), ",", -1)
+///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<byte>>>(),  bytes::SplitN(",a,b2,c".as_bytes(), ",", -1)
 ///    );
-///    assert_eq!(vec!["", "a,b2,c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<u8>>>(), bytes::SplitN(",a,b2,c".as_bytes(), ",", 2));
-///    assert_eq!(vec!["", "a", "b2,c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<u8>>>(), bytes::SplitN(",a,b2,c".as_bytes(), ",", 3));
+///    assert_eq!(vec!["", "a,b2,c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<byte>>>(), bytes::SplitN(",a,b2,c".as_bytes(), ",", 2));
+///    assert_eq!(vec!["", "a", "b2,c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<byte>>>(), bytes::SplitN(",a,b2,c".as_bytes(), ",", 3));
 ///    assert_eq!(
-///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<u8>>>(),
+///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<byte>>>(),
 ///        bytes::SplitN(",a,b2,c".as_bytes(), ",", 4)
 ///    );
 ///    assert_eq!(
-///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<u8>>>(),
+///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<byte>>>(),
 ///        bytes::SplitN(",a,b2,c".as_bytes(), ",", 5)
 ///    );
 ///    assert_eq!(
-///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<u8>>>(),
+///        vec!["", "a", "b2", "c"].iter().map(|x|x.as_bytes().to_vec()).collect::<Vec<Vec<byte>>>(),
 ///        bytes::SplitN(",a,b2,c".as_bytes(), ",", 10)
 ///    );
 ///
