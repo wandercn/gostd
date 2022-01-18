@@ -778,12 +778,33 @@ pub fn Repeat(s: impl AsRef<[byte]>, count: uint) -> Vec<byte> {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!("oinky oinky oink",strings::Replace("oink oink oink", "k", "ky", 2));
-/// assert_eq!("moo moo moo",strings::Replace("oink oink oink", "oink", "moo", -1));
+/// assert_eq!("oinky oinky oink".as_bytes(),bytes::Replace("oink oink oink".as_bytes(), "k".as_bytes(), "ky".as_bytes(), 2));
+/// assert_eq!("moo moo moo".as_bytes(),bytes::Replace("oink oink oink".as_bytes(), "oink", "moo", -1));
 ///
 /// ```
+pub fn Replace(
+    s: impl AsRef<[byte]>,
+    old: impl AsRef<[byte]>,
+    new: impl AsRef<[byte]>,
+    n: int,
+) -> Vec<byte> {
+    let mut s = s.as_ref();
+    let mut start: int = 0;
+    let old_len = len!(old.as_ref());
+    let mut result: Vec<byte> = vec![];
+    let mut count = 0;
+    while start > -1 && start < len!(s.as_ref()) as int && (count < n || n == -1) {
+        start = Index(s, old.as_ref());
+        result.extend_from_slice(&s[..start as uint]);
+        result.extend_from_slice(new.as_ref());
+        s = &s[start as usize + old_len..];
+        count += 1;
+    }
+    result.extend_from_slice(&s[..]);
+    result
+}
 
 /// ReplaceAll returns a copy of the string s with all non-overlapping instances of old replaced by new. If old is empty, it matches at the beginning of the string and after each UTF-8 sequence, yielding up to k+1 replacements for a k-rune string.
 /// <details class="rustdoc-toggle top-doc">
@@ -799,6 +820,14 @@ pub fn Repeat(s: impl AsRef<[byte]>, count: uint) -> Vec<byte> {
 /// assert_eq!("moo moo moo",strings::ReplaceAll("oink oink oink", "oink", "moo"));
 ///
 /// ```
+///
+pub fn ReplaceAll(
+    s: impl AsRef<[byte]>,
+    old: impl AsRef<[byte]>,
+    new: impl AsRef<[byte]>,
+) -> Vec<byte> {
+    Replace(s, old, new, -1)
+}
 
 /// Split slices s into all substrings separated by sep and returns a slice of the substrings between those separators.
 ///
