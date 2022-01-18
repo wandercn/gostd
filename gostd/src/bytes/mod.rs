@@ -485,7 +485,7 @@ pub fn IndexByte(s: impl AsRef<[byte]>, c: byte) -> int {
 ///    } */
 ///    // 用上面注释掉的函数也可以，用下面的匿名函数也可以。
 ///    let f = |c: u32| {
-///        let s = char::from_u32(c).unwrap();
+///        let s = char::from_u32(c).expect("u32 to char failed!");
 ///        !s.is_ascii()
 ///    };
 ///    assert_eq!(7, bytes::IndexFunc("Hello, 世界", f));
@@ -523,7 +523,7 @@ pub fn IndexFunc(s: impl AsRef<[byte]>, f: fn(rune) -> bool) -> int {
 ///
 /// ```
 pub fn IndexRune(s: impl AsRef<[byte]>, r: rune) -> int {
-    let c = char::from_u32(r).unwrap();
+    let c = char::from_u32(r).expect("IndexRune rune to char failed!");
     let bytes = c.to_string();
     let n = bytes.as_bytes().len();
     for (i, &x) in s.as_ref().iter().enumerate() {
@@ -752,9 +752,10 @@ pub fn Map(mapping: fn(rune) -> rune, mut s: impl AsRef<[byte]>) -> String {
 /// # Example
 ///
 /// ```
-///  use gostd::strings;
+///  use gostd::bytes;
 ///
-///  println!("{}",strings::Repeat("12",3));
+///  assert_eq!("121212".as_bytes(),bytes::Repeat("12",3));
+///  println!("{:?}",bytes::Repeat("12",3).as_slice());
 ///
 /// ```
 /// # Output
@@ -763,30 +764,10 @@ pub fn Map(mapping: fn(rune) -> rune, mut s: impl AsRef<[byte]>) -> String {
 /// 121212
 /// ```
 
-/*
-pub fn Repeat(s: impl AsRef<[byte]>, count: uint) -> String {
-    if count == 0 {
-        return "".to_owned();
-    }
-
-    if len!(s.as_ref()) * count / count != len!(s.as_ref()) {
-        panic!("strings: Repeat count causes overflow")
-    }
-    let mut n = len!(s.as_ref()) * count;
-    let mut b = Builder::new();
-    b.Grow(int!(n));
-    b.WriteString(s.as_ref());
-    while (b.Len() < int!(n)) {
-        if b.Len() <= int!(n) / 2 {
-            b.WriteString(b.String().as_str());
-        } else {
-            b.WriteString(b.String().get(..(n - b.Len() as usize)).unwrap());
-            break;
-        }
-    }
-    b.String()
+pub fn Repeat(s: impl AsRef<[byte]>, count: uint) -> Vec<byte> {
+    s.as_ref().repeat(count)
 }
-*/
+
 /// Replace returns a copy of the string s with the first n non-overlapping instances of old replaced by new. If old is empty, it matches at the beginning of the string and after each UTF-8 sequence, yielding up to k+1 replacements for a k-rune string. If n < 0, there is no limit on the number of replacements.
 /// It panics if count is negative or if the result of (len!(s) * count) overflows.
 /// <details class="rustdoc-toggle top-doc">
@@ -797,12 +778,33 @@ pub fn Repeat(s: impl AsRef<[byte]>, count: uint) -> String {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!("oinky oinky oink",strings::Replace("oink oink oink", "k", "ky", 2));
-/// assert_eq!("moo moo moo",strings::Replace("oink oink oink", "oink", "moo", -1));
+/// assert_eq!("oinky oinky oink".as_bytes(),bytes::Replace("oink oink oink".as_bytes(), "k".as_bytes(), "ky".as_bytes(), 2));
+/// assert_eq!("moo moo moo".as_bytes(),bytes::Replace("oink oink oink".as_bytes(), "oink", "moo", -1));
 ///
 /// ```
+pub fn Replace(
+    s: impl AsRef<[byte]>,
+    old: impl AsRef<[byte]>,
+    new: impl AsRef<[byte]>,
+    n: int,
+) -> Vec<byte> {
+    let mut s = s.as_ref();
+    let mut start: int = 0;
+    let old_len = len!(old.as_ref());
+    let mut result: Vec<byte> = vec![];
+    let mut count = 0;
+    while start > -1 && start < len!(s.as_ref()) as int && (count < n || n == -1) {
+        start = Index(s, old.as_ref());
+        result.extend_from_slice(&s[..start as uint]);
+        result.extend_from_slice(new.as_ref());
+        s = &s[start as usize + old_len..];
+        count += 1;
+    }
+    result.extend_from_slice(&s[..]);
+    result
+}
 
 /// ReplaceAll returns a copy of the string s with all non-overlapping instances of old replaced by new. If old is empty, it matches at the beginning of the string and after each UTF-8 sequence, yielding up to k+1 replacements for a k-rune string.
 /// <details class="rustdoc-toggle top-doc">
@@ -813,11 +815,19 @@ pub fn Repeat(s: impl AsRef<[byte]>, count: uint) -> String {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!("moo moo moo",strings::ReplaceAll("oink oink oink", "oink", "moo"));
+/// assert_eq!("moo moo moo".as_bytes(),bytes::ReplaceAll("oink oink oink".as_bytes(), "oink".as_bytes(), "moo".as_bytes()));
 ///
 /// ```
+///
+pub fn ReplaceAll(
+    s: impl AsRef<[byte]>,
+    old: impl AsRef<[byte]>,
+    new: impl AsRef<[byte]>,
+) -> Vec<byte> {
+    Replace(s, old, new, -1)
+}
 
 /// Split slices s into all substrings separated by sep and returns a slice of the substrings between those separators.
 ///
@@ -1194,19 +1204,25 @@ pub fn TrimRight(s: &[byte], cutset: impl AsRef<[byte]>) -> &[byte] {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
 /// let f = |x| x >= '1' as u32 && x <= '9' as u32;
-/// assert_eq!("123456Hello, Rust",strings::TrimRightFunc("123456Hello, Rust654321", f));
+/// assert_eq!("123456Hello, Rust".as_bytes(),bytes::TrimRightFunc("123456Hello, Rust654321".as_bytes(), f));
 ///
 /// ```
 pub fn TrimRightFunc(s: &[byte], f: fn(rune) -> bool) -> &[byte] {
-    for &v in s {
-        if f(v as rune) {
-            s.strip_suffix(&[v]);
+    let mut isStart = true;
+    let mut i: usize = 0;
+    let n = len!(s);
+    for &v in s.as_ref().iter().rev() {
+        if isStart && f(v as rune) {
+            i += 1;
+        } else {
+            isStart = false
         }
     }
-    s
+
+    &s[..n - i]
 }
 
 /// TrimSpace returns a slice of the string s, with all leading and trailing white space removed, as defined by Unicode.
