@@ -1201,12 +1201,18 @@ pub fn TrimRight(s: &[byte], cutset: impl AsRef<[byte]>) -> &[byte] {
 ///
 /// ```
 pub fn TrimRightFunc(s: &[byte], f: fn(rune) -> bool) -> &[byte] {
-    for &v in s {
-        if f(v as rune) {
-            s.strip_suffix(&[v]);
+    let mut isStart = true;
+    let mut i: usize = 0;
+    let n = len!(s);
+    for &v in s.as_ref().iter().rev() {
+        if isStart && f(v as rune) {
+            i += 1;
+        } else {
+            isStart = false
         }
     }
-    s
+
+    &s[..n - i]
 }
 
 /// TrimSpace returns a slice of the string s, with all leading and trailing white space removed, as defined by Unicode.
