@@ -1048,18 +1048,14 @@ pub fn ToUpper(s: impl AsRef<[byte]>) -> Vec<byte> {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!("Hello, 中国",strings::Trim("¡¡¡Hello, 中国!!!", "!¡"));
+/// assert_eq!("Hello, 中国".as_bytes(),bytes::Trim("¡¡¡Hello, 中国!!!".as_bytes(), "!¡".as_bytes()));
 ///
 /// ```
 
 pub fn Trim(mut s: &[byte], cutset: impl AsRef<[byte]>) -> &[byte] {
-    for &v in cutset.as_ref().iter() {
-        s.strip_suffix(&[v]);
-        s.strip_prefix(&[v]);
-    }
-    s
+    TrimRight(TrimLeft(s, cutset.as_ref()), cutset.as_ref())
 }
 
 /// TrimFunc returns a slice of the string s with all leading and trailing Unicode code points c satisfying f(c) removed.
@@ -1097,15 +1093,22 @@ pub fn TrimFunc(s: &[byte], f: fn(rune) -> bool) -> &[byte] {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!("Hello, Gophers!!!",strings::TrimLeft("¡¡¡Hello, Gophers!!!", "!¡"))
+/// assert_eq!("Hello, Gophers!!!".as_bytes(),bytes::TrimLeft("¡¡¡Hello, Gophers!!!".as_bytes(), "!¡".as_bytes()))
 /// ```
 pub fn TrimLeft(s: &[byte], cutset: impl AsRef<[byte]>) -> &[byte] {
-    for &v in cutset.as_ref() {
-        s.strip_prefix(&[v]);
+    let mut isStart = true;
+    let mut i: usize = 0;
+    for v in s.as_ref() {
+        if isStart && cutset.as_ref().contains(v) {
+            i += 1;
+        } else {
+            isStart = false
+        }
     }
-    s
+
+    &s[i..]
 }
 
 /// TrimLeftFunc returns a slice of the string s with all leading Unicode code points c satisfying f(c) removed.
@@ -1165,15 +1168,23 @@ pub fn TrimPrefix(s: &[byte], prefix: impl AsRef<[byte]>) -> &[byte] {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
-/// assert_eq!("¡¡¡Hello, Gophers",strings::TrimRight("¡¡¡Hello, Gophers!!!", "!¡"));
+/// use gostd::bytes;
+/// assert_eq!("¡¡¡Hello, Gophers".as_bytes(),bytes::TrimRight("¡¡¡Hello, Gophers!!!".as_bytes(), "!¡".as_bytes()));
 ///
 /// ```
 pub fn TrimRight(s: &[byte], cutset: impl AsRef<[byte]>) -> &[byte] {
-    for &v in cutset.as_ref() {
-        s.strip_suffix(&[v]);
+    let mut isStart = true;
+    let mut i: usize = 0;
+    let n = len!(s);
+    for v in s.as_ref().iter().rev() {
+        if isStart && cutset.as_ref().contains(v) {
+            i += 1;
+        } else {
+            isStart = false
+        }
     }
-    s
+
+    &s[..n - i]
 }
 
 /// TrimRightFunc returns a slice of the string s with all trailing Unicode code points c satisfying f(c) removed.
