@@ -1073,13 +1073,7 @@ pub fn Trim(mut s: &[byte], cutset: impl AsRef<[byte]>) -> &[byte] {
 /// assert_eq!("Hello, Rust",strings::TrimFunc("2211345Hello, Rust1122345", f));
 /// ```
 pub fn TrimFunc(s: &[byte], f: fn(rune) -> bool) -> &[byte] {
-    for &v in s {
-        if f(v as rune) {
-            s.strip_prefix(&[v]);
-            s.strip_suffix(&[v]);
-        }
-    }
-    s
+    TrimRightFunc(TrimLeftFunc(s, f), f)
 }
 
 /// TrimLeft returns a slice of the string s with all leading Unicode code points contained in cutset removed.
@@ -1107,7 +1101,6 @@ pub fn TrimLeft(s: &[byte], cutset: impl AsRef<[byte]>) -> &[byte] {
             isStart = false
         }
     }
-
     &s[i..]
 }
 
