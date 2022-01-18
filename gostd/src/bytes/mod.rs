@@ -1120,10 +1120,10 @@ pub fn TrimLeft(s: &[byte], cutset: impl AsRef<[byte]>) -> &[byte] {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
 /// let f = |x| x >= '1' as u32 && x <= '9' as u32;
-/// assert_eq!("Hello, Rust654321",strings::TrimLeftFunc("123456Hello, Rust654321", f));
+/// assert_eq!("Hello, Rust654321".as_bytes(),bytes::TrimLeftFunc("123456Hello, Rust654321".as_bytes(), f));
 ///
 ///
 /// ```
@@ -1145,9 +1145,9 @@ pub fn TrimLeftFunc(s: &[byte], f: fn(rune) -> bool) -> &[byte] {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!("Hello, Rust!xxx",strings::TrimPrefix("xxxHello, Rust!xxx","xxx"));
+/// assert_eq!("Hello, Rust!xxx".as_bytes(),bytes::TrimPrefix("xxxHello, Rust!xxx".as_bytes(),"xxx".as_bytes()));
 ///
 /// ```
 pub fn TrimPrefix(s: &[byte], prefix: impl AsRef<[byte]>) -> &[byte] {
@@ -1220,32 +1220,32 @@ pub fn TrimRightFunc(s: &[byte], f: fn(rune) -> bool) -> &[byte] {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!("Hello, Rust!",strings::TrimSpace("  Hello, Rust!  "));
-/// assert_eq!("Hello, Rust!",strings::TrimSpace("\nHello, Rust! \t "));
-/// assert_eq!("Hello, Rust!",strings::TrimSpace("\n\t Hello, Rust! \t\r "));
+/// assert_eq!("Hello, Rust!".as_bytes(),bytes::TrimSpace("  Hello, Rust!  ".as_bytes()));
+/// assert_eq!("Hello, Rust!".as_bytes(),bytes::TrimSpace("\nHello, Rust! \t ".as_bytes()));
+/// assert_eq!("Hello, Rust!".as_bytes(),bytes::TrimSpace("\n\t Hello, Rust! \t\r ".as_bytes()));
 ///
 /// ```
 pub fn TrimSpace(s: &[byte]) -> &[byte] {
-    let n = len!(s) - 1;
+    let n = len!(s);
     let mut start: usize = 0;
     let mut end: usize = n - 1;
-    for i in 0..=n {
+    for i in 0..n {
         if s[i].is_ascii_whitespace() || s[i] == 0x85 || s[i] == 0xA0 {
             start = i;
         } else {
             break;
         }
     }
-    for i in n..=0 {
-        if s[i].is_ascii_whitespace() || s[i] == 0x85 || s[i] == 0xA0 {
-            end = i;
+    while end > 0 {
+        if s[end].is_ascii_whitespace() || s[end] == 0x85 || s[end] == 0xA0 {
+            end -= 1;
         } else {
             break;
         }
     }
-    &s[start..end]
+    &s[start + 1..end + 1]
 }
 
 /// TrimSuffix returns s without the provided trailing suffix string. If s doesn't end with suffix, s is returned unchanged.
@@ -1257,9 +1257,9 @@ pub fn TrimSpace(s: &[byte]) -> &[byte] {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!("test",strings::TrimSuffix("test.rs",".rs"))
+/// assert_eq!("test".as_bytes(),bytes::TrimSuffix("test.rs".as_bytes(),".rs".as_bytes()))
 ///
 /// ```
 pub fn TrimSuffix(s: &[byte], suffix: impl AsRef<[byte]>) -> &[byte] {
