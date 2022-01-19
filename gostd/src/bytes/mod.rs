@@ -701,7 +701,7 @@ pub fn LastIndexFunc(s: impl AsRef<[byte]>, f: fn(rune) -> bool) -> int {
 ///
 /// ```
 pub fn Map(mapping: fn(rune) -> rune, mut s: impl AsRef<[byte]>) -> String {
-    let mut b = Builder::new();
+    let mut b = Buffer::new();
     b.Grow(int!(len!(s.as_ref())));
     for (idx, &v) in s.as_ref().iter().enumerate() {
         let r = mapping(v as u32);
@@ -1236,21 +1236,21 @@ pub fn TrimSuffix(s: &[byte], suffix: impl AsRef<[byte]>) -> &[byte] {
     }
 }
 
-// Builder Begin
+// Buffer Begin
 
-/// A Builder is used to efficiently build a string using Write methods. It minimizes memory copying. The zero value is ready to use. Do not copy a non-zero Builder.
+/// A Buffer is a variable-sized buffer of bytes with Read and Write methods. The zero value for Buffer is an empty buffer ready to use.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// Builder 生成器用于使用写方法高效地构建字符串。它最大限度地减少了内存复制。零值已准备好使用。不要复制非零生成器。
+/// Buffer是一个实现了读写方法的可变大小的字节缓冲。本类型的零值是一个空的可用于读写的缓冲。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
 ///  use gostd::io::*;
-///  use gostd::strings::Builder;
+///  use gostd::bytes::Buffer;
 ///
-///  let mut buf = Builder::new();
+///  let mut buf = Buffer::new();
 ///  buf.WriteString("hello");
 ///  buf.WriteByte(b' ');
 ///  buf.WriteString("world");
@@ -1267,19 +1267,19 @@ pub fn TrimSuffix(s: &[byte], suffix: impl AsRef<[byte]>) -> &[byte] {
 ///
 /// ```
 #[derive(Default, PartialEq, PartialOrd, Debug, Clone, Fmt)]
-pub struct Builder {
-    addr: Box<Option<Builder>>,
+pub struct Buffer {
+    addr: Box<Option<Buffer>>,
     buf: Vec<byte>,
 }
 
-impl Builder {
+impl Buffer {
     /// initialization a Builder
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
     /// 初始化生成器
     /// </details>
-    pub fn new() -> Builder {
-        let mut b = Builder::default();
+    pub fn new() -> Buffer {
+        let mut b = Buffer::default();
         b.addr = Box::new(Some(b.clone()));
         b
     }
@@ -1373,7 +1373,7 @@ impl Builder {
 }
 
 use crate::io::ByteWriter;
-impl ByteWriter for Builder {
+impl ByteWriter for Buffer {
     /// WriteByte appends the byte c to b's buffer.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
@@ -1386,7 +1386,7 @@ impl ByteWriter for Builder {
 }
 
 use crate::io::StringWriter;
-impl StringWriter for Builder {
+impl StringWriter for Buffer {
     /// WriteString appends the contents of s to b's buffer. It returns the length of s.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
@@ -1399,7 +1399,7 @@ impl StringWriter for Builder {
 }
 
 use crate::io::Writer;
-impl Writer for Builder {
+impl Writer for Buffer {
     /// Write appends the contents of p to b's buffer. Write always returns len!(p).
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
@@ -1411,7 +1411,7 @@ impl Writer for Builder {
     }
 }
 
-// Builder End
+// Buffer End
 /// A Reader implements the io.Reader, io.ReaderAt, io.ByteReader, io.ByteScanner,
 /// io.RuneReader, io.RuneScanner, io.Seeker, and io.WriterTo interfaces by reading
 /// from a string.
@@ -1422,7 +1422,7 @@ impl Writer for Builder {
 /// </details>
 #[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
 pub struct Reader {
-    s: String,
+    s: Vec<byte>,
     i: int64,      // current reading index
     prevRune: int, // index of previous rune; or < 0
 }
@@ -1489,8 +1489,8 @@ impl io::Reader for Reader {
             return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
         }
         self.prevRune = -1;
-        let n = int!(len!(self.s.as_bytes()[uint!(self.i)..]));
-        b.copy_from_slice(self.s.as_bytes()[uint!(self.i)..].as_ref());
+        let n = int!(len!(self.s.as_slice()[uint!(self.i)..]));
+        b.copy_from_slice(self.s.as_slice()[uint!(self.i)..].as_ref());
         self.i += int64!(n);
         Ok(n)
     }
@@ -1507,8 +1507,8 @@ impl io::ReaderAt for Reader {
         if off >= int64!(len!(self.s)) {
             return Err(Error::new(ErrorKind::UnexpectedEof, "EOF")); //todo io.EOF在rust中怎么表示
         }
-        let n = len!(self.s.as_bytes()[uint!(off)..]);
-        b.copy_from_slice(self.s.as_bytes()[uint!(off)..].as_ref());
+        let n = len!(self.s.as_slice()[uint!(off)..]);
+        b.copy_from_slice(self.s.as_slice()[uint!(off)..].as_ref());
         if n < len!(b) {
             return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
         }
@@ -1522,7 +1522,7 @@ impl io::ByteReader for Reader {
         if self.i >= int64!(len!(self.s)) {
             return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
         }
-        let b = self.s.as_bytes()[uint!(self.i)];
+        let b = self.s.as_slice()[uint!(self.i)];
         self.i += 1;
         Ok(b)
     }
@@ -1535,12 +1535,12 @@ impl io::RuneReader for Reader {
             return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
         }
         self.prevRune = self.i as int;
-        if let Some(c) = self.s.chars().nth(uint!(self.i)) {
+        if let Some(&c) = self.s.as_slice().get(uint!(self.i)) {
             if rune!(c) < utf8::RuneSelf {
                 self.i += 1;
                 return Ok((rune!(c), 1));
             }
-            let size = c.len_utf8() as int;
+            let size = c.to_ne_bytes().len() as int;
             self.i += 1;
             return Ok((c as rune, size as isize));
         } else {
@@ -1580,15 +1580,15 @@ impl io::ByteScanner for Reader {
 }
 
 impl io::WriterTo for Reader {
-    fn WriteTo(&mut self, w: Box<dyn io::Writer>) -> Result<int64, Error> {
+    fn WriteTo(&mut self, mut w: Box<dyn io::Writer>) -> Result<int64, Error> {
         self.prevRune = -1;
         if self.i >= int64!(len!(self.s)) {
             return Ok(0);
         }
         let s = self.s.get(self.i as usize..).unwrap();
-        if let Ok(m) = io::WriteString(w, s) {
+        if let Ok(m) = w.Write(s.to_vec()) {
             if m > int!(len!(s)) {
-                panic!("gostd::strings::Reader::WriteTo: invalid WriteString count")
+                panic!("gostd::bytes::Reader::WriteTo: invalid Write count")
             }
             if m != int!(len!(s)) {
                 return Err(Error::new(ErrorKind::Other, "short write"));
@@ -1602,32 +1602,32 @@ impl io::WriterTo for Reader {
     }
 }
 
-/// Replacer replaces a list of strings with replacements. It is safe for concurrent use by multiple goroutines.
+/// Replacer replaces a list of slices with replacements. It is safe for concurrent use by multiple goroutines.
 ///
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// Replacer类型进行一系列字符串的替换。
+/// Replacer类型进行一系列字节切片的替换。
 /// </details>
 pub struct Replacer<'a> {
-    oldnew: Vec<(&'a str, &'a str)>,
+    oldnew: Vec<(&'a [byte], &'a [byte])>,
 }
 
 impl<'a> Replacer<'a> {
-    /// new returns a new Replacer from a list of old, new string pairs. Replacements are performed in the order they appear in the target string, without overlapping matches. The old string comparisons are done in argument order.
+    /// new returns a new Replacer from a list of old, new &[byte] pairs. Replacements are performed in the order they appear in the target string, without overlapping matches. The old string comparisons are done in argument order.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    /// 使用提供的多组old、new字符串对创建并返回一个*Replacer。替换是依次进行的，匹配时不会重叠。
+    /// 使用提供的多组old、new字节切片对创建并返回一个*Replacer。替换是依次进行的，匹配时不会重叠。
     /// </details>
     ///
     /// # Example
     ///
     /// ```
-    /// use gostd::strings;
+    /// use gostd::bytes;
     ///
-    ///    let p = vec![("<", "&lt;"), (">", "&gt;")];
-    ///    let r = strings::Replacer::new(p);
-    ///    let s = r.Replace("This is <b>HTML</b>!");
-    ///    println!("{}", s);
+    ///    let p = vec![("<".as_bytes(), "&lt;".as_bytes()), (">".as_bytes(), "&gt;".as_bytes())];
+    ///    let r = bytes::Replacer::new(p);
+    ///    let s = r.Replace("This is <b>HTML</b>!".as_bytes());
+    ///    println!("{}", String::from_utf8(s).unwrap());
     ///
     /// ```
     /// # Output
@@ -1635,7 +1635,7 @@ impl<'a> Replacer<'a> {
     /// ```text
     /// This is &lt;b&gt;HTML&lt;/b&gt;!
     /// ```
-    pub fn new(pairs: Vec<(&'a str, &'a str)>) -> Replacer<'a> {
+    pub fn new(pairs: Vec<(&'a [byte], &'a [byte])>) -> Replacer<'a> {
         Replacer { oldnew: pairs }
     }
     /// Replace returns a copy of s with all replacements performed.
@@ -1643,13 +1643,13 @@ impl<'a> Replacer<'a> {
     /// <summary class="docblock">zh-cn</summary>
     /// Replace返回s的所有替换进行完后的拷贝.
     /// </details>
-    // pub fn Replace(self, s: &str) -> String {
-    //     let mut new_str = s.to_owned();
-    //     for pair in self.oldnew.clone() {
-    //         new_str = ReplaceAll(new_str.as_str(), pair.0, pair.1);
-    //     }
-    //     new_str
-    // }
+    pub fn Replace(self, s: &[byte]) -> Vec<byte> {
+        let mut new_slice: Vec<byte> = s.to_vec();
+        for pair in self.oldnew.clone() {
+            new_slice = ReplaceAll(new_slice, pair.0, pair.1);
+        }
+        new_slice
+    }
     /// WriteString writes s to w with all replacements performed.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
