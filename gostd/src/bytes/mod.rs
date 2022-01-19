@@ -205,7 +205,7 @@ pub fn Fields(s: &[byte]) -> Vec<&[byte]> {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
 ///    /* fn f(c: u32) -> bool {
 ///        let s = char::from_u32(c).unwrap();
@@ -217,8 +217,8 @@ pub fn Fields(s: &[byte]) -> Vec<&[byte]> {
 ///        !s.is_numeric() && !s.is_alphabetic()
 ///    };
 ///    assert_eq!(
-///        vec!["foo1", "bar2", "baz3"],
-///        strings::FieldsFunc("  foo1;bar2,baz3...", f)
+///        vec!["foo1".as_bytes(), "bar2".as_bytes(), "baz3".as_bytes()],
+///        bytes::FieldsFunc("  foo1;bar2,baz3...".as_bytes(), f)
 ///    )
 /// ```
 pub fn FieldsFunc(s: &[byte], f: fn(rune) -> bool) -> Vec<&[byte]> {
@@ -261,31 +261,31 @@ pub fn FieldsFunc(s: &[byte], f: fn(rune) -> bool) -> Vec<&[byte]> {
     a
 }
 
-/// HasPrefix tests whether the string s begins with prefix.
+/// HasPrefix tests whether the byte slice s begins with prefix.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 判断s是否有前缀字符串prefix。
+/// 判断s是否有前缀切片prefix。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!(true,strings::HasPrefix("Rustacean","Rust"));
-/// assert_eq!(false,strings::HasPrefix("Rustacean","c"));
-/// assert_eq!(true,strings::HasPrefix("Rustacean",""));
-/// assert_eq!(true,strings::HasPrefix("Gopher","Go"));
+/// assert_eq!(true,bytes::HasPrefix("Rustacean","Rust"));
+/// assert_eq!(false,bytes::HasPrefix("Rustacean","c"));
+/// assert_eq!(true,bytes::HasPrefix("Rustacean",""));
+/// assert_eq!(true,bytes::HasPrefix("Gopher","Go"));
 ///
 /// ```
 pub fn HasPrefix(s: impl AsRef<[byte]>, prefix: impl AsRef<[byte]>) -> bool {
     s.as_ref().starts_with(prefix.as_ref())
 }
 
-/// HasSuffix tests whether the string s ends with suffix.
+/// HasSuffix tests whether the byte slice s ends with suffix.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 判断s是否有后缀字符串suffix。
+/// 判断s是否有后缀切片suffix。
 /// </details>
 ///
 /// # Example
@@ -308,7 +308,7 @@ pub fn HasSuffix(s: impl AsRef<[byte]>, suffix: impl AsRef<[byte]>) -> bool {
 /// If sep does not appear in s, cut returns s, "", false.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 在s中的第一个分隔字符串sep处切分字符串，返回sep前面部分before和sep后面的部分字符串after。found 值表示在s字符串中是否找到sep字符串。如果seq在s中找不到，切割结果返回(s,"",false)。
+/// 在s中的第一个分隔sep处切分子切片，返回sep前面部分子切片before和sep后面的部分切片after。found 值表示在s字符串中是否找到sep字节切片。如果seq在s中找不到，切割结果返回(s,"",false)。
 /// </details>
 ///
 /// # Example
@@ -327,6 +327,7 @@ pub fn Cut<'a>(s: &'a [byte], sep: &[byte]) -> (&'a [byte], &'a [byte], bool) {
         after = &s[(uint!(i) + len!(sep))..];
         found = true;
         return (before, after, found);
+    } else {
     }
     before = s;
     after = "".as_bytes();
