@@ -43,10 +43,10 @@ pub fn Compare(a: impl AsRef<[byte]>, b: impl AsRef<[byte]>) -> int {
     }
     1
 }
-/// Contains reports whether substr is within s.
+/// Contains reports whether subslice is within b.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 判断字符串s是否包含子串substr。
+/// 判断切片b是否包含子切片subslice。
 /// </details>
 ///
 /// # Example
@@ -59,17 +59,17 @@ pub fn Compare(a: impl AsRef<[byte]>, b: impl AsRef<[byte]>) -> int {
 /// assert_eq!(true,bytes::Contains(b"seafood", b""));
 /// assert_eq!(true,bytes::Contains(b"", b""));
 /// ```
-pub fn Contains(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> bool {
-    if substr.as_ref().is_empty() {
+pub fn Contains(b: impl AsRef<[byte]>, subslice: impl AsRef<[byte]>) -> bool {
+    if subslice.as_ref().is_empty() {
         return true;
     }
-    Index(s, substr) != -1
+    Index(b, subslice) != -1
 }
 
-/// ContainsAny reports whether any Unicode code points in chars are within s.
+/// ContainsAny reports whether any of the UTF-8-encoded code points in chars are within b.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 判断字符串s是否包含字符串chars中的任一字符。
+/// 判断chars字符中的任何UTF-8编码代码点是否在b切片内。
 /// </details>
 ///
 /// # Example
@@ -84,19 +84,19 @@ pub fn Contains(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> bool {
 ///    assert_eq!(true, bytes::ContainsAny("你好,中国", "hello,好"));
 ///
 /// ```
-pub fn ContainsAny(s: impl AsRef<[byte]>, chars: impl AsRef<[byte]>) -> bool {
+pub fn ContainsAny(b: impl AsRef<[byte]>, chars: impl AsRef<[byte]>) -> bool {
     for c in chars.as_ref() {
-        if s.as_ref().contains(c) {
+        if b.as_ref().contains(c) {
             return true;
         }
     }
     false
 }
 
-/// ContainsRune reports whether the Unicode code point r is within s.
+/// ContainsRune reports whether the rune is contained in the UTF-8-encoded byte slice b.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 判断字符串s是否包含utf-8码值r
+/// 判断字节切片b是否包含utf-8码值r
 /// </details>
 ///
 /// # Example
@@ -110,48 +110,48 @@ pub fn ContainsAny(s: impl AsRef<[byte]>, chars: impl AsRef<[byte]>) -> bool {
 /// assert_eq!(true, bytes::ContainsRune("hello中国!", 0x4e2d));
 /// assert_eq!(false, bytes::ContainsRune("hello世界!", 0x4e2d));
 /// ```
-pub fn ContainsRune(s: impl AsRef<[byte]>, r: rune) -> bool {
+pub fn ContainsRune(b: impl AsRef<[byte]>, r: rune) -> bool {
     let c = char::from_u32(r).unwrap();
     let bytes = c.to_string();
     let mut is_contain = false;
-    let mut b: Vec<byte> = Vec::new();
+    let mut buf: Vec<byte> = Vec::new();
     for v in bytes.bytes() {
-        if s.as_ref().contains(&v) {
+        if b.as_ref().contains(&v) {
             is_contain = true;
-            b.push(v);
-            if b.as_slice() == bytes.as_bytes() {
+            buf.push(v);
+            if buf.as_slice() == bytes.as_bytes() {
                 return is_contain;
             }
         } else {
-            b.clear();
+            buf.clear();
             is_contain = false;
         }
     }
     is_contain
 }
 
-/// Count counts the number of non-overlapping instances of substr in s. If substr is an empty string, Count returns 1 + the number of Unicode code points in s.
+/// Count counts the number of non-overlapping instances of sep in s. If sep is an empty slice, Count returns 1 + the number of UTF-8-encoded code points in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 返回字符串s中有几个不重复的substr子串。
+/// 返回s字节切片中有几个不重复的seq子切片。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
-///     assert_eq!(3, strings::Count("cheese", "e"));
-///     assert_eq!(5, strings::Count("five", ""));
-///     assert_eq!(4, strings::Count("台湾人香港人澳门人都是中国人", "人"));
+/// use gostd::bytes;
+///     assert_eq!(3, bytes::Count("cheese".as_bytes(), "e".as_bytes()));
+///     assert_eq!(5, bytes::Count("five".as_bytes(), "".as_bytes()));
+///     assert_eq!(4, bytes::Count("台湾人香港人澳门人都是中国人".as_bytes(), "人".as_bytes()));
 /// ```
-pub fn Count(mut s: &[byte], substr: impl AsRef<[byte]>) -> int {
-    if len!(substr.as_ref()) == 0 {
+pub fn Count(mut s: &[byte], sep: impl AsRef<[byte]>) -> int {
+    if len!(sep.as_ref()) == 0 {
         return int!(s.len() as isize + 1);
     }
 
-    if len!(substr.as_ref()) == 1 {
+    if len!(sep.as_ref()) == 1 {
         let mut c: int = 0;
-        let s1 = substr.as_ref()[0];
+        let s1 = sep.as_ref()[0];
         for v in s.as_ref() {
             if v == &s1 {
                 c += 1
@@ -162,12 +162,12 @@ pub fn Count(mut s: &[byte], substr: impl AsRef<[byte]>) -> int {
 
     let mut n: int = 0;
     loop {
-        let i = Index(s, substr.as_ref());
+        let i = Index(s, sep.as_ref());
         if i == -1 {
             return n;
         }
         n += 1;
-        s = &s[uint!(i) + len!(substr.as_ref())..];
+        s = &s[uint!(i) + len!(sep.as_ref())..];
     }
 }
 
