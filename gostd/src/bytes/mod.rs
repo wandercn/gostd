@@ -133,7 +133,7 @@ pub fn ContainsRune(b: impl AsRef<[byte]>, r: rune) -> bool {
 /// Count counts the number of non-overlapping instances of sep in s. If sep is an empty slice, Count returns 1 + the number of UTF-8-encoded code points in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 返回s字节切片中有几个不重复的seq子切片。
+/// 返回s字节切片中有几个不重复的sep子切片。
 /// </details>
 ///
 /// # Example
@@ -171,27 +171,6 @@ pub fn Count(mut s: &[byte], sep: impl AsRef<[byte]>) -> int {
     }
 }
 
-/// EqualFold reports whether s and t, interpreted as UTF-8 strings, are equal under Unicode case-folding, which is a more general form of case-insensitivity.
-/// <details class="rustdoc-toggle top-doc">
-/// <summary class="docblock">zh-cn</summary>
-/// 判断两个utf-8编码字符串（将unicode大写、小写、标题三种格式字符视为相同）是否相同
-/// </details>
-///
-/// # Example
-///
-/// ```
-/// use gostd::strings;
-///
-///    assert_eq!(true, strings::EqualFold("Hello, 世界", "heLLo, 世界"));
-///    assert_eq!(false, strings::EqualFold("hello,world", "hello, 世界"));
-///    assert_eq!(true, strings::EqualFold("RUST-LANG", "rust-lang"));
-///    assert_eq!(true, strings::EqualFold("Go", "go"));
-/// ```
-pub fn EqualFold(s: impl AsRef<[byte]>, t: impl AsRef<[byte]>) -> bool {
-    // s.as_ref().to_lowercase() == t.as_ref().to_lowercase()
-    todo!()
-}
-
 /// Fields splits the string s around each instance of one or more consecutive white space characters, as defined by unicode.IsSpace, returning a slice of substrings of s or an empty slice if s contains only white space.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
@@ -201,16 +180,16 @@ pub fn EqualFold(s: impl AsRef<[byte]>, t: impl AsRef<[byte]>) -> bool {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
-///  assert_eq!(vec!["foo","bar","baz"],strings::Fields("  foo bar  baz   "));
+/// use gostd::bytes;
+///  assert_eq!(vec!["foo".as_bytes(),"bar".as_bytes(),"baz".as_bytes()],bytes::Fields("  foo bar  baz   ".as_bytes()));
 ///  assert_eq!(
-///     vec!["aaa", "bbb", "cccc", "ddd"],
-///     strings::Fields("  \taaa bbb\t  cccc\r ddd  \r"));
+///     vec!["aaa".as_bytes(), "bbb".as_bytes(), "cccc".as_bytes(), "ddd".as_bytes()],
+///     bytes::Fields("  \taaa bbb\t  cccc\r ddd  \r".as_bytes()));
 /// ```
 pub fn Fields(s: &[byte]) -> Vec<&[byte]> {
     let f = |c: u32| {
         let s = char::from_u32(c).unwrap();
-        !s.is_whitespace()
+        s.is_whitespace()
     };
 
     FieldsFunc(s.as_ref(), f)
