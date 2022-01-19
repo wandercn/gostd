@@ -171,10 +171,10 @@ pub fn Count(mut s: &[byte], sep: impl AsRef<[byte]>) -> int {
     }
 }
 
-/// Fields splits the string s around each instance of one or more consecutive white space characters, as defined by unicode.IsSpace, returning a slice of substrings of s or an empty slice if s contains only white space.
+/// Fields interprets s as a sequence of UTF-8-encoded code points. It splits the slice s around each instance of one or more consecutive white space characters, as defined by unicode.IsSpace, returning a slice of subslices of s or an empty slice if s contains only white space.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 返回将字符串按照空白（unicode.IsSpace确定，可以是一到多个连续的空白字符）分割的多个字符串。如果字符串全部是空白或者是空字符串的话，会返回空切片。
+/// 字段将s解释为UTF-8编码的代码点序列。它围绕由unicode定义的一个或多个连续空白字符的每个实例分割成子切片。
 /// </details>
 ///
 /// # Example
@@ -194,13 +194,12 @@ pub fn Fields(s: &[byte]) -> Vec<&[byte]> {
 
     FieldsFunc(s.as_ref(), f)
 }
-
-/// FieldsFunc splits the string s at each run of Unicode code points c satisfying f(c) and returns an array of slices of s. If all code points in s satisfy f(c) or the string is empty, an empty slice is returned.
+/// FieldsFunc interprets s as a sequence of UTF-8-encoded code points. It splits the slice s at each run of code points c satisfying f(c) and returns a slice of subslices of s. If all code points in s satisfy f(c), or len(s) == 0, an empty slice is returned.
 ///
 /// FieldsFunc makes no guarantees about the order in which it calls f(c) and assumes that f always returns the same value for a given c.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 类似Fields，但使用函数f来确定分割符（满足f的utf-8码值）。如果字符串全部是分隔符或者是空字符串的话，会返回空切片。
 /// </details>
 ///
 /// # Example
