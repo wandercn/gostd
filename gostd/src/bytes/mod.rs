@@ -682,7 +682,7 @@ pub fn LastIndexFunc(s: impl AsRef<[byte]>, f: fn(rune) -> bool) -> int {
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
 ///    let rot13 = |r: u32| -> u32 {
 ///        if r >= 'A' as u32 && r < 'Z' as u32 {
@@ -693,14 +693,14 @@ pub fn LastIndexFunc(s: impl AsRef<[byte]>, f: fn(rune) -> bool) -> int {
 ///        }
 ///        r
 ///    };
-///    let s = "'Twas brillig and the slithy gopher...";
+///    let s = "'Twas brillig and the slithy gopher...".as_bytes();
 ///    assert_eq!(
-///        "'Gjnf oevyyvt naq gur fyvgul tbcure...",
-///        strings::Map(rot13, s)
+///        "'Gjnf oevyyvt naq gur fyvgul tbcure...".as_bytes(),
+///        bytes::Map(rot13, s)
 ///    );
 ///
 /// ```
-pub fn Map(mapping: fn(rune) -> rune, mut s: impl AsRef<[byte]>) -> String {
+pub fn Map(mapping: fn(rune) -> rune, mut s: impl AsRef<[byte]>) -> Vec<byte> {
     let mut b = Buffer::new();
     b.Grow(int!(len!(s.as_ref())));
     for (idx, &v) in s.as_ref().iter().enumerate() {
@@ -711,7 +711,7 @@ pub fn Map(mapping: fn(rune) -> rune, mut s: impl AsRef<[byte]>) -> String {
             b.WriteRune(v as u32);
         }
     }
-    b.String()
+    b.Bytes()
 }
 
 /// Repeat returns a new string consisting of count copies of the string s.
@@ -1338,7 +1338,7 @@ impl Buffer {
     /// <summary class="docblock">zh-cn</summary>
     /// 返回累积的字节序列
     /// </details>
-    pub fn Bytes(self) -> Vec<byte> {
+    pub fn Bytes(&self) -> Vec<byte> {
         self.buf.clone()
     }
 
