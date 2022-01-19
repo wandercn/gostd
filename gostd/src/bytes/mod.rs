@@ -1613,7 +1613,7 @@ pub struct Replacer<'a> {
 }
 
 impl<'a> Replacer<'a> {
-    /// new returns a new Replacer from a list of old, new &[byte] pairs. Replacements are performed in the order they appear in the target string, without overlapping matches. The old string comparisons are done in argument order.
+    /// new returns a new Replacer from a list of old, new bytes pairs. Replacements are performed in the order they appear in the target string, without overlapping matches. The old string comparisons are done in argument order.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
     /// 使用提供的多组old、new字节切片对创建并返回一个*Replacer。替换是依次进行的，匹配时不会重叠。
