@@ -145,6 +145,7 @@ use gostd::vendor
 - [x] strings模块, 完成剩余的方法实现。(version >=0.2.4)
 - [x] io模块,完成部分接口例如Reader，Writer等。(version >=0.2.4)
 - [x] http模块的client客户端功能，支持http和https。(version >=0.2.6)
+- [x] 完成bytes模块。(version >=0.2.8)
 
 # 独立发布包
  
