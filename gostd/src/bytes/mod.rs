@@ -18,12 +18,10 @@ use crate::builtin::*;
 use crate::io;
 use crate::unicode::utf8;
 use gostd_derive::Fmt;
-/// Compare returns an integer comparing two strings lexicographically. The result will be 0 if a==b, -1 if a < b, and +1 if a > b.
-/// Compare is included only for symmetry with package bytes. It is usually clearer and always faster to use the built-in string comparison operators ==, <, >, and so on.
+/// Compare returns an integer comparing two byte slices lexicographically. The result will be 0 if a==b, -1 if a < b, and +1 if a > b.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// Compare返回一个按字典顺序比较两个字符串的整数。如果a==b，结果为0；如果a<b，结果为-1；如果a>b，结果为+1
-/// 比较仅用于与包字节对称。使用内置的字符串比较运算符==、<、>，等等通常更清晰，而且总是更快。
+/// Compare函数返回一个整数表示两个&[byte]切片按字典序比较的结果（类同C的strcmp）。如果a==b返回0；如果a<b返回-1；否则返回+1。
 /// </details>
 ///
 /// # Example
@@ -45,10 +43,10 @@ pub fn Compare(a: impl AsRef<[byte]>, b: impl AsRef<[byte]>) -> int {
     }
     1
 }
-/// Contains reports whether substr is within s.
+/// Contains reports whether subslice is within b.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 判断字符串s是否包含子串substr。
+/// 判断切片b是否包含子切片subslice。
 /// </details>
 ///
 /// # Example
@@ -61,17 +59,17 @@ pub fn Compare(a: impl AsRef<[byte]>, b: impl AsRef<[byte]>) -> int {
 /// assert_eq!(true,bytes::Contains(b"seafood", b""));
 /// assert_eq!(true,bytes::Contains(b"", b""));
 /// ```
-pub fn Contains(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> bool {
-    if substr.as_ref().is_empty() {
+pub fn Contains(b: impl AsRef<[byte]>, subslice: impl AsRef<[byte]>) -> bool {
+    if subslice.as_ref().is_empty() {
         return true;
     }
-    Index(s, substr) != -1
+    Index(b, subslice) != -1
 }
 
-/// ContainsAny reports whether any Unicode code points in chars are within s.
+/// ContainsAny reports whether any of the UTF-8-encoded code points in chars are within b.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 判断字符串s是否包含字符串chars中的任一字符。
+/// 判断chars字符中的任何UTF-8编码代码点是否在b切片内。
 /// </details>
 ///
 /// # Example
@@ -86,19 +84,19 @@ pub fn Contains(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> bool {
 ///    assert_eq!(true, bytes::ContainsAny("你好,中国", "hello,好"));
 ///
 /// ```
-pub fn ContainsAny(s: impl AsRef<[byte]>, chars: impl AsRef<[byte]>) -> bool {
+pub fn ContainsAny(b: impl AsRef<[byte]>, chars: impl AsRef<[byte]>) -> bool {
     for c in chars.as_ref() {
-        if s.as_ref().contains(c) {
+        if b.as_ref().contains(c) {
             return true;
         }
     }
     false
 }
 
-/// ContainsRune reports whether the Unicode code point r is within s.
+/// ContainsRune reports whether the rune is contained in the UTF-8-encoded byte slice b.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 判断字符串s是否包含utf-8码值r
+/// 判断字节切片b是否包含utf-8码值r
 /// </details>
 ///
 /// # Example
@@ -112,48 +110,48 @@ pub fn ContainsAny(s: impl AsRef<[byte]>, chars: impl AsRef<[byte]>) -> bool {
 /// assert_eq!(true, bytes::ContainsRune("hello中国!", 0x4e2d));
 /// assert_eq!(false, bytes::ContainsRune("hello世界!", 0x4e2d));
 /// ```
-pub fn ContainsRune(s: impl AsRef<[byte]>, r: rune) -> bool {
+pub fn ContainsRune(b: impl AsRef<[byte]>, r: rune) -> bool {
     let c = char::from_u32(r).unwrap();
     let bytes = c.to_string();
     let mut is_contain = false;
-    let mut b: Vec<byte> = Vec::new();
+    let mut buf: Vec<byte> = Vec::new();
     for v in bytes.bytes() {
-        if s.as_ref().contains(&v) {
+        if b.as_ref().contains(&v) {
             is_contain = true;
-            b.push(v);
-            if b.as_slice() == bytes.as_bytes() {
+            buf.push(v);
+            if buf.as_slice() == bytes.as_bytes() {
                 return is_contain;
             }
         } else {
-            b.clear();
+            buf.clear();
             is_contain = false;
         }
     }
     is_contain
 }
 
-/// Count counts the number of non-overlapping instances of substr in s. If substr is an empty string, Count returns 1 + the number of Unicode code points in s.
+/// Count counts the number of non-overlapping instances of sep in s. If sep is an empty slice, Count returns 1 + the number of UTF-8-encoded code points in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 返回字符串s中有几个不重复的substr子串。
+/// 返回s字节切片中有几个不重复的sep子切片。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
-///     assert_eq!(3, strings::Count("cheese", "e"));
-///     assert_eq!(5, strings::Count("five", ""));
-///     assert_eq!(4, strings::Count("台湾人香港人澳门人都是中国人", "人"));
+/// use gostd::bytes;
+///     assert_eq!(3, bytes::Count("cheese".as_bytes(), "e".as_bytes()));
+///     assert_eq!(5, bytes::Count("five".as_bytes(), "".as_bytes()));
+///     assert_eq!(4, bytes::Count("台湾人香港人澳门人都是中国人".as_bytes(), "人".as_bytes()));
 /// ```
-pub fn Count(mut s: &[byte], substr: impl AsRef<[byte]>) -> int {
-    if len!(substr.as_ref()) == 0 {
+pub fn Count(mut s: &[byte], sep: impl AsRef<[byte]>) -> int {
+    if len!(sep.as_ref()) == 0 {
         return int!(s.len() as isize + 1);
     }
 
-    if len!(substr.as_ref()) == 1 {
+    if len!(sep.as_ref()) == 1 {
         let mut c: int = 0;
-        let s1 = substr.as_ref()[0];
+        let s1 = sep.as_ref()[0];
         for v in s.as_ref() {
             if v == &s1 {
                 c += 1
@@ -164,72 +162,50 @@ pub fn Count(mut s: &[byte], substr: impl AsRef<[byte]>) -> int {
 
     let mut n: int = 0;
     loop {
-        let i = Index(s, substr.as_ref());
+        let i = Index(s, sep.as_ref());
         if i == -1 {
             return n;
         }
         n += 1;
-        s = &s[uint!(i) + len!(substr.as_ref())..];
+        s = &s[uint!(i) + len!(sep.as_ref())..];
     }
 }
 
-/// EqualFold reports whether s and t, interpreted as UTF-8 strings, are equal under Unicode case-folding, which is a more general form of case-insensitivity.
+/// Fields interprets s as a sequence of UTF-8-encoded code points. It splits the slice s around each instance of one or more consecutive white space characters, as defined by unicode.IsSpace, returning a slice of subslices of s or an empty slice if s contains only white space.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 判断两个utf-8编码字符串（将unicode大写、小写、标题三种格式字符视为相同）是否相同
+/// 字段将s解释为UTF-8编码的代码点序列。它围绕由unicode定义的一个或多个连续空白字符的每个实例分割成子切片。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
-///
-///    assert_eq!(true, strings::EqualFold("Hello, 世界", "heLLo, 世界"));
-///    assert_eq!(false, strings::EqualFold("hello,world", "hello, 世界"));
-///    assert_eq!(true, strings::EqualFold("RUST-LANG", "rust-lang"));
-///    assert_eq!(true, strings::EqualFold("Go", "go"));
-/// ```
-pub fn EqualFold(s: impl AsRef<[byte]>, t: impl AsRef<[byte]>) -> bool {
-    // s.as_ref().to_lowercase() == t.as_ref().to_lowercase()
-    todo!()
-}
-
-/// Fields splits the string s around each instance of one or more consecutive white space characters, as defined by unicode.IsSpace, returning a slice of substrings of s or an empty slice if s contains only white space.
-/// <details class="rustdoc-toggle top-doc">
-/// <summary class="docblock">zh-cn</summary>
-/// 返回将字符串按照空白（unicode.IsSpace确定，可以是一到多个连续的空白字符）分割的多个字符串。如果字符串全部是空白或者是空字符串的话，会返回空切片。
-/// </details>
-///
-/// # Example
-///
-/// ```
-/// use gostd::strings;
-///  assert_eq!(vec!["foo","bar","baz"],strings::Fields("  foo bar  baz   "));
+/// use gostd::bytes;
+///  assert_eq!(vec!["foo".as_bytes(),"bar".as_bytes(),"baz".as_bytes()],bytes::Fields("  foo bar  baz   ".as_bytes()));
 ///  assert_eq!(
-///     vec!["aaa", "bbb", "cccc", "ddd"],
-///     strings::Fields("  \taaa bbb\t  cccc\r ddd  \r"));
+///     vec!["aaa".as_bytes(), "bbb".as_bytes(), "cccc".as_bytes(), "ddd".as_bytes()],
+///     bytes::Fields("  \taaa bbb\t  cccc\r ddd  \r".as_bytes()));
 /// ```
 pub fn Fields(s: &[byte]) -> Vec<&[byte]> {
     let f = |c: u32| {
         let s = char::from_u32(c).unwrap();
-        !s.is_whitespace()
+        s.is_whitespace()
     };
 
     FieldsFunc(s.as_ref(), f)
 }
-
-/// FieldsFunc splits the string s at each run of Unicode code points c satisfying f(c) and returns an array of slices of s. If all code points in s satisfy f(c) or the string is empty, an empty slice is returned.
+/// FieldsFunc interprets s as a sequence of UTF-8-encoded code points. It splits the slice s at each run of code points c satisfying f(c) and returns a slice of subslices of s. If all code points in s satisfy f(c), or len(s) == 0, an empty slice is returned.
 ///
 /// FieldsFunc makes no guarantees about the order in which it calls f(c) and assumes that f always returns the same value for a given c.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 类似Fields，但使用函数f来确定分割符（满足f的utf-8码值）。如果字符串全部是分隔符或者是空字符串的话，会返回空切片。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
 ///    /* fn f(c: u32) -> bool {
 ///        let s = char::from_u32(c).unwrap();
@@ -241,8 +217,8 @@ pub fn Fields(s: &[byte]) -> Vec<&[byte]> {
 ///        !s.is_numeric() && !s.is_alphabetic()
 ///    };
 ///    assert_eq!(
-///        vec!["foo1", "bar2", "baz3"],
-///        strings::FieldsFunc("  foo1;bar2,baz3...", f)
+///        vec!["foo1".as_bytes(), "bar2".as_bytes(), "baz3".as_bytes()],
+///        bytes::FieldsFunc("  foo1;bar2,baz3...".as_bytes(), f)
 ///    )
 /// ```
 pub fn FieldsFunc(s: &[byte], f: fn(rune) -> bool) -> Vec<&[byte]> {
@@ -285,31 +261,31 @@ pub fn FieldsFunc(s: &[byte], f: fn(rune) -> bool) -> Vec<&[byte]> {
     a
 }
 
-/// HasPrefix tests whether the string s begins with prefix.
+/// HasPrefix tests whether the byte slice s begins with prefix.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 判断s是否有前缀字符串prefix。
+/// 判断s是否有前缀切片prefix。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
-/// use gostd::strings;
+/// use gostd::bytes;
 ///
-/// assert_eq!(true,strings::HasPrefix("Rustacean","Rust"));
-/// assert_eq!(false,strings::HasPrefix("Rustacean","c"));
-/// assert_eq!(true,strings::HasPrefix("Rustacean",""));
-/// assert_eq!(true,strings::HasPrefix("Gopher","Go"));
+/// assert_eq!(true,bytes::HasPrefix("Rustacean","Rust"));
+/// assert_eq!(false,bytes::HasPrefix("Rustacean","c"));
+/// assert_eq!(true,bytes::HasPrefix("Rustacean",""));
+/// assert_eq!(true,bytes::HasPrefix("Gopher","Go"));
 ///
 /// ```
 pub fn HasPrefix(s: impl AsRef<[byte]>, prefix: impl AsRef<[byte]>) -> bool {
     s.as_ref().starts_with(prefix.as_ref())
 }
 
-/// HasSuffix tests whether the string s ends with suffix.
+/// HasSuffix tests whether the byte slice s ends with suffix.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 判断s是否有后缀字符串suffix。
+/// 判断s是否有后缀切片suffix。
 /// </details>
 ///
 /// # Example
@@ -332,7 +308,7 @@ pub fn HasSuffix(s: impl AsRef<[byte]>, suffix: impl AsRef<[byte]>) -> bool {
 /// If sep does not appear in s, cut returns s, "", false.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 在s中的第一个分隔字符串sep处切分字符串，返回sep前面部分before和sep后面的部分字符串after。found 值表示在s字符串中是否找到sep字符串。如果seq在s中找不到，切割结果返回(s,"",false)。
+/// 在s中的第一个分隔sep处切分子切片，返回sep前面部分子切片before和sep后面的部分切片after。found 值表示在s字符串中是否找到sep字节切片。如果seq在s中找不到，切割结果返回(s,"",false)。
 /// </details>
 ///
 /// # Example
@@ -351,6 +327,7 @@ pub fn Cut<'a>(s: &'a [byte], sep: &[byte]) -> (&'a [byte], &'a [byte], bool) {
         after = &s[(uint!(i) + len!(sep))..];
         found = true;
         return (before, after, found);
+    } else {
     }
     before = s;
     after = "".as_bytes();
@@ -358,10 +335,10 @@ pub fn Cut<'a>(s: &'a [byte], sep: &[byte]) -> (&'a [byte], &'a [byte], bool) {
     (before, after, found)
 }
 
-/// Index returns the index of the first instance of substr in s, or -1 if substr is not present in s.
+/// Index returns the index of the first instance of sep in s, or -1 if sep is not present in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 子串substr在字符串s中第一次出现的位置，不存在则返回-1
+/// 子切片sep在s中第一次出现的位置，不存在则返回-1。
 /// </details>
 ///
 /// # Example
@@ -373,18 +350,18 @@ pub fn Cut<'a>(s: &'a [byte], sep: &[byte]) -> (&'a [byte], &'a [byte], bool) {
 /// assert_eq!(4,bytes::Index("chkcken", "ken"));
 /// assert_eq!(-1,bytes::Index("chicken", "dmr"));
 /// ```
-pub fn Index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
-    let n = len!(substr.as_ref());
+pub fn Index(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> int {
+    let n = len!(sep.as_ref());
     let length = len!(s.as_ref());
     match n {
         0 => {
             return 0 as int;
         }
-        1 => return IndexByte(s.as_ref(), substr.as_ref()[0]),
+        1 => return IndexByte(s.as_ref(), sep.as_ref()[0]),
 
         _ => {
             if length == n {
-                if s.as_ref() == substr.as_ref() {
+                if s.as_ref() == sep.as_ref() {
                     return 0 as int;
                 }
                 return -1;
@@ -394,28 +371,25 @@ pub fn Index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
             }
         }
     }
-    index(s, substr)
+    index(s, sep)
 }
 
-fn index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
-    let n: usize = len!(substr.as_ref());
+fn index(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> int {
+    let n: usize = len!(sep.as_ref());
     let length = len!(s.as_ref());
-    let start_byte = substr.as_ref()[0];
-    for (index, &v) in s.as_ref().iter().enumerate() {
-        if start_byte == v
-            && index + n <= length
-            && substr.as_ref() == &s.as_ref()[index..index + n]
-        {
-            return int!(index);
+    let start_byte = sep.as_ref()[0];
+    for (i, &v) in s.as_ref().iter().enumerate() {
+        if start_byte == v && i + n <= length && sep.as_ref() == &s.as_ref()[i..i + n] {
+            return int!(i);
         }
     }
     -1
 }
 
-/// IndexAny returns the index of the first instance of any Unicode code point from chars in s, or -1 if no Unicode code point from chars is present in s.
+/// IndexAny interprets s as a sequence of UTF-8-encoded Unicode code points. It returns the byte index of the first occurrence in s of any of the Unicode code points in chars. It returns -1 if chars is empty or if there is no code point in common.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 字符串chars中的任一utf-8码值在s中第一次出现的位置，如果不存在或者chars为空字符串则返回-1。
+/// 字符串chars中的任一utf-8编码在s中第一次出现的位置，如不存在或者chars为空字符串则返回-1
 /// </details>
 ///
 /// # Example
@@ -441,10 +415,10 @@ pub fn IndexAny(s: impl AsRef<[byte]>, chars: impl AsRef<str>) -> int {
     -1
 }
 
-/// IndexByte returns the index of the first instance of c in s, or -1 if c is not present in s.
+/// IndexByte returns the index of the first instance of c in b, or -1 if c is not present in b.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 字符c在s中第一次出现的位置，不存在则返回-1。
+/// 字符c在s切片中第一次出现的位置，不存在则返回-1。
 /// </details>
 ///
 /// # Example
@@ -468,7 +442,7 @@ pub fn IndexByte(s: impl AsRef<[byte]>, c: byte) -> int {
     -1
 }
 
-/// IndexFunc returns the index into s of the first Unicode code point satisfying f(c), or -1 if none do.
+/// IndexFunc interprets s as a sequence of UTF-8-encoded code points. It returns the byte index in s of the first Unicode code point satisfying f(c), or -1 if none do.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
 /// IndexFunc将满足f（rune）的第一个Unicode代码点的索引返回到s，如果没有，则返回-1。
@@ -503,10 +477,10 @@ pub fn IndexFunc(s: impl AsRef<[byte]>, f: fn(rune) -> bool) -> int {
     -1
 }
 
-/// IndexRune returns the index of the first instance of the Unicode code point r, or -1 if rune is not present in s. If r is utf8.RuneError, it returns the first instance of any invalid UTF-8 byte sequence.
+/// IndexRune interprets s as a sequence of UTF-8-encoded code points. It returns the byte index of the first occurrence in s of the given rune. It returns -1 if rune is not present in s. If r is utf8.RuneError, it returns the first instance of any invalid UTF-8 byte sequence.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// unicode码值r在s中第一次出现的位置，不存在则返回-1。
+/// unicode码值r在s字节切片中第一次出现的位置，不存在则返回-1。
 /// </details>
 ///
 /// # Example
@@ -524,17 +498,17 @@ pub fn IndexFunc(s: impl AsRef<[byte]>, f: fn(rune) -> bool) -> int {
 /// ```
 pub fn IndexRune(s: impl AsRef<[byte]>, r: rune) -> int {
     let c = char::from_u32(r).expect("IndexRune rune to char failed!");
-    let bytes = c.to_string();
-    let n = bytes.as_bytes().len();
-    for (i, &x) in s.as_ref().iter().enumerate() {
-        if bytes.as_bytes()[0] == s.as_ref()[i] && &s.as_ref()[i..i + n] == bytes.as_bytes() {
+    let b = c.to_string();
+    let n = b.as_bytes().len();
+    for (i, _) in s.as_ref().iter().enumerate() {
+        if b.as_bytes()[0] == s.as_ref()[i] && &s.as_ref()[i..i + n] == b.as_bytes() {
             return int!(i);
         }
     }
     -1
 }
 
-/// Join concatenates the elements of its first argument to create a single string. The separator string sep is placed between elements in the resulting string.
+/// Join concatenates the elements of s to create a new byte slice. The separator sep is placed between elements in the resulting slice.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
 /// 将一系列字符串连接为一个字符串，之间用sep来分隔。
@@ -558,10 +532,10 @@ pub fn Join(elems: Vec<&[byte]>, sep: impl AsRef<[byte]>) -> Vec<byte> {
     elems.join(sep.as_ref())
 }
 
-/// LastIndex returns the index of the last instance of substr in s, or -1 if substr is not present in s.
+/// LastIndex returns the index of the last instance of sep in s, or -1 if sep is not present in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 子串substr在字符串s中最后一次出现的位置，不存在则返回-1。
+/// 切片sep在字符串s中最后一次出现的位置，不存在则返回-1。
 /// </details>
 ///
 /// # Example
@@ -612,10 +586,10 @@ pub fn LastIndex(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> int {
     -1
 }
 
-/// LastIndexAny returns the index of the last instance of any Unicode code point from chars in s, or -1 if no Unicode code point from chars is present in s.
+/// LastIndexAny interprets s as a sequence of UTF-8-encoded Unicode code points. It returns the byte index of the last occurrence in s of any of the Unicode code points in chars. It returns -1 if chars is empty or if there is no code point in common.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 字符串chars中的任一utf-8码值在s中最后一次出现的位置，如不存在或者chars为空字符串则返回-1。
+/// 字符串chars中的任一utf-8字符在s中最后一次出现的位置，如不存在或者chars为空字符串则返回-1。
 /// </details>
 ///
 /// # Example
@@ -647,8 +621,7 @@ pub fn LastIndexAny(s: impl AsRef<[byte]>, chars: impl AsRef<str>) -> int {
 /// LastIndexByte returns the index of the last instance of c in s, or -1 if c is not present in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 字符c在s中最后一次出现的位置，如不存在返回-1。
-
+/// 返回s中c的最后一个出现的位置，如果s中不存在c，则返回-1。
 /// </details>
 ///
 /// # Example
@@ -671,10 +644,10 @@ pub fn LastIndexByte(s: impl AsRef<[byte]>, c: byte) -> int {
     -1
 }
 
-/// LastIndexFunc returns the index into s of the last Unicode code point satisfying f(c), or -1 if none do.
+/// LastIndexFunc interprets s as a sequence of UTF-8-encoded code points. It returns the byte index in s of the last Unicode code point satisfying f(c), or -1 if none do.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// s中最后一个满足函数f的unicode码值的位置i，不存在则返回-1。
+/// s字节切片中最后一个满足函数f的unicode码值的位置，不存在则返回-1。
 /// </details>
 ///
 /// # Example
@@ -728,7 +701,7 @@ pub fn LastIndexFunc(s: impl AsRef<[byte]>, f: fn(rune) -> bool) -> int {
 ///
 /// ```
 pub fn Map(mapping: fn(rune) -> rune, mut s: impl AsRef<[byte]>) -> String {
-    let mut b = Builder::new();
+    let mut b = Buffer::new();
     b.Grow(int!(len!(s.as_ref())));
     for (idx, &v) in s.as_ref().iter().enumerate() {
         let r = mapping(v as u32);
@@ -746,7 +719,7 @@ pub fn Map(mapping: fn(rune) -> rune, mut s: impl AsRef<[byte]>) -> String {
 /// It panics if count is negative or if the result of (len!(s) * count) overflows.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 返回count个s串联的字符串。
+/// 返回count个b串联形成的新的切片。
 /// </details>
 ///
 /// # Example
@@ -768,11 +741,10 @@ pub fn Repeat(s: impl AsRef<[byte]>, count: uint) -> Vec<byte> {
     s.as_ref().repeat(count)
 }
 
-/// Replace returns a copy of the string s with the first n non-overlapping instances of old replaced by new. If old is empty, it matches at the beginning of the string and after each UTF-8 sequence, yielding up to k+1 replacements for a k-rune string. If n < 0, there is no limit on the number of replacements.
-/// It panics if count is negative or if the result of (len!(s) * count) overflows.
+/// Replace returns a copy of the slice s with the first n non-overlapping instances of old replaced by new. If old is empty, it matches at the beginning of the slice and after each UTF-8 sequence, yielding up to k+1 replacements for a k-rune slice. If n = -1, there is no limit on the number of replacements.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 返回将s中前n个不重叠old子串都替换为new的新字符串，如果n<0会替换所有old子串
+/// 返回将s中前n个不重叠old切片序列都替换为new的新的切片拷贝，如果n=-1会替换所有old子切片。
 /// </details>
 ///
 /// # Example
@@ -806,10 +778,10 @@ pub fn Replace(
     result
 }
 
-/// ReplaceAll returns a copy of the string s with all non-overlapping instances of old replaced by new. If old is empty, it matches at the beginning of the string and after each UTF-8 sequence, yielding up to k+1 replacements for a k-rune string.
+/// ReplaceAll returns a copy of the slice s with all non-overlapping instances of old replaced by new. If old is empty, it matches at the beginning of the slice and after each UTF-8 sequence, yielding up to k+1 replacements for a k-rune slice.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 返回将s中不重叠old子串都替换为new的新字符串。
+/// 返回将s中不重叠old切片序列都替换为new的新的切片拷贝。
 /// </details>
 ///
 /// # Example
@@ -829,16 +801,10 @@ pub fn ReplaceAll(
     Replace(s, old, new, -1)
 }
 
-/// Split slices s into all substrings separated by sep and returns a slice of the substrings between those separators.
-///
-/// If s does not contain sep and sep is not empty, Split returns a slice of length 1 whose only element is s.
-///
-/// If sep is empty, Split splits after each UTF-8 sequence. If both s and sep are empty, Split returns an empty slice.
-///
-/// It is equivalent to SplitN with a count of -1.
+/// Split slices s into all subslices separated by sep and returns a slice of the subslices between those separators. If sep is empty, Split splits after each UTF-8 sequence. It is equivalent to SplitN with a count of -1.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 用去掉s中出现的sep的方式进行分割，会分割到结尾，并返回生成的所有片段组成的切片（每一个sep都会进行一次切割，即使两个sep相邻，也会进行两次切割）。如果sep为空字符，Split会将s切分成每一个unicode码值一个字符串。
+/// 用去掉s中出现的sep的方式进行分割，会分割到结尾，并返回生成的所有&[byte]切片组成的切片（每一个sep都会进行一次切割，即使两个sep相邻，也会进行两次切割）。如果sep为空字符，Split会将s切分成每一个unicode码值一个[]byte切片。
 /// </details>
 ///
 /// # Example
@@ -851,7 +817,6 @@ pub fn ReplaceAll(
 /// assert_eq!(vec![b" ".to_vec(), b"x".to_vec(), b"y".to_vec(), b"z".to_vec(), b" ".to_vec()],bytes::Split(" xyz ".as_bytes(),""));
 /// assert_eq!(vec![b"".to_vec()],bytes::Split("".as_bytes(),"Bernardo O'Higgins".as_bytes()));
 /// ```
-
 pub fn Split(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> Vec<Vec<byte>> {
     genSplit(s, sep, 0, -1)
 }
@@ -888,16 +853,10 @@ fn genSplit(
     a
 }
 
-/// SplitAfter slices s into all substrings after each instance of sep and returns a slice of those substrings.
-///
-/// If s does not contain sep and sep is not empty, SplitAfter returns a slice of length 1 whose only element is s.
-///
-/// If sep is empty, SplitAfter splits after each UTF-8 sequence. If both s and sep are empty, SplitAfter returns an empty slice.
-///
-/// It is equivalent to SplitAfterN with a count of -1.
+/// SplitAfter slices s into all subslices after each instance of sep and returns a slice of those subslices. If sep is empty, SplitAfter splits after each UTF-8 sequence. It is equivalent to SplitAfterN with a count of -1.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 用从s中出现的sep后面切断的方式进行分割，会分割到结尾，并返回生成的所有片段组成的切片（每一个sep都会进行一次切割，即使两个sep相邻，也会进行两次切割）。如果sep为空字符，Split会将s切分成每一个unicode码值一个字符串。
+/// 用从s中出现的sep后面切断的方式进行分割，会分割到结尾，并返回生成的所有&[byte]切片组成的切片（每一个sep都会进行一次切割，即使两个sep相邻，也会进行两次切割）。如果sep为空字符，Split会将s切分成每一个unicode码值一个&[byte]切片。
 /// </details>
 ///
 /// # Example
@@ -911,26 +870,25 @@ pub fn SplitAfter(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> Vec<Vec<byt
     genSplit(s, sep.as_ref(), len!(sep.as_ref()), -1)
 }
 
-/// SplitAfterN slices s into substrings after each instance of sep and returns a slice of those substrings.
-///
-/// The count determines the number of substrings to return:
+/// SplitAfterN slices s into subslices after each instance of sep and returns a slice of those subslices. If sep is empty, SplitAfterN splits after each UTF-8 sequence.
+/// The count determines the number of subslices to return:
 /// ```text
-/// n > 0: at most n substrings; the last substring will be the unsplit remainder.
-/// n == 0: the result is [] (zero substrings)
-/// n < 0: all substrings
+/// n > 0: at most n subslices; the last subslice will be the unsplit remainder.
+/// n == 0: the result is [] (zero subslices)
+/// n < 0: all subslices
 /// ```
 /// Edge cases for s and sep (for example, empty strings) are handled as described in the documentation for SplitAfter.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 用从s中出现的sep后面切断的方式进行分割，会分割到结尾，并返回生成的所有片段组成的切片（每一个sep都会进行一次切割，即使两个sep相邻，也会进行两次切割）。如果sep为空字符，Split会将s切分成每一个unicode码值一个字符串。
+/// 用从s中出现的sep后面切断的方式进行分割，会分割到最多n个子切片，并返回生成的所有 &[byte]切片组成的切片（每一个sep都会进行一次切割，即使两个sep相邻，也会进行两次切割）。如果sep为空字符，Split会将s切分成每一个unicode码值一个&[byte]切片
 ///
 /// 参数n决定返回的切片的数目：
 ///
 /// ```text
 ///
-/// n > 0 : 返回的切片最多n个子字符串；最后一个子字符串包含未进行切割的部分(当n大于最大子串数量，也只返回最大值)。
+/// n > 0 : 返回的切片最多n个子切片；最后一个子切片包含未进行切割的部分。
 /// n == 0: 返回[]
-/// n < 0 : 返回所有的子字符
+/// n < 0 : 返回所有的子切片组成的切片
 ///
 /// ```
 /// </details>
@@ -958,15 +916,14 @@ pub fn SplitAfterN(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>, n: int) -> Ve
     genSplit(s, sep.as_ref(), len!(sep.as_ref()), n)
 }
 
-/// SplitN slices s into substrings separated by sep and returns a slice of the substrings between those separators.
+/// SplitN slices s into subslices separated by sep and returns a slice of the subslices between those separators. If sep is empty, SplitN splits after each UTF-8 sequence.
 ///
-/// The count determines the number of substrings to return:
+/// The count determines the number of subslices to return:
 /// ```text
-/// n > 0: at most n substrings; the last substring will be the unsplit remainder.
-/// n == 0: the result is nil (zero substrings)
-/// n < 0: all substrings
+/// n > 0: at most n subslices; the last subslices will be the unsplit remainder.
+/// n == 0: the result is [] (zero subslices)
+/// n < 0: all subslices
 /// ```
-/// Edge cases for s and sep (for example, empty strings) are handled as described in the documentation for Split.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
 /// 用去掉s中出现的sep的方式进行分割，会分割到结尾，并返回生成的所有片段组成的切片（每一个sep都会进行一次切割，即使两个sep相邻，也会进行两次切割）。如果sep为空字符，Split会将s切分成每一个unicode码值一个字符串。参数n决定返回的切片的数目：
@@ -1049,10 +1006,10 @@ pub fn ToUpper(s: impl AsRef<[byte]>) -> Vec<byte> {
     s.as_ref().to_ascii_uppercase()
 }
 
-/// Trim returns a slice of the string s with all leading and trailing Unicode code points contained in cutset removed.
+/// Trim returns a subslice of s by slicing off all leading and trailing UTF-8-encoded code points contained in cutset.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 返回将s前后端所有cutset包含的utf-8码值都去掉的字符串。
+/// 返回将s前后端所有cutset包含的utf-8码值都去掉的子切片。
 /// </details>
 ///
 /// # Example
@@ -1068,10 +1025,10 @@ pub fn Trim(mut s: &[byte], cutset: impl AsRef<[byte]>) -> &[byte] {
     TrimRight(TrimLeft(s, cutset.as_ref()), cutset.as_ref())
 }
 
-/// TrimFunc returns a slice of the string s with all leading and trailing Unicode code points c satisfying f(c) removed.
+/// TrimFunc returns a subslice of s by slicing off all leading and trailing UTF-8-encoded code points c that satisfy f(c).
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-///
+/// 返回将s前后端所有满足f的unicode码值都去掉的子切片。
 /// </details>
 ///
 /// # Example
@@ -1086,12 +1043,10 @@ pub fn TrimFunc(s: &[byte], f: fn(rune) -> bool) -> &[byte] {
     TrimRightFunc(TrimLeftFunc(s, f), f)
 }
 
-/// TrimLeft returns a slice of the string s with all leading Unicode code points contained in cutset removed.
-///
-/// To remove a prefix, use TrimPrefix instead.
+/// TrimLeft returns a subslice of s by slicing off all leading UTF-8-encoded code points contained in cutset.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 返回将s前端所有cutset包含的utf-8码值都去掉的字符串。
+/// 返回将s前端所有cutset包含的unicode码值都去掉的子切片
 /// </details>
 ///
 /// # Example
@@ -1114,10 +1069,10 @@ pub fn TrimLeft(s: &[byte], cutset: impl AsRef<[byte]>) -> &[byte] {
     &s[i..]
 }
 
-/// TrimLeftFunc returns a slice of the string s with all leading Unicode code points c satisfying f(c) removed.
+/// TrimLeftFunc treats s as UTF-8-encoded bytes and returns a subslice of s by slicing off all leading UTF-8-encoded code points c that satisfy f(c).
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 返回将s前端所有满足f的unicode码值都去掉的字符串
+/// 返回将s前端所有满足f的unicode码值都去掉的子切片。
 /// </details>
 ///
 /// # Example
@@ -1144,10 +1099,10 @@ pub fn TrimLeftFunc(s: &[byte], f: fn(rune) -> bool) -> &[byte] {
     &s[i..]
 }
 
-/// TrimPrefix returns s without the provided leading prefix string. If s doesn't start with prefix, s is returned unchanged.
+/// TrimPrefix returns s without the provided leading prefix slices. If s doesn't start with prefix, s is returned unchanged.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 返回去除s可能的前缀prefix的字符串。
+/// 返回去除s可能的前缀prefix的子切片。
 /// </details>
 ///
 /// # Example
@@ -1165,12 +1120,10 @@ pub fn TrimPrefix(s: &[byte], prefix: impl AsRef<[byte]>) -> &[byte] {
     }
 }
 
-/// TrimRight returns a slice of the string s, with all trailing Unicode code points contained in cutset removed.
-///
-/// To remove a suffix, use TrimSuffix instead.
+/// TrimRight returns a subslice of s by slicing off all trailing UTF-8-encoded code points that are contained in cutset.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 返回将s后端所有cutset包含的utf-8码值都去掉的字符串。
+/// 返回将s后端所有cutset包含的unicode码值都去掉的子切片。
 /// </details>
 ///
 /// # Example
@@ -1195,10 +1148,10 @@ pub fn TrimRight(s: &[byte], cutset: impl AsRef<[byte]>) -> &[byte] {
     &s[..n - i]
 }
 
-/// TrimRightFunc returns a slice of the string s with all trailing Unicode code points c satisfying f(c) removed.
+/// TrimRightFunc returns a subslice of s by slicing off all trailing UTF-8-encoded code points c that satisfy f(c).
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 返回将s后端所有满足f的unicode码值都去掉的字符串。
+/// 返回将s后端所有满足f的unicode码值都去掉的子切片。
 /// </details>
 ///
 /// # Example
@@ -1225,10 +1178,10 @@ pub fn TrimRightFunc(s: &[byte], f: fn(rune) -> bool) -> &[byte] {
     &s[..n - i]
 }
 
-/// TrimSpace returns a slice of the string s, with all leading and trailing white space removed, as defined by Unicode.
+/// TrimSpace returns a subslice of s by slicing off all leading and trailing white space, as defined by Unicode.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 返回将s前后端所有空白（is_whitespace()指定）都去掉的字符串。
+/// 返回将s前后端所有空白（is_whitespace()指定）都去掉的切片。
 /// </details>
 ///
 /// # Example
@@ -1265,7 +1218,7 @@ pub fn TrimSpace(s: &[byte]) -> &[byte] {
 /// TrimSuffix returns s without the provided trailing suffix string. If s doesn't end with suffix, s is returned unchanged.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 返回去除s可能的后缀suffix的字符串。
+/// 返回去除s可能的后缀suffix的子切片。
 /// </details>
 ///
 /// # Example
@@ -1283,21 +1236,21 @@ pub fn TrimSuffix(s: &[byte], suffix: impl AsRef<[byte]>) -> &[byte] {
     }
 }
 
-// Builder Begin
+// Buffer Begin
 
-/// A Builder is used to efficiently build a string using Write methods. It minimizes memory copying. The zero value is ready to use. Do not copy a non-zero Builder.
+/// A Buffer is a variable-sized buffer of bytes with Read and Write methods. The zero value for Buffer is an empty buffer ready to use.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// Builder 生成器用于使用写方法高效地构建字符串。它最大限度地减少了内存复制。零值已准备好使用。不要复制非零生成器。
+/// Buffer是一个实现了读写方法的可变大小的字节缓冲。本类型的零值是一个空的可用于读写的缓冲。
 /// </details>
 ///
 /// # Example
 ///
 /// ```
 ///  use gostd::io::*;
-///  use gostd::strings::Builder;
+///  use gostd::bytes::Buffer;
 ///
-///  let mut buf = Builder::new();
+///  let mut buf = Buffer::new();
 ///  buf.WriteString("hello");
 ///  buf.WriteByte(b' ');
 ///  buf.WriteString("world");
@@ -1314,19 +1267,19 @@ pub fn TrimSuffix(s: &[byte], suffix: impl AsRef<[byte]>) -> &[byte] {
 ///
 /// ```
 #[derive(Default, PartialEq, PartialOrd, Debug, Clone, Fmt)]
-pub struct Builder {
-    addr: Box<Option<Builder>>,
+pub struct Buffer {
+    addr: Box<Option<Buffer>>,
     buf: Vec<byte>,
 }
 
-impl Builder {
+impl Buffer {
     /// initialization a Builder
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
     /// 初始化生成器
     /// </details>
-    pub fn new() -> Builder {
-        let mut b = Builder::default();
+    pub fn new() -> Buffer {
+        let mut b = Buffer::default();
         b.addr = Box::new(Some(b.clone()));
         b
     }
@@ -1420,7 +1373,7 @@ impl Builder {
 }
 
 use crate::io::ByteWriter;
-impl ByteWriter for Builder {
+impl ByteWriter for Buffer {
     /// WriteByte appends the byte c to b's buffer.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
@@ -1433,7 +1386,7 @@ impl ByteWriter for Builder {
 }
 
 use crate::io::StringWriter;
-impl StringWriter for Builder {
+impl StringWriter for Buffer {
     /// WriteString appends the contents of s to b's buffer. It returns the length of s.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
@@ -1446,7 +1399,7 @@ impl StringWriter for Builder {
 }
 
 use crate::io::Writer;
-impl Writer for Builder {
+impl Writer for Buffer {
     /// Write appends the contents of p to b's buffer. Write always returns len!(p).
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
@@ -1458,7 +1411,7 @@ impl Writer for Builder {
     }
 }
 
-// Builder End
+// Buffer End
 /// A Reader implements the io.Reader, io.ReaderAt, io.ByteReader, io.ByteScanner,
 /// io.RuneReader, io.RuneScanner, io.Seeker, and io.WriterTo interfaces by reading
 /// from a string.
@@ -1469,7 +1422,7 @@ impl Writer for Builder {
 /// </details>
 #[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
 pub struct Reader {
-    s: String,
+    s: Vec<byte>,
     i: int64,      // current reading index
     prevRune: int, // index of previous rune; or < 0
 }
@@ -1536,8 +1489,8 @@ impl io::Reader for Reader {
             return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
         }
         self.prevRune = -1;
-        let n = int!(len!(self.s.as_bytes()[uint!(self.i)..]));
-        b.copy_from_slice(self.s.as_bytes()[uint!(self.i)..].as_ref());
+        let n = int!(len!(self.s.as_slice()[uint!(self.i)..]));
+        b.copy_from_slice(self.s.as_slice()[uint!(self.i)..].as_ref());
         self.i += int64!(n);
         Ok(n)
     }
@@ -1554,8 +1507,8 @@ impl io::ReaderAt for Reader {
         if off >= int64!(len!(self.s)) {
             return Err(Error::new(ErrorKind::UnexpectedEof, "EOF")); //todo io.EOF在rust中怎么表示
         }
-        let n = len!(self.s.as_bytes()[uint!(off)..]);
-        b.copy_from_slice(self.s.as_bytes()[uint!(off)..].as_ref());
+        let n = len!(self.s.as_slice()[uint!(off)..]);
+        b.copy_from_slice(self.s.as_slice()[uint!(off)..].as_ref());
         if n < len!(b) {
             return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
         }
@@ -1569,7 +1522,7 @@ impl io::ByteReader for Reader {
         if self.i >= int64!(len!(self.s)) {
             return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
         }
-        let b = self.s.as_bytes()[uint!(self.i)];
+        let b = self.s.as_slice()[uint!(self.i)];
         self.i += 1;
         Ok(b)
     }
@@ -1582,12 +1535,12 @@ impl io::RuneReader for Reader {
             return Err(Error::new(ErrorKind::UnexpectedEof, "EOF"));
         }
         self.prevRune = self.i as int;
-        if let Some(c) = self.s.chars().nth(uint!(self.i)) {
+        if let Some(&c) = self.s.as_slice().get(uint!(self.i)) {
             if rune!(c) < utf8::RuneSelf {
                 self.i += 1;
                 return Ok((rune!(c), 1));
             }
-            let size = c.len_utf8() as int;
+            let size = c.to_ne_bytes().len() as int;
             self.i += 1;
             return Ok((c as rune, size as isize));
         } else {
@@ -1627,15 +1580,15 @@ impl io::ByteScanner for Reader {
 }
 
 impl io::WriterTo for Reader {
-    fn WriteTo(&mut self, w: Box<dyn io::Writer>) -> Result<int64, Error> {
+    fn WriteTo(&mut self, mut w: Box<dyn io::Writer>) -> Result<int64, Error> {
         self.prevRune = -1;
         if self.i >= int64!(len!(self.s)) {
             return Ok(0);
         }
         let s = self.s.get(self.i as usize..).unwrap();
-        if let Ok(m) = io::WriteString(w, s) {
+        if let Ok(m) = w.Write(s.to_vec()) {
             if m > int!(len!(s)) {
-                panic!("gostd::strings::Reader::WriteTo: invalid WriteString count")
+                panic!("gostd::bytes::Reader::WriteTo: invalid Write count")
             }
             if m != int!(len!(s)) {
                 return Err(Error::new(ErrorKind::Other, "short write"));
@@ -1649,32 +1602,32 @@ impl io::WriterTo for Reader {
     }
 }
 
-/// Replacer replaces a list of strings with replacements. It is safe for concurrent use by multiple goroutines.
+/// Replacer replaces a list of slices with replacements. It is safe for concurrent use by multiple goroutines.
 ///
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// Replacer类型进行一系列字符串的替换。
+/// Replacer类型进行一系列字节切片的替换。
 /// </details>
 pub struct Replacer<'a> {
-    oldnew: Vec<(&'a str, &'a str)>,
+    oldnew: Vec<(&'a [byte], &'a [byte])>,
 }
 
 impl<'a> Replacer<'a> {
-    /// new returns a new Replacer from a list of old, new string pairs. Replacements are performed in the order they appear in the target string, without overlapping matches. The old string comparisons are done in argument order.
+    /// new returns a new Replacer from a list of old, new &[byte] pairs. Replacements are performed in the order they appear in the target string, without overlapping matches. The old string comparisons are done in argument order.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
-    /// 使用提供的多组old、new字符串对创建并返回一个*Replacer。替换是依次进行的，匹配时不会重叠。
+    /// 使用提供的多组old、new字节切片对创建并返回一个*Replacer。替换是依次进行的，匹配时不会重叠。
     /// </details>
     ///
     /// # Example
     ///
     /// ```
-    /// use gostd::strings;
+    /// use gostd::bytes;
     ///
-    ///    let p = vec![("<", "&lt;"), (">", "&gt;")];
-    ///    let r = strings::Replacer::new(p);
-    ///    let s = r.Replace("This is <b>HTML</b>!");
-    ///    println!("{}", s);
+    ///    let p = vec![("<".as_bytes(), "&lt;".as_bytes()), (">".as_bytes(), "&gt;".as_bytes())];
+    ///    let r = bytes::Replacer::new(p);
+    ///    let s = r.Replace("This is <b>HTML</b>!".as_bytes());
+    ///    println!("{}", String::from_utf8(s).unwrap());
     ///
     /// ```
     /// # Output
@@ -1682,7 +1635,7 @@ impl<'a> Replacer<'a> {
     /// ```text
     /// This is &lt;b&gt;HTML&lt;/b&gt;!
     /// ```
-    pub fn new(pairs: Vec<(&'a str, &'a str)>) -> Replacer<'a> {
+    pub fn new(pairs: Vec<(&'a [byte], &'a [byte])>) -> Replacer<'a> {
         Replacer { oldnew: pairs }
     }
     /// Replace returns a copy of s with all replacements performed.
@@ -1690,13 +1643,13 @@ impl<'a> Replacer<'a> {
     /// <summary class="docblock">zh-cn</summary>
     /// Replace返回s的所有替换进行完后的拷贝.
     /// </details>
-    // pub fn Replace(self, s: &str) -> String {
-    //     let mut new_str = s.to_owned();
-    //     for pair in self.oldnew.clone() {
-    //         new_str = ReplaceAll(new_str.as_str(), pair.0, pair.1);
-    //     }
-    //     new_str
-    // }
+    pub fn Replace(self, s: &[byte]) -> Vec<byte> {
+        let mut new_slice: Vec<byte> = s.to_vec();
+        for pair in self.oldnew.clone() {
+            new_slice = ReplaceAll(new_slice, pair.0, pair.1);
+        }
+        new_slice
+    }
     /// WriteString writes s to w with all replacements performed.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
