@@ -1273,7 +1273,7 @@ pub struct Buffer {
 }
 
 impl Buffer {
-    /// initialization a Builder
+    /// new initialization a Buffer
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
     /// 初始化生成器
@@ -1284,6 +1284,31 @@ impl Buffer {
         b
     }
 
+    /// with_bytes creates and initializes a new Buffer using buf as its initial contents. The new Buffer takes ownership of buf, and the caller should not use buf after this call. with_bytes is intended to prepare a Buffer to read existing data. It can also be used to set the initial size of the internal buffer for writing. To do that, buf should have the desired capacity but a length of zero.
+    ///
+    /// In most cases, new() is sufficient to initialize a Buffer.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 使用buf作为初始内容创建并初始化一个Buffer。本函数用于创建一个用于读取已存在数据的buffer；也用于指定用于写入的内部缓冲的大小，此时，buf应为一个具有指定容量但长度为0的切片。buf会被作为返回值的底层缓冲切片。
+    /// </details>
+    pub fn with_bytes(buf: Vec<byte>) -> Buffer {
+        let mut b = Buffer::new();
+        b.buf = buf;
+        b
+    }
+
+    /// with_str creates and initializes a new Buffer using string s as its initial contents. It is intended to prepare a buffer to read an existing string.
+    ///
+    /// In most cases, new() is sufficient to initialize a Buffer.
+    /// <details class="rustdoc-toggle top-doc">
+    /// <summary class="docblock">zh-cn</summary>
+    /// 使用s作为初始内容创建并初始化一个Buffer。本函数用于创建一个用于读取已存在数据的buffer。
+    /// </details>
+    pub fn with_str(s: &str) -> Buffer {
+        let mut b = Buffer::new();
+        b.buf.extend_from_slice(s.as_bytes());
+        b
+    }
     /// Cap returns the capacity of the builder's underlying byte slice. It is the total space allocated for the string being built and includes any bytes already written.
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
