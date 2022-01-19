@@ -18,12 +18,10 @@ use crate::builtin::*;
 use crate::io;
 use crate::unicode::utf8;
 use gostd_derive::Fmt;
-/// Compare returns an integer comparing two strings lexicographically. The result will be 0 if a==b, -1 if a < b, and +1 if a > b.
-/// Compare is included only for symmetry with package bytes. It is usually clearer and always faster to use the built-in string comparison operators ==, <, >, and so on.
+/// Compare returns an integer comparing two byte slices lexicographically. The result will be 0 if a==b, -1 if a < b, and +1 if a > b.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// Compare返回一个按字典顺序比较两个字符串的整数。如果a==b，结果为0；如果a<b，结果为-1；如果a>b，结果为+1
-/// 比较仅用于与包字节对称。使用内置的字符串比较运算符==、<、>，等等通常更清晰，而且总是更快。
+/// Compare函数返回一个整数表示两个&[byte]切片按字典序比较的结果（类同C的strcmp）。如果a==b返回0；如果a<b返回-1；否则返回+1。
 /// </details>
 ///
 /// # Example
