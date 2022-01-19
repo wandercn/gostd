@@ -335,10 +335,10 @@ pub fn Cut<'a>(s: &'a [byte], sep: &[byte]) -> (&'a [byte], &'a [byte], bool) {
     (before, after, found)
 }
 
-/// Index returns the index of the first instance of substr in s, or -1 if substr is not present in s.
+/// Index returns the index of the first instance of sep in s, or -1 if sep is not present in s.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 子串substr在字符串s中第一次出现的位置，不存在则返回-1
+/// 子切片sep在s中第一次出现的位置，不存在则返回-1。
 /// </details>
 ///
 /// # Example
@@ -350,18 +350,18 @@ pub fn Cut<'a>(s: &'a [byte], sep: &[byte]) -> (&'a [byte], &'a [byte], bool) {
 /// assert_eq!(4,bytes::Index("chkcken", "ken"));
 /// assert_eq!(-1,bytes::Index("chicken", "dmr"));
 /// ```
-pub fn Index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
-    let n = len!(substr.as_ref());
+pub fn Index(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> int {
+    let n = len!(sep.as_ref());
     let length = len!(s.as_ref());
     match n {
         0 => {
             return 0 as int;
         }
-        1 => return IndexByte(s.as_ref(), substr.as_ref()[0]),
+        1 => return IndexByte(s.as_ref(), sep.as_ref()[0]),
 
         _ => {
             if length == n {
-                if s.as_ref() == substr.as_ref() {
+                if s.as_ref() == sep.as_ref() {
                     return 0 as int;
                 }
                 return -1;
@@ -371,28 +371,25 @@ pub fn Index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
             }
         }
     }
-    index(s, substr)
+    index(s, sep)
 }
 
-fn index(s: impl AsRef<[byte]>, substr: impl AsRef<[byte]>) -> int {
-    let n: usize = len!(substr.as_ref());
+fn index(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> int {
+    let n: usize = len!(sep.as_ref());
     let length = len!(s.as_ref());
-    let start_byte = substr.as_ref()[0];
-    for (index, &v) in s.as_ref().iter().enumerate() {
-        if start_byte == v
-            && index + n <= length
-            && substr.as_ref() == &s.as_ref()[index..index + n]
-        {
-            return int!(index);
+    let start_byte = sep.as_ref()[0];
+    for (i, &v) in s.as_ref().iter().enumerate() {
+        if start_byte == v && i + n <= length && sep.as_ref() == &s.as_ref()[i..i + n] {
+            return int!(i);
         }
     }
     -1
 }
 
-/// IndexAny returns the index of the first instance of any Unicode code point from chars in s, or -1 if no Unicode code point from chars is present in s.
+/// IndexAny interprets s as a sequence of UTF-8-encoded Unicode code points. It returns the byte index of the first occurrence in s of any of the Unicode code points in chars. It returns -1 if chars is empty or if there is no code point in common.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 字符串chars中的任一utf-8码值在s中第一次出现的位置，如果不存在或者chars为空字符串则返回-1。
+/// 字符串chars中的任一utf-8编码在s中第一次出现的位置，如不存在或者chars为空字符串则返回-1
 /// </details>
 ///
 /// # Example
@@ -418,10 +415,10 @@ pub fn IndexAny(s: impl AsRef<[byte]>, chars: impl AsRef<str>) -> int {
     -1
 }
 
-/// IndexByte returns the index of the first instance of c in s, or -1 if c is not present in s.
+/// IndexByte returns the index of the first instance of c in b, or -1 if c is not present in b.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// 字符c在s中第一次出现的位置，不存在则返回-1。
+/// 字符c在s切片中第一次出现的位置，不存在则返回-1。
 /// </details>
 ///
 /// # Example
@@ -445,7 +442,7 @@ pub fn IndexByte(s: impl AsRef<[byte]>, c: byte) -> int {
     -1
 }
 
-/// IndexFunc returns the index into s of the first Unicode code point satisfying f(c), or -1 if none do.
+/// IndexFunc interprets s as a sequence of UTF-8-encoded code points. It returns the byte index in s of the first Unicode code point satisfying f(c), or -1 if none do.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
 /// IndexFunc将满足f（rune）的第一个Unicode代码点的索引返回到s，如果没有，则返回-1。
@@ -480,10 +477,10 @@ pub fn IndexFunc(s: impl AsRef<[byte]>, f: fn(rune) -> bool) -> int {
     -1
 }
 
-/// IndexRune returns the index of the first instance of the Unicode code point r, or -1 if rune is not present in s. If r is utf8.RuneError, it returns the first instance of any invalid UTF-8 byte sequence.
+/// IndexRune interprets s as a sequence of UTF-8-encoded code points. It returns the byte index of the first occurrence in s of the given rune. It returns -1 if rune is not present in s. If r is utf8.RuneError, it returns the first instance of any invalid UTF-8 byte sequence.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// unicode码值r在s中第一次出现的位置，不存在则返回-1。
+/// unicode码值r在s字节切片中第一次出现的位置，不存在则返回-1。
 /// </details>
 ///
 /// # Example
