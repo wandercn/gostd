@@ -131,6 +131,7 @@ where
         match self.w.Write(bound.as_bytes().to_vec()) {
             Err(err) => return Err(err),
             Ok(n) => return Ok(()),
+            _ => Ok(()),
         }
     }
 }
