@@ -4,3 +4,4 @@ Cargo.lock
 .idea/vcs.xml
 .idea/gostd.iml
 .idea/modules.xml
+.vscode/settings.json
