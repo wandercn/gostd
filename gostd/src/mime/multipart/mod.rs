@@ -17,25 +17,32 @@ use std::collections::HashMap;
 
 use std::io::Error;
 
-struct Writer<'a> {
-    w: &'a dyn io::Writer,
+#[derive(Debug)]
+struct Writer<W>
+where
+    W: io::Writer,
+{
+    w: W,
     boundary: String,
-    lastpart:bool,
+    lastpart: bool,
     // lastpart: Option<Box<part<'a>>>,
 }
 
-impl<'a> Writer<'a> {
-    fn new(b: &'a dyn io::Writer) -> Writer<'a> {
+impl<W> Writer<W>
+where
+    W: io::Writer,
+{
+    fn new(writer: W) -> Writer<W> {
         Writer {
-            w: b,
+            w: writer,
             boundary: randomBoundary(),
-            lastpart:false,
+            lastpart: false,
             // lastpart: None,
         }
     }
 
-    fn Boundary(&self) -> String {
-        self.boundary.to_owned()
+    fn Boundary(&self) -> &str {
+        &self.boundary
     }
 
     fn FormDataContentType(&self) -> String {
@@ -58,7 +65,7 @@ impl<'a> Writer<'a> {
         //     self.lastpart.as_mut().unwrap().close();
         // }
         let mut b = bytes::Buffer::new();
-        if self.lastpart{
+        if self.lastpart {
             b.WriteString(format!("\r\n--{}\r\n", self.boundary.clone()).as_str());
         } else {
             b.WriteString(format!("--{}\r\n", self.boundary.clone()).as_str());
@@ -76,14 +83,11 @@ impl<'a> Writer<'a> {
         b.WriteString("\r\n");
         self.w.Write(b.Bytes());
 
-
         Ok(Box::new(b))
     }
 
     fn Close(&mut self) -> Result<(), Error> {
-        if self.lastpart {
-            return Err(self.lastpart.3as_mut().unwrap().close());
-        }
+        if self.lastpart {}
         self.lastpart = true;
         let bound = format!("\r\n--{}--\r\n", self.boundary);
         match self.w.Write(bound.as_bytes().to_vec()) {
@@ -96,34 +100,44 @@ impl<'a> Writer<'a> {
 fn randomBoundary() -> String {
     "1617b70c8a3c4bc49a9a3ae659fb224f".to_string()
 }
-// struct part<'a> {
-//     mw: &'a Writer<'a>,
-//     closed: bool,
-//     we: Error,
-// }
-//
-// impl<'a> part<'a> {
-//     fn new(w: Writer) -> part {
-//         part {
-//             mw: w,
-//             closed: false,
-//             we: Error::new(std::io::ErrorKind::Other, "error"),
-//         }
-//     }
-//     fn close(&mut self) -> Error {
-//         self.closed = true;
-//         Error::new(std::io::ErrorKind::Other, self.we.to_string())
-//     }
-// }
-//
-// impl<'a> io::Writer for part<'a> {
-//     fn Write(&mut self, d: Vec<byte>) -> Result<int, Error> {
-//         if self.closed {
-//             return Err(Error::new(std::io::ErrorKind::Other, "multipart: can"));
-//         }
-//         if let Ok(n) = self.mw.w.Write(d) {
-//             return Ok(n);
-//         }
-//         return Err(Error::new(std::io::ErrorKind::Other, "error"));
-//     }
-// }
+
+struct part<W>
+where
+    W: io::Writer,
+{
+    mw: Writer<W>,
+    closed: bool,
+    we: Error,
+}
+
+impl<W> part<W>
+where
+    W: io::Writer,
+{
+    fn new(w: Writer<W>) -> part<W> {
+        part {
+            mw: w,
+            closed: false,
+            we: Error::new(std::io::ErrorKind::Other, "error"),
+        }
+    }
+    fn close(&mut self) -> Error {
+        self.closed = true;
+        Error::new(std::io::ErrorKind::Other, self.we.to_string())
+    }
+}
+
+impl<W> io::Writer for part<W>
+where
+    W: io::Writer,
+{
+    fn Write(&mut self, d: Vec<byte>) -> Result<int, Error> {
+        if self.closed {
+            return Err(Error::new(std::io::ErrorKind::Other, "multipart: can"));
+        }
+        if let Ok(n) = self.mw.w.Write(d) {
+            return Ok(n);
+        }
+        return Err(Error::new(std::io::ErrorKind::Other, "error"));
+    }
+}
