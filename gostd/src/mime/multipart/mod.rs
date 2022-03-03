@@ -86,6 +86,44 @@ where
         Ok(Box::new(b))
     }
 
+    fn CreateFormFile(
+        &mut self,
+        fieldname: &str,
+        filename: &str,
+    ) -> Result<Box<dyn io::Writer>, Error> {
+        let mut h: HashMap<String, Vec<String>> = HashMap::new();
+        h.insert(
+            "Content-Disposition".to_string(),
+            vec![format!(
+                r#"form-data; name="{}"; filename="{}""#,
+                escapeQuotes(fieldname),
+                escapeQuotes(filename)
+            )],
+        );
+        h.insert(
+            "Content-Type".to_string(),
+            vec!["application/octet-stream".to_string()],
+        );
+        self.CreatePart(h)
+    }
+
+    fn CreateFormField(&mut self, fieldname: &str) -> Result<Box<dyn io::Writer>, Error> {
+        let mut h: HashMap<String, Vec<String>> = HashMap::new();
+        h.insert(
+            "Content-Disposition".to_string(),
+            vec![format!(r#"form-data; name="{}""#, escapeQuotes(fieldname))],
+        );
+        self.CreatePart(h)
+    }
+
+    fn WriteField(&mut self, fieldname: &str, value: &str) -> Result<(), Error> {
+        let mut p = self.CreateFormField(fieldname)?;
+        match p.Write(value.as_bytes().to_vec()) {
+            Err(err) => return Err(err),
+            Ok(_) => return Ok(()),
+        }
+    }
+
     fn Close(&mut self) -> Result<(), Error> {
         if self.lastpart {}
         self.lastpart = true;
@@ -95,6 +133,12 @@ where
             Ok(n) => return Ok(()),
         }
     }
+}
+
+fn escapeQuotes(s: &str) -> String {
+    let p = vec![("\\", "\\\\"), (r#"""#, r#"\\\""#)];
+    let r = strings::Replacer::new(p);
+    r.Replace(s)
 }
 
 fn randomBoundary() -> String {
