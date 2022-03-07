@@ -1,5 +1,3 @@
-#![allow(unused)]
-// #![allow(dead_code)]
 #![allow(non_upper_case_globals)]
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
@@ -10,7 +8,7 @@ use std::borrow::{Borrow, BorrowMut};
 use crate::builtin::*;
 use crate::bytes;
 use crate::io;
-use crate::io::StringWriter;
+use crate::io::*;
 use crate::strings;
 use rand::prelude::*;
 use std::collections::HashMap;
@@ -18,20 +16,20 @@ use std::collections::HashMap;
 use std::io::Error;
 
 #[derive(Debug)]
-struct Writer<W>
+pub struct Writer<'a, W>
 where
     W: io::Writer,
 {
-    w: W,
+    w: &'a mut W,
     boundary: String,
     lastpart: bool,
 }
 
-impl<W> Writer<W>
+impl<'a, W> Writer<'a, W>
 where
     W: io::Writer,
 {
-    fn new(writer: W) -> Writer<W> {
+    pub fn new(writer: &mut W) -> Writer<W> {
         Writer {
             w: writer,
             boundary: randomBoundary(),
@@ -39,11 +37,11 @@ where
         }
     }
 
-    fn Boundary(&self) -> &str {
+    pub fn Boundary(&self) -> &str {
         &self.boundary
     }
 
-    fn FormDataContentType(&self) -> String {
+    pub fn FormDataContentType(&self) -> String {
         let mut b = "".to_string();
         if strings::ContainsAny(self.boundary.clone().as_str(), "()<>@,;:\"/[]?=") {
             b.push('"');
@@ -55,12 +53,12 @@ where
         format!("multipart/form-data; boundary={}", b)
     }
 
-    fn CreatePart(&mut self, header: HashMap<String, Vec<String>>) -> Result<(), Error> {
+    pub fn CreatePart(&mut self, header: HashMap<String, Vec<String>>) -> Result<&mut W, Error> {
         if self.lastpart {
             return Err(Error::new(std::io::ErrorKind::Other, "is closed"));
         }
         let mut b = bytes::Buffer::new();
-        if self.lastpart {
+        if !self.lastpart {
             b.WriteString(format!("\r\n--{}\r\n", self.boundary.clone()).as_str());
         } else {
             b.WriteString(format!("--{}\r\n", self.boundary.clone()).as_str());
@@ -78,10 +76,10 @@ where
         b.WriteString("\r\n");
         self.w.Write(b.Bytes());
 
-        Ok(())
+        Ok(self.w.borrow_mut())
     }
 
-    fn CreateFormFile(&mut self, fieldname: &str, filename: &str) -> Result<(), Error> {
+    pub fn CreateFormFile(&mut self, fieldname: &str, filename: &str) -> Result<&mut W, Error> {
         let mut h: HashMap<String, Vec<String>> = HashMap::new();
         h.insert(
             "Content-Disposition".to_string(),
@@ -98,7 +96,7 @@ where
         self.CreatePart(h)
     }
 
-    fn CreateFormField(&mut self, fieldname: &str) -> Result<(), Error> {
+    pub fn CreateFormField(&mut self, fieldname: &str) -> Result<&mut W, Error> {
         let mut h: HashMap<String, Vec<String>> = HashMap::new();
         h.insert(
             "Content-Disposition".to_string(),
@@ -107,15 +105,15 @@ where
         self.CreatePart(h)
     }
 
-    fn WriteField(&mut self, fieldname: &str, value: &str) -> Result<(), Error> {
-        self.CreateFormField(fieldname)?;
-        match self.w.Write(value.as_bytes().to_vec()) {
+    pub fn WriteField(&mut self, fieldname: &str, value: &str) -> Result<(), Error> {
+        let mut p = self.CreateFormField(fieldname)?;
+        match p.Write(value.as_bytes().to_vec()) {
             Err(err) => Err(err),
             Ok(_) => Ok(()),
         }
     }
 
-    fn Close(&mut self) -> Result<(), Error> {
+    pub fn Close(&mut self) -> Result<(), Error> {
         if self.lastpart {
             return Err(Error::new(std::io::ErrorKind::Other, "is closed"));
         }
@@ -138,7 +136,7 @@ fn escapeQuotes(s: &str) -> String {
 fn randomBoundary() -> String {
     use rand::RngCore;
 
-    let mut bytes = [0; 12];
+    let mut bytes = [0; 30];
     rand::thread_rng().fill_bytes(&mut bytes);
 
     fn as_u32(slice: &[u8]) -> u32 {
@@ -149,7 +147,10 @@ fn randomBoundary() -> String {
 
     let a = as_u32(&bytes[0..4]);
     let b = as_u32(&bytes[4..8]);
-    let c = as_u32(&bytes[8..]);
-
-    format!("{:x}{:x}{:x}", a, b, c)
+    let c = as_u32(&bytes[8..12]);
+    let d = as_u32(&bytes[12..16]);
+    let e = as_u32(&bytes[16..20]);
+    let f = as_u32(&bytes[20..24]);
+    let g = as_u32(&bytes[24..28]);
+    format!("{:x}{:x}{:x}{:x}{:x}{:x}{:x}xx", a, b, c, d, e, f, g)
 }
