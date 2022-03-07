@@ -146,6 +146,7 @@ use gostd::vendor
 - [x] io模块,完成部分接口例如Reader，Writer等。(version >=0.2.4)
 - [x] http模块的client客户端功能，支持http和https。(version >=0.2.6)
 - [x] 完成bytes模块。(version >=0.2.8)
+- [x] 完成mime::multipart模块。(version >=0.3.1)
 
 # 独立发布包
  
