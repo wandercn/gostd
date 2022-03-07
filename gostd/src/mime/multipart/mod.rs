@@ -25,7 +25,6 @@ where
     w: W,
     boundary: String,
     lastpart: bool,
-    // lastpart: Option<Box<part<'a>>>,
 }
 
 impl<W> Writer<W>
@@ -37,7 +36,6 @@ where
             w: writer,
             boundary: randomBoundary(),
             lastpart: false,
-            // lastpart: None,
         }
     }
 
@@ -57,13 +55,10 @@ where
         format!("multipart/form-data; boundary={}", b)
     }
 
-    fn CreatePart(
-        &mut self,
-        header: HashMap<String, Vec<String>>,
-    ) -> Result<Box<dyn io::Writer>, Error> {
-        // if self.lastpart.is_some() {
-        //     self.lastpart.as_mut().unwrap().close();
-        // }
+    fn CreatePart(&mut self, header: HashMap<String, Vec<String>>) -> Result<(), Error> {
+        if self.lastpart {
+            return Err(Error::new(std::io::ErrorKind::Other, "is closed"));
+        }
         let mut b = bytes::Buffer::new();
         if self.lastpart {
             b.WriteString(format!("\r\n--{}\r\n", self.boundary.clone()).as_str());
@@ -83,14 +78,10 @@ where
         b.WriteString("\r\n");
         self.w.Write(b.Bytes());
 
-        Ok(Box::new(b))
+        Ok(())
     }
 
-    fn CreateFormFile(
-        &mut self,
-        fieldname: &str,
-        filename: &str,
-    ) -> Result<Box<dyn io::Writer>, Error> {
+    fn CreateFormFile(&mut self, fieldname: &str, filename: &str) -> Result<(), Error> {
         let mut h: HashMap<String, Vec<String>> = HashMap::new();
         h.insert(
             "Content-Disposition".to_string(),
@@ -107,7 +98,7 @@ where
         self.CreatePart(h)
     }
 
-    fn CreateFormField(&mut self, fieldname: &str) -> Result<Box<dyn io::Writer>, Error> {
+    fn CreateFormField(&mut self, fieldname: &str) -> Result<(), Error> {
         let mut h: HashMap<String, Vec<String>> = HashMap::new();
         h.insert(
             "Content-Disposition".to_string(),
@@ -117,15 +108,17 @@ where
     }
 
     fn WriteField(&mut self, fieldname: &str, value: &str) -> Result<(), Error> {
-        let mut p = self.CreateFormField(fieldname)?;
-        match p.Write(value.as_bytes().to_vec()) {
-            Err(err) => return Err(err),
-            Ok(_) => return Ok(()),
+        self.CreateFormField(fieldname)?;
+        match self.w.Write(value.as_bytes().to_vec()) {
+            Err(err) => Err(err),
+            Ok(_) => Ok(()),
         }
     }
 
     fn Close(&mut self) -> Result<(), Error> {
-        if self.lastpart {}
+        if self.lastpart {
+            return Err(Error::new(std::io::ErrorKind::Other, "is closed"));
+        }
         self.lastpart = true;
         let bound = format!("\r\n--{}--\r\n", self.boundary);
         match self.w.Write(bound.as_bytes().to_vec()) {
@@ -143,46 +136,20 @@ fn escapeQuotes(s: &str) -> String {
 }
 
 fn randomBoundary() -> String {
-    "1617b70c8a3c4bc49a9a3ae659fb224f".to_string()
-}
+    use rand::RngCore;
 
-struct part<W>
-where
-    W: io::Writer,
-{
-    mw: Writer<W>,
-    closed: bool,
-    we: Error,
-}
+    let mut bytes = [0; 12];
+    rand::thread_rng().fill_bytes(&mut bytes);
 
-impl<W> part<W>
-where
-    W: io::Writer,
-{
-    fn new(w: Writer<W>) -> part<W> {
-        part {
-            mw: w,
-            closed: false,
-            we: Error::new(std::io::ErrorKind::Other, "error"),
-        }
+    fn as_u32(slice: &[u8]) -> u32 {
+        let mut copy = [0; 4];
+        copy.copy_from_slice(slice);
+        u32::from_ne_bytes(copy)
     }
-    fn close(&mut self) -> Error {
-        self.closed = true;
-        Error::new(std::io::ErrorKind::Other, self.we.to_string())
-    }
-}
 
-impl<W> io::Writer for part<W>
-where
-    W: io::Writer,
-{
-    fn Write(&mut self, d: Vec<byte>) -> Result<int, Error> {
-        if self.closed {
-            return Err(Error::new(std::io::ErrorKind::Other, "multipart: can"));
-        }
-        if let Ok(n) = self.mw.w.Write(d) {
-            return Ok(n);
-        }
-        return Err(Error::new(std::io::ErrorKind::Other, "error"));
-    }
+    let a = as_u32(&bytes[0..4]);
+    let b = as_u32(&bytes[4..8]);
+    let c = as_u32(&bytes[8..]);
+
+    format!("{:x}{:x}{:x}", a, b, c)
 }
