@@ -156,6 +156,50 @@ use gostd::vendor
 
 # 使用例子
 
+## multipart模块
+
+### form-data Body
+
+```rust
+use gostd::bytes;
+use gostd::mime::multipart::Writer;
+use gostd::net::http::{Client, Method, Request};
+fn main() -> Result<(), std::io::Error> {
+    let mut body = bytes::Buffer::new();
+    let mut w = Writer::new(&mut body);
+    w.WriteField("requestId", "12121231231")?;
+    w.WriteField("testTime", "2022-01-22 18:00:00")?;
+    w.WriteField("checkTime", "2022-01-22 22:00:00")?;
+    w.WriteField("auditTime", "2022-01-22 23:00:00")?;
+    w.WriteField("tubeCode", "QCGD99SDF")?;
+    w.WriteField("testRatio", "1")?;
+    w.WriteField("name", "刘xxx")?;
+    w.WriteField("sex", "1")?;
+    w.WriteField("birthdate", "20003-07-02")?;
+    w.WriteField("address", "北京市丰台区")?;
+    w.WriteField("phoneNumber", "1881xxxx")?;
+    w.WriteField("cardType", "身份证")?;
+    w.WriteField("cardNumber", "xxxx")?;
+    w.WriteField("testResult", "0")?;
+    w.WriteField("testUserName", "xxx")?;
+    w.WriteField("checkUserName", "xxx")?;
+    w.Close()?;
+    let contentType = w.FormDataContentType();
+    let url = "http://www.baidu.com";
+    let mut req = Request::New(Method::Post, url, Some(body.Bytes()))?;
+    req.Header.Set("Content-Type", contentType.as_str());
+    let mut client = Client::New();
+    let response = client.Do(&mut req)?;
+
+    println!(
+        "{}",
+        String::from_utf8(response.Body.expect("return body error")).unwrap()
+    );
+
+    Ok(())
+}
+```
+
 ## http模块
 
 ### client客户端
