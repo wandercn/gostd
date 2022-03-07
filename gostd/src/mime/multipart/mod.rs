@@ -2,17 +2,13 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
-use std::borrow::{Borrow, BorrowMut};
 // #[cfg(test)]
 // mod tests;
-use crate::builtin::*;
-use crate::bytes;
-use crate::io;
 use crate::io::*;
-use crate::strings;
-use rand::prelude::*;
+use crate::{builtin::*, bytes, io, strings};
+use rand::RngCore;
+use std::borrow::{Borrow, BorrowMut};
 use std::collections::HashMap;
-
 use std::io::Error;
 
 #[derive(Debug)]
@@ -134,8 +130,6 @@ fn escapeQuotes(s: &str) -> String {
 }
 
 fn randomBoundary() -> String {
-    use rand::RngCore;
-
     let mut bytes = [0; 30];
     rand::thread_rng().fill_bytes(&mut bytes);
 
