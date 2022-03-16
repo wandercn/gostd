@@ -29,6 +29,7 @@ use std::io::Error;
 /// ```
 /// use gostd::bytes;
 /// use gostd::mime::multipart::Writer;
+/// fn main()->Result<(),std::io::Error>{
 ///     let mut body = bytes::Buffer::new();
 ///     let mut w = Writer::new(&mut body);
 ///     w.WriteField("requestId", "12121231231")?;
@@ -51,6 +52,7 @@ use std::io::Error;
 ///     println!("{}", w.FormDataContentType());
 ///     println!("{}", body.String());
 ///     Ok(())
+///     }
 /// ```
 #[derive(Debug)]
 pub struct Writer<'a, W>
