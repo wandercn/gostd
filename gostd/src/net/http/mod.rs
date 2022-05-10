@@ -1113,7 +1113,7 @@ fn parseChunkedBody(chunkedBody: &Vec<u8>) -> Vec<u8> {
     let mut lineSep: Vec<u8> = Vec::new();
     let mut isSizeLine = true;
     for &b in chunkedBody {
-        if b == b'\r' || b == b'\n' || b == b'0' {
+        if b == b'\r' || b == b'\n' {
             lineSep.push(b);
         } else {
             if !isSizeLine {
@@ -1124,6 +1124,9 @@ fn parseChunkedBody(chunkedBody: &Vec<u8>) -> Vec<u8> {
         if lineSep.as_slice() == b"\r\n" || lineSep.as_slice() == b"\r\n0" {
             isSizeLine = false;
         }
+    }
+    if body[body.len() - 1] == b'0' {
+        body.pop();
     }
     body
 }
