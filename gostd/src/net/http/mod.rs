@@ -296,13 +296,18 @@ pub struct Client {
 }
 
 pub type HttpResult = Result<Response, Error>;
-impl Client {
-    pub fn New() -> Client {
-        Client {
+impl Default for Client {
+    fn default() -> Self {
+        Self {
             Transport: Box::new(Transport::default()),
             Timeout: time::Duration::new(0),
             Jar: Box::new(Cookie::default()),
         }
+    }
+}
+impl Client {
+    pub fn New() -> Self {
+        Self::default()
     }
 
     pub fn Get(&mut self, url: &str) -> HttpResult {
