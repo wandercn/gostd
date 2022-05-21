@@ -999,14 +999,16 @@ impl persistConn {
             && req.Req.Method != "HEAD".to_string()
         {
             requestedGzip = true;
-            req.extra = Some(req.Req.Header.clone());
-            let mut hd = req.extra.take().unwrap();
-            // hd.Set("Accept-Encoding", "gzip");
-            if req.Req.Close {
-                hd.Set("Connection", "close");
-            }
-            req.extra = Some(hd.clone());
-            req.Req.Header = hd;
+            // req.extra = Some(req.Req.Header.clone());
+            // let mut hd = req.extra.take().unwrap();
+            // // hd.Set("Accept-Encoding", "gzip");
+
+            // req.extra = Some(hd.clone());
+            // req.Req.Header = hd;
+        }
+        if req.Req.Close {
+            // 暂时没有实现KeepAlive特性，关闭长链接，避免服务器和客户端不匹配，服务器长时间无返回信息
+            req.Req.Header.Set("Connection", "close");
         }
 
         let r = req.Req.Write()?;
