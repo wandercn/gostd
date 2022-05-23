@@ -1070,7 +1070,11 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
     if len!(statusCode) != 3 {
         return Err(Error::new(ErrorKind::Other, "malformed HTTP status code"));
     }
-    resp.StatusCode = statusCode.parse::<int>().unwrap();
+    // map_err 重新转换Err类型到io::Error
+    resp.StatusCode = statusCode
+        .parse::<int>()
+        .map_err(|err| Error::new(ErrorKind::Other, err))?;
+
     if resp.StatusCode < 0 {
         return Err(Error::new(ErrorKind::Other, "malformed HTTP status code"));
     }
