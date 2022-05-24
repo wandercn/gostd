@@ -1105,7 +1105,6 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
     let startIndex = startIndexOfBody(&response).unwrap();
     let headPart: Vec<u8> = response[..(startIndex - 2_usize)].to_vec();
     let bodyPart: Vec<u8> = response[startIndex + 1..].to_vec();
-    // println!("bodyPart_len: {}", bodyPart.len());
     // parse headPart
     resp.Header = Header::NewWithHashMap(parseHeader(headPart));
     fixPragmaCacheControl(&mut resp.Header);
@@ -1121,23 +1120,20 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
 
 fn parseChunkedBody(chunkedBody: &Vec<u8>) -> Vec<u8> {
     let mut body: Vec<u8> = Vec::new();
-    let mut lineSep: Vec<u8> = Vec::new();
+    let mut lines = std::str::from_utf8(&chunkedBody).expect("chunkbody is not ut8 String");
     let mut isSizeLine = true;
-    for &b in chunkedBody {
-        if b == b'\r' || b == b'\n' {
-            lineSep.push(b);
-        } else {
-            if !isSizeLine {
-                body.push(b);
-            }
-            lineSep.clear();
-        }
-        if lineSep.as_slice() == b"\r\n" || lineSep.as_slice() == b"\r\n0" {
+    for v in lines
+        .trim_end_matches("\r\n0\r\n\r\n")
+        .split("\r\n")
+        .into_iter()
+    {
+        if isSizeLine {
             isSizeLine = false;
+            continue;
+        } else {
+            body.extend_from_slice(v.as_bytes());
+            isSizeLine = true;
         }
-    }
-    if body[body.len() - 1] == b'0' {
-        body.pop();
     }
     body
 }
