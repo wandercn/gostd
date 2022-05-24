@@ -1120,7 +1120,8 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
 
 fn parseChunkedBody(chunkedBody: &Vec<u8>) -> Vec<u8> {
     let mut body: Vec<u8> = Vec::new();
-    let mut lines = std::str::from_utf8(&chunkedBody).expect("chunkbody is not ut8 String");
+    // let mut lines = std::str::from_utf8(chunkedBody).unwrap();
+    let mut lines = unsafe { std::str::from_utf8_unchecked(chunkedBody) };
     let mut isSizeLine = true;
     for v in lines
         .trim_end_matches("\r\n0\r\n\r\n")
