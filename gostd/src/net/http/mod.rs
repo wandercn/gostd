@@ -481,7 +481,7 @@ impl Request {
             Header: Header::default(),
             ContentLength: 0,
             TransferEncoding: Vec::<String>::new(),
-            Close: true,
+            Close: false,
             Form: url::Values::default(),
             PostForm: url::Values::default(),
             Trailer: Header::default(),
@@ -1086,9 +1086,9 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
     }
     resp.ProtoMajor = vers.0;
     resp.ProtoMinor = vers.1;
-    let mut response: Vec<u8> = vec![];
+    let mut headPart: Vec<u8> = vec![];
     // split Response to headpart and bodyPart
-    r.read_to_end(&mut response);
+    // r.read_to_end(&mut response);
     // 下面的loop 跟read_to_end功能一样
     /* loop {
         if let Ok(buf) = r.fill_buf() {
@@ -1102,16 +1102,93 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
             break;
         }
     } */
-    let startIndex = startIndexOfBody(&response).unwrap();
-    let headPart: Vec<u8> = response[..(startIndex - 2_usize)].to_vec();
-    let bodyPart: Vec<u8> = response[startIndex + 1..].to_vec();
+
+    let mut isCRLF = false;
+    loop {
+        let mut buf: Vec<u8> = vec![];
+        r.read_until(b'\n', &mut buf)?;
+        println!("str: {:?}", std::str::from_utf8(&buf).unwrap());
+        println!("buf: {:?}", buf.as_slice());
+        println!("buf_len: {}", buf.len());
+        let mut length = buf.len();
+        if length <= 6 {
+            if length == 0 {
+                break;
+            }
+            if buf.as_slice() == b"\r\n" {
+                isCRLF = true;
+                break;
+            }
+            // if buf.as_slice() == b"0\r\n" {
+            // isEndCRLF = true
+            // }
+            // if !isHeadEnd && buf.as_slice() == b"\r\n" {
+            // isHeadEnd = true;
+            // }
+            // if isHeadEnd {}
+
+            // if isCRLF && isEndCRLF {
+            // break;
+            // }
+        }
+        if !isCRLF {
+            headPart.extend_from_slice(&buf);
+        }
+    }
+    // let startIndex = startIndexOfBody(&response).unwrap();
+    // let headPart: Vec<u8> = response[..(startIndex - 2_usize)].to_vec();
+    // let bodyPart: Vec<u8> = response[startIndex + 1..].to_vec();
     // parse headPart
+    println!("headpart:{}", std::str::from_utf8(&headPart).unwrap());
     resp.Header = Header::NewWithHashMap(parseHeader(headPart));
+    println!("header: {:?}", resp.Header);
     fixPragmaCacheControl(&mut resp.Header);
+
+    let mut bodyPart: Vec<u8> = vec![];
     // set Body
     if resp.Header.Get("Transfer-Encoding").as_str() == "chunked" {
+        let mut isEndCRLF = false;
+        let mut isCRLF = false;
+        loop {
+            let mut buf: Vec<u8> = vec![];
+            r.read_until(b'\n', &mut buf)?;
+            println!("str: {:?}", std::str::from_utf8(&buf).unwrap());
+            println!("buf: {:?}", buf.as_slice());
+            println!("buf_len: {}", buf.len());
+            let mut length = buf.len();
+            if length <= 6 {
+                if length == 0 {
+                    break;
+                }
+                if buf.as_slice() == b"\r\n" {
+                    isCRLF = true;
+                    break;
+                }
+                if buf.as_slice() == b"0\r\n" {
+                    isEndCRLF = true
+                }
+
+                if isCRLF && isEndCRLF {
+                    break;
+                }
+            }
+            bodyPart.extend_from_slice(&buf);
+        }
+
         resp.Body.replace(parseChunkedBody(&bodyPart));
     } else {
+        println!("length: {:?}", resp.Header.Get("Content-Length").as_str());
+        let ln: usize = resp
+            .Header
+            .Get("Content-Length")
+            .as_str()
+            .parse::<usize>()
+            .unwrap();
+
+        let mut buf = vec![0; ln];
+        println!("content_buf_len:{}", buf.len());
+        r.read_exact(&mut buf)?;
+        bodyPart.extend_from_slice(&buf);
         resp.Body = Some(bodyPart);
     }
     resp.ContentLength = len!(&resp.Body.as_ref().unwrap()) as i64;
