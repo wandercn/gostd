@@ -24,4 +24,4 @@ gostd_derive = "0.0.3"
 gostd_builtin = { version = "=1.0.4", optional = false, path = "../builtin"}
 gostd_time= { version = "=1.0.6", optional = false, path = "../time"}
 rand = "0.8.5"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+log = "0.4"
