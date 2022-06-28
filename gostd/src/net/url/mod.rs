@@ -9,7 +9,6 @@
 #[cfg(test)]
 mod tests;
 use crate::builtin::*;
-
 #[derive(Default, PartialEq, PartialOrd, Debug, Clone)]
 pub struct URL {
     pub Scheme: String,
@@ -344,6 +343,51 @@ impl Values {
         }
         buf.String()
     }
+}
+/// ParseQuery parses the URL-encoded query string and returns
+/// a map listing the values specified for each key.
+/// ParseQuery always returns a non-nil map containing all the
+/// valid query parameters found; err describes the first decoding error
+/// encountered, if any.
+///
+/// Query is expected to be a list of key=value settings separated by ampersands.
+/// A setting without an equals sign is interpreted as a key set to an empty
+/// value.
+/// Settings containing a non-URL-encoded semicolon are considered invalid.
+pub fn ParseQuery(mut query: &str) -> Result<Values, Error> {
+    let mut m = Values::new(HashMap::new());
+    parseQuery(&mut m, query)?;
+    Ok(m)
+}
+
+fn parseQuery(m: &mut Values, mut query: &str) -> Result<(), Error> {
+    while !query.is_empty() {
+        let mut key = query;
+        let i = strings::IndexAny(key, "&");
+        if i >= 0 {
+            query = key.get((i + 1) as usize..).unwrap();
+            key = key.get(..i as usize).unwrap();
+        } else {
+            query = "";
+        }
+        if strings::Contains(key, ";") {
+            continue;
+        }
+        if key.is_empty() {
+            continue;
+        }
+        let mut value = "".to_string();
+        let i = strings::Index(key, "=");
+        if i >= 0 {
+            value = key.get((i + 1) as usize..).unwrap().to_string();
+            key = key.get(..i as usize).unwrap();
+        }
+
+        let value1 = QueryUnescape(&value)?;
+        let key1 = QueryUnescape(key)?;
+        m.Add(&key1, &value1);
+    }
+    Ok(())
 }
 use crate::strings;
 /// Parse parses rawurl into a URL structure.
