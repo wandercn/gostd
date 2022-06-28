@@ -272,6 +272,7 @@ fn resolvePath(base: &str, refurl: &str) -> String {
     }
     r
 }
+use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::io::Error;
 use std::io::ErrorKind;
@@ -282,6 +283,42 @@ impl Values {
     pub fn new(m: HashMap<String, Vec<String>>) -> Values {
         Values(m)
     }
+
+    /// Get gets the first value associated with the given key.
+    /// If there are no values associated with the key, Get returns
+    /// the empty string. To access multiple values, use the HashMap
+    /// directly.
+    pub fn Get(&self, key: &str) -> String {
+        if self.0.is_empty() {
+            return "".to_string();
+        }
+        if let Some(v) = self.0.get(key).and_then(|x| x.get(0)).and_then(|x| Some(x)) {
+            return v.to_owned();
+        }
+        "".to_owned()
+    }
+    /// Set sets the key to value. It replaces any existing
+    /// values.
+    pub fn Set(&mut self, key: &str, value: &str) {
+        self.0.insert(key.to_string(), vec![value.to_string()]);
+    }
+    /// Add adds the value to key. It appends to any existing
+    /// values associated with key.
+    pub fn Add(&mut self, key: &str, value: &str) {
+        if let Some(v) = self.0.get_mut(key) {
+            v.push(value.to_string())
+        }
+    }
+    /// Del deletes the values associated with key.
+    pub fn Del(&mut self, key: &str) {
+        self.0.remove(key);
+    }
+    /// Has checks whether a given key is set.
+    pub fn Has(&self, key: &str) -> bool {
+        self.0.contains_key(key)
+    }
+    /// Encode encodes the values into ``URL encoded'' form
+    /// ("bar=baz&foo=quux") sorted by key.
     pub fn Encode(&self) -> String {
         let v = &self.0.clone();
         if v.len() == 0 {
