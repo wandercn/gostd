@@ -271,7 +271,6 @@ fn resolvePath(base: &str, refurl: &str) -> String {
     }
     r
 }
-use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::io::Error;
 use std::io::ErrorKind;
@@ -318,6 +317,7 @@ impl Values {
     pub fn Has(&self, key: &str) -> bool {
         self.0.contains_key(key)
     }
+
     /// Encode encodes the values into ``URL encoded'' form
     /// ("bar=baz&foo=quux") sorted by key.
     pub fn Encode(&self) -> String {
@@ -346,6 +346,18 @@ impl Values {
         buf.String()
     }
 }
+
+impl Iterator for Values {
+    type Item = (String, Vec<String>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0
+            .iter()
+            .next()
+            .and_then(|(k, v)| Some((k.to_owned(), v.to_owned())))
+    }
+}
+
 /// ParseQuery parses the URL-encoded query string and returns
 /// a map listing the values specified for each key.
 /// ParseQuery always returns a non-nil map containing all the
