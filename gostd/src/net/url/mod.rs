@@ -306,6 +306,8 @@ impl Values {
     pub fn Add(&mut self, key: &str, value: &str) {
         if let Some(v) = self.0.get_mut(key) {
             v.push(value.to_string())
+        } else {
+            self.Set(key, value)
         }
     }
     /// Del deletes the values associated with key.
@@ -497,11 +499,11 @@ fn getscheme(rawurl: &str) -> Result<(&str, &str), Error> {
     Ok(("", rawurl))
 }
 
-fn ishex(c: char) -> bool {
+fn ishex(c: byte) -> bool {
     match c {
-        '0'..='9' => return true,
-        'a'..='f' => return true,
-        'A'..='F' => return true,
+        b'0'..=b'9' => return true,
+        b'a'..=b'f' => return true,
+        b'A'..=b'F' => return true,
         _ => (),
     }
     return false;
@@ -597,10 +599,7 @@ fn unescape(mut s: &str, mode: Encoding) -> Result<String, Error> {
         match s.as_bytes()[i] {
             b'%' => {
                 n += 1;
-                if i + 2 >= len!(s)
-                    || !ishex(s.as_bytes()[i + 1] as char)
-                    || !ishex(s.as_bytes()[i + 2] as char)
-                {
+                if i + 2 >= len!(s) || !ishex(s.as_bytes()[i + 1]) || !ishex(s.as_bytes()[i + 2]) {
                     s = &s[i..];
                     if len!(s) > 3 {
                         s = &s[..3];
@@ -656,10 +655,11 @@ fn unescape(mut s: &str, mode: Encoding) -> Result<String, Error> {
 
     let mut t = strings::Builder::new();
     t.Grow(int!(len!(s) - 2 * n));
-    for mut i in 0..len!(s) {
+    let mut i: usize = 0;
+    while i < len!(s) {
         match s.as_bytes()[i] {
             b'%' => {
-                t.WriteByte(unhex(s.as_bytes()[i + 1] << 4 | unhex(s.as_bytes()[i + 2])));
+                t.WriteByte(unhex(s.as_bytes()[i + 1]) << 4 | unhex(s.as_bytes()[i + 2]));
                 i += 2;
             }
             b'+' => {
@@ -673,6 +673,7 @@ fn unescape(mut s: &str, mode: Encoding) -> Result<String, Error> {
                 t.WriteByte(s.as_bytes()[i]);
             }
         }
+        i += 1;
     }
     Ok(t.String())
 }
@@ -705,25 +706,27 @@ fn validEncoded(s: &str, mode: Encoding) -> bool {
 }
 
 fn shouldEscape(c: byte, mode: Encoding) -> bool {
-    let c = c as char;
-    if 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c && c <= '9' {
+    let c = c;
+    if b'a' <= c && c <= b'z' || b'A' <= c && c <= b'Z' || b'0' <= c && c <= b'9' {
         return false;
     }
 
     if mode == Encoding::encodeHost || mode == Encoding::encodeZone {
-        match c as char {
-            '!' | '$' | '&' | '\'' | '(' | ')' | '*' | '+' | ',' | ';' | '=' | ':' | '[' | ']'
-            | '<' | '>' | '"' => return false,
+        match c {
+            b'!' | b'$' | b'&' | b'\'' | b'(' | b')' | b'*' | b'+' | b',' | b';' | b'=' | b':'
+            | b'[' | b']' | b'<' | b'>' | b'"' => return false,
             _ => (),
         }
     }
 
-    match c as char {
-        '-' | '_' | '.' | '~' => return false,
-        '$' | '&' | '+' | ',' | '/' | ':' | ';' | '=' | '?' | '@' => match mode {
-            Encoding::encodePath => return c == '?',
-            Encoding::encodePathSegment => return c == '/' || c == ';' || c == ',' || c == '?',
-            Encoding::encodeUserPassword => return c == '@' || c == '/' || c == '?' || c == ':',
+    match c {
+        b'-' | b'_' | b'.' | b'~' => return false,
+        b'$' | b'&' | b'+' | b',' | b'/' | b':' | b';' | b'=' | b'?' | b'@' => match mode {
+            Encoding::encodePath => return c == b'?',
+            Encoding::encodePathSegment => return c == b'/' || c == b';' || c == b',' || c == b'?',
+            Encoding::encodeUserPassword => {
+                return c == b'@' || c == b'/' || c == b'?' || c == b':'
+            }
             Encoding::encodeQueryComponent => return true,
             Encoding::encodeFragment => return false,
             _ => (),
@@ -732,7 +735,7 @@ fn shouldEscape(c: byte, mode: Encoding) -> bool {
     }
     if mode == Encoding::encodeFragment {
         match c {
-            '!' | '(' | ')' | '*' => return false,
+            b'!' | b'(' | b')' | b'*' => return false,
             _ => (),
         }
     }
