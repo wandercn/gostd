@@ -5,7 +5,7 @@
 [![GPL3 licensed](https://img.shields.io/github/license/wandercn/gostd.svg)](./LICENSE)
 [![Downloads of Crates.io](https://img.shields.io/crates/d/gostd.svg)](https://crates.io/crates/gostd)
 [![Lines of code](https://img.shields.io/tokei/lines/github/wandercn/gostd.svg)](#)
-[![Build](https://img.shields.io/github/workflow/status/wandercn/gostd/Rust.svg)](#)
+[![Build](https://img.shields.io/github/actions/workflow/status/wandercn/gostd/.github/workflows/rust.yml?branch=master)](#)
 [![Languages](https://img.shields.io/github/languages/top/wandercn/gostd.svg)](#)
 
 Gostd is the golang standard library implementation in rust-lang.
