@@ -7,8 +7,8 @@ authors = ["wandercn<wander@ffactory.org>"]
 description = "gostd is the go standard library implementation in rust. gostd 是Go标准库的rust实现"
 homepage = "https://github.com/wandercn/gostd"
 repository = "https://github.com/wandercn/gostd"
-keywords = ["gobind","go-api","gostd","go-to-rust","go-standard-library"]
-categories= ["api-bindings","accessibility","development-tools","compilers"]
+keywords = ["gobind", "go-api", "gostd", "go-to-rust", "go-standard-library"]
+categories = ["api-bindings", "accessibility", "development-tools", "compilers"]
 
 [profile.dev]
 opt-level = 0
@@ -21,7 +21,8 @@ opt-level = 3
 webpki-roots = "0.22.1"
 rustls = "0.20.2"
 gostd_derive = "0.0.3"
-gostd_builtin = { version = "=1.0.4", optional = false, path = "../builtin"}
-gostd_time= { version = "=1.0.6", optional = false, path = "../time"}
+gostd_builtin = { version = "=1.0.4", optional = false, path = "../builtin" }
+gostd_time = { version = "=1.0.6", optional = false, path = "../time" }
 rand = "0.8.5"
 log = "0.4"
+lazy_static = "1.4.0"
