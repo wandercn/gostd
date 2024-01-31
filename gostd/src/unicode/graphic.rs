@@ -63,3 +63,11 @@ lazy_static::lazy_static! {
 lazy_static::lazy_static! {
     static ref S: Arc<RangeTable> = _S.clone();
 }
+
+// IsLetter reports whether the rune is a letter (category L).
+pub fn IsLetter(r: i32) -> bool {
+    if r as u32 <= MaxLatin1 as u32 {
+        return properties[r as usize] as isize & pLmask != 0;
+    }
+    isExcludingLatin(Letter.clone(), r)
+}

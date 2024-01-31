@@ -66,6 +66,9 @@ lazy_static::lazy_static! {
         LatinOffset: 10,
     });
 }
+lazy_static::lazy_static! {
+    pub static ref Letter:Arc<RangeTable> = Arc::clone(&_L);
+}
 
 lazy_static::lazy_static! {
     pub static ref _S_RangeTable_R16: Arc<Vec<Range16>> = Arc::new(vec![
