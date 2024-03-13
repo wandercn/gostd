@@ -1231,7 +1231,7 @@ impl Time {
     /// UnixMilli返回self作为Unix时间，即从1970年1月1日UTC开始经过的毫秒数。
     /// </details>
     pub fn UnixMilli(&self) -> int64 {
-        self.unixSec() * 1000 + int64!(self.nsec()) * 1000_000
+        self.unixSec() * 1000 + int64!(self.nsec()) / 1000_000
     }
     /// UnixMicro returns t as a Unix time, the number of microseconds elapsed since January 1, 1970 UTC.
     /// <details class="rustdoc-toggle top-doc">
