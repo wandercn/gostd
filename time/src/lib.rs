@@ -1329,6 +1329,30 @@ pub fn Unix(sec: int64, nsec: int64) -> Time {
 /// <summary class="docblock">zh-cn</summary>
 /// UnixMilli返回与给定的Unix时间相对应的本地时间，自1970年1月1日UTC以来的毫秒数。
 /// </details>
+///
+/// # Example
+/// ```
+/// use gostd_time as time;
+///
+/// let timestamp_millis = 1571893634109_i64;
+/// let t = time::UnixMilli(timestamp_millis);
+/// println!("{}",t.Unix());     // seconds since 1970
+/// println!("{}",t.UnixNano()); // nanoseconds since 1970
+/// println!("{}", t.Format(time::RFC3339Nano));
+/// assert_eq!(1571893634,t.Unix());
+/// assert_eq!(1571893634109,t.UnixMilli());
+/// assert_eq!(1571893634109000000,t.UnixNano());
+/// assert_eq!("2019-10-24T05:07:14.109Z",t.Format(time::RFC3339Nano));
+///
+///
+/// ```
+/// ## Output:
+///
+/// ```text
+/// 1571893634
+/// 1571893634109000000
+/// 2019-10-24T05:07:14.109Z
+/// ```
 pub fn UnixMilli(msec: int64) -> Time {
     Unix(msec / 1000, (msec % 1000) * 1000_000)
 }
