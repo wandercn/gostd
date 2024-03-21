@@ -1088,24 +1088,21 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
 
     // 1. 获取response的header部分，到第一个 '\r\b'符号为header的结束。
     let mut headPart: Vec<u8> = vec![];
-    let mut isCRLF = false;
+    let mut head_line = String::new();
     loop {
-        let mut buf: Vec<u8> = vec![];
-        r.read_until(b'\n', &mut buf)?;
-        let mut length = buf.len();
-        if length <= 6 {
-            if length == 0 {
-                break;
-            }
-            if buf.as_slice() == b"\r\n" {
-                isCRLF = true;
+        r.read_line(&mut head_line)?;
+
+        if head_line.as_bytes() == b"\r\n" {
+            let line_trim = head_line.trim_end();
+            if line_trim.is_empty() {
                 break;
             }
         }
-        if !isCRLF {
-            headPart.extend_from_slice(&buf);
-        }
+
+        headPart.extend_from_slice(head_line.as_bytes());
+        head_line.clear();
     }
+
     // parse headPart
     resp.Header = Header::NewWithHashMap(parseHeader(headPart));
     fixPragmaCacheControl(&mut resp.Header);
@@ -1114,29 +1111,8 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
     // set Body
     if resp.Header.Get("Transfer-Encoding").as_str() == "chunked" {
         // 2.chunked方式传输方式。获取body数据。
-        let mut isEndCRLF = false;
-        let mut isCRLF = false;
-        loop {
-            let mut buf: Vec<u8> = vec![];
-            r.read_until(b'\n', &mut buf)?;
-            let mut length = buf.len();
-            if length <= 6 {
-                if buf.as_slice() == b"\r\n" {
-                    isCRLF = true;
-                    break;
-                }
-                if buf.as_slice() == b"0\r\n" {
-                    isEndCRLF = true
-                }
-
-                if isCRLF && isEndCRLF {
-                    break;
-                }
-            }
-            bodyPart.extend_from_slice(&buf);
-        }
-
-        resp.Body.replace(parseChunkedBody(&bodyPart));
+        bodyPart = parseChunkedBody(r);
+        resp.Body.replace(bodyPart);
     } else {
         // 3. 除chunked外的其他传输方式，都有Content-Length字段,根据长度获取body
         let ln: usize = resp
@@ -1155,22 +1131,24 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
     Ok(resp)
 }
 
-fn parseChunkedBody(chunkedBody: &Vec<u8>) -> Vec<u8> {
+fn parseChunkedBody(mut r: impl BufRead) -> Vec<u8> {
     let mut body: Vec<u8> = Vec::new();
-    // let mut lines = std::str::from_utf8(chunkedBody).unwrap();
-    let mut lines = unsafe { std::str::from_utf8_unchecked(chunkedBody) };
-    let mut isSizeLine = true;
-    for v in lines
-        .trim_end_matches("\r\n0\r\n\r\n")
-        .split("\r\n")
-        .into_iter()
-    {
-        if isSizeLine {
-            isSizeLine = false;
-            continue;
-        } else {
-            body.extend_from_slice(v.as_bytes());
-            isSizeLine = true;
+    let mut size_buf = vec![];
+    while let Ok(length) = r.read_until(b'\n', &mut size_buf) {
+        if &size_buf[length - 2..length - 1] == b"\r\n" {
+            size_buf.pop(); //  remove "\n"
+            size_buf.pop(); // remove "\r"
+
+            // 16进制chunk大小字符串
+            let size_str = std::str::from_utf8(&size_buf).unwrap();
+            // 如果字符串等于"0"，已经到结束位置
+            if size_str == "0" {
+                break;
+            }
+            let chunk_size = usize::from_str_radix(size_str, 16).unwrap();
+            let mut chunk_data = vec![0u8; chunk_size];
+            r.read_exact(&mut chunk_data).unwrap();
+            body.extend_from_slice(&chunk_data);
         }
     }
     body
