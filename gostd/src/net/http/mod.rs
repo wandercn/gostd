@@ -811,6 +811,7 @@ fn removeEmptyPort(host: &str) -> &str {
     }
     host
 }
+use std::iter::FromIterator;
 use std::sync;
 #[derive(Default, Clone)]
 struct Transport {
@@ -1027,22 +1028,17 @@ impl persistConn {
     }
 }
 
+use rustls::pki_types::ServerName;
 use std::io::ErrorKind;
 
 fn getTLSConn(dnsName: &str, socket: TcpConn) -> StreamOwned<ClientConnection, TcpConn> {
-    let mut clientRootCert = rustls::RootCertStore::empty();
-    clientRootCert.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.0.iter().map(|ta| {
-        rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
-            ta.subject,
-            ta.spki,
-            ta.name_constraints,
-        )
-    }));
+    let mut clientRootCert =
+        rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+
     let tlsconfig = rustls::ClientConfig::builder()
-        .with_safe_defaults()
         .with_root_certificates(clientRootCert)
         .with_no_client_auth();
-    let serverName = rustls::ServerName::try_from(dnsName.as_ref()).expect("url error");
+    let serverName = ServerName::try_from(dnsName).expect("url error").to_owned();
     let mut tlsClient = ClientConnection::new(Arc::new(tlsconfig), serverName).unwrap();
     let mut tlsConn = StreamOwned::new(tlsClient, socket);
     tlsConn
