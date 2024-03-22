@@ -1105,7 +1105,7 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
     // set Body
     if resp.Header.Get("Transfer-Encoding").as_str() == "chunked" {
         // 2.chunked方式传输方式。获取body数据。
-        resp.Body.replace(parseChunkedBody(r));
+        resp.Body.replace(parseChunkedBody(r)?);
     } else {
         // 3. 除chunked外的其他传输方式，都有Content-Length字段,根据长度获取body
         let ln: usize = resp
@@ -1125,7 +1125,7 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
 }
 
 // chunk数据是以16位数据长度 7acc\r\n独立行开头+ [data] 下一行以\r\n结尾数据段形式，所以数据的结尾用0\r\n表示。
-fn parseChunkedBody(mut r: impl BufRead) -> Vec<u8> {
+fn parseChunkedBody(mut r: impl BufRead) -> Result<Vec<u8>, Error> {
     let mut body: Vec<u8> = Vec::new();
     let mut size_buf = vec![];
     while r.read_until(b'\n', &mut size_buf).is_ok() {
@@ -1136,24 +1136,34 @@ fn parseChunkedBody(mut r: impl BufRead) -> Vec<u8> {
             size_buf.pop(); // remove "\r"
 
             // 16进制chunk大小字符串
-            let size_str = std::str::from_utf8(&size_buf).unwrap();
+            let size_str = std::str::from_utf8(&size_buf).map_err(|e| {
+                Error::new(ErrorKind::InvalidData, format!("from_utf8 error: {}", e))
+            })?;
+
             // 如果字符串等于"0"，已经到最后一个chunk数据段。
             if size_str == "0" {
                 break;
             }
+
             // 按chunk长度读取分段的实际数据
-            let chunk_size = usize::from_str_radix(size_str, 16).unwrap();
+            let chunk_size = usize::from_str_radix(size_str, 16).map_err(|e| {
+                Error::new(
+                    ErrorKind::InvalidData,
+                    format!("from_str_radix error: {}", e),
+                )
+            })?;
+
             let mut chunk_data = vec![0u8; chunk_size];
-            r.read_exact(&mut chunk_data).unwrap();
+            r.read_exact(&mut chunk_data)?;
             body.extend_from_slice(&chunk_data);
             //读取每个chunk data 结尾的\r\n，并丢弃掉
             let mut crlf = [0u8; 2];
-            r.read_exact(&mut crlf);
+            r.read_exact(&mut crlf)?;
             //chuank size 行的数据要清空
             size_buf.clear();
         }
     }
-    body
+    Ok(body)
 }
 
 pub type MIMEHeader = HashMap<String, Vec<String>>;
