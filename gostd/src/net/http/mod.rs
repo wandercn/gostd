@@ -1086,21 +1086,15 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
     resp.ProtoMajor = vers.0;
     resp.ProtoMinor = vers.1;
 
-    // 1. 获取response的header部分，到第一个 '\r\b'符号为header的结束。
+    // 1. 获取response的header部分，到第一个 '\r\b'独立行为header的结束。
     let mut headPart: Vec<u8> = vec![];
     let mut head_line = String::new();
-    loop {
-        r.read_line(&mut head_line)?;
-
+    while r.read_line(&mut head_line).is_ok() {
         if head_line.as_bytes() == b"\r\n" {
-            let line_trim = head_line.trim_end();
-            if line_trim.is_empty() {
-                break;
-            }
+            break;
         }
-
         headPart.extend_from_slice(head_line.as_bytes());
-        head_line.clear();
+        head_line.clear()
     }
 
     // parse headPart
@@ -1111,8 +1105,7 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
     // set Body
     if resp.Header.Get("Transfer-Encoding").as_str() == "chunked" {
         // 2.chunked方式传输方式。获取body数据。
-        bodyPart = parseChunkedBody(r);
-        resp.Body.replace(bodyPart);
+        resp.Body.replace(parseChunkedBody(r));
     } else {
         // 3. 除chunked外的其他传输方式，都有Content-Length字段,根据长度获取body
         let ln: usize = resp
@@ -1131,24 +1124,33 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
     Ok(resp)
 }
 
+// chunk数据是以16位数据长度 7acc\r\n独立行开头+ [data] 下一行以\r\n结尾数据段形式，所以数据的结尾用0\r\n表示。如下示例数据的hello 和world 就是[data]
 fn parseChunkedBody(mut r: impl BufRead) -> Vec<u8> {
     let mut body: Vec<u8> = Vec::new();
     let mut size_buf = vec![];
-    while let Ok(length) = r.read_until(b'\n', &mut size_buf) {
-        if &size_buf[length - 2..length - 1] == b"\r\n" {
-            size_buf.pop(); //  remove "\n"
+    while r.read_until(b'\n', &mut size_buf).is_ok() {
+        // 校验开头行是\r\n结尾的chuank size行
+        if size_buf.as_slice().ends_with(b"\r\n") {
+            // 删除尾部的\r\n,只保留表示大小的字符串
+            size_buf.pop(); // remove "\n"
             size_buf.pop(); // remove "\r"
 
             // 16进制chunk大小字符串
             let size_str = std::str::from_utf8(&size_buf).unwrap();
-            // 如果字符串等于"0"，已经到结束位置
+            // 如果字符串等于"0"，已经到最后一个chunk数据段。
             if size_str == "0" {
                 break;
             }
+            // 按chunk长度读取分段的实际数据
             let chunk_size = usize::from_str_radix(size_str, 16).unwrap();
             let mut chunk_data = vec![0u8; chunk_size];
             r.read_exact(&mut chunk_data).unwrap();
             body.extend_from_slice(&chunk_data);
+            //读取每个chunk data 结尾的\r\n，并丢弃掉
+            let mut crlf = [0u8; 2];
+            r.read_exact(&mut crlf);
+            //chuank size 行的数据要清空
+            size_buf.clear();
         }
     }
     body
