@@ -1237,7 +1237,7 @@ impl Time {
     /// <details class="rustdoc-toggle top-doc">
     /// <summary class="docblock">zh-cn</summary>
     /// UnixMicro将t作为Unix时间返回，即从1970年1月1日UTC开始经过的微秒数。
-    /// </detail>
+    /// </details>
     pub fn UnixMicro(&self) -> int64 {
         self.unixSec() * 1000_000 + int64!(self.nsec()) / 1000
     }
