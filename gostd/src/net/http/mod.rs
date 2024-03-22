@@ -1124,7 +1124,7 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
     Ok(resp)
 }
 
-// chunk数据是以16位数据长度 7acc\r\n独立行开头+ [data] 下一行以\r\n结尾数据段形式，所以数据的结尾用0\r\n表示。如下示例数据的hello 和world 就是[data]
+// chunk数据是以16位数据长度 7acc\r\n独立行开头+ [data] 下一行以\r\n结尾数据段形式，所以数据的结尾用0\r\n表示。
 fn parseChunkedBody(mut r: impl BufRead) -> Vec<u8> {
     let mut body: Vec<u8> = Vec::new();
     let mut size_buf = vec![];
