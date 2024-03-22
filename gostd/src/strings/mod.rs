@@ -22,7 +22,7 @@ use gostd_derive::Fmt;
 /// Compare is included only for symmetry with package bytes. It is usually clearer and always faster to use the built-in string comparison operators ==, <, >, and so on.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// Compare返回一个按字典顺序比较两个字符串的整数。如果a==b，结果为0；如果a<b，结果为-1；如果a>b，结果为+1
+/// Compare返回一个按字典顺序比较两个字符串的整数。如果a == b，结果为0；如果a < b，结果为-1；如果a>b，结果为+1
 /// 比较仅用于与包字节对称。使用内置的字符串比较运算符==、<、>，等等通常更清晰，而且总是更快。
 /// </details>
 ///

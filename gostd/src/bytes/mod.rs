@@ -21,7 +21,7 @@ use gostd_derive::Fmt;
 /// Compare returns an integer comparing two byte slices lexicographically. The result will be 0 if a==b, -1 if a < b, and +1 if a > b.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
-/// Compare函数返回一个整数表示两个&[byte]切片按字典序比较的结果（类同C的strcmp）。如果a==b返回0；如果a<b返回-1；否则返回+1。
+/// Compare函数返回一个整数表示两个&[byte]切片按字典序比较的结果（类同C的strcmp）。如果a == b返回0；如果a < b返回-1；否则返回+1。
 /// </details>
 ///
 /// # Example
