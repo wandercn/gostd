@@ -14,3 +14,7 @@ mod inner;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 #[path = "sys/darwin.rs"]
 mod inner;
+
+#[cfg(any(target_os = "windows"))]
+#[path = "sys/windows.rs"]
+mod inner;
