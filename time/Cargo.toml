@@ -23,7 +23,7 @@ libc = "0.2"
 cvt = "0.1.1"
 lazy_static = "1.4.0"
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3"}
+winapi = { version = "0.3" , features = ["profileapi", "sysinfoapi"]}
 
 [lib]
 name = "gostd_time"
