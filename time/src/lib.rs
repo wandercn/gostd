@@ -4057,6 +4057,7 @@ fn initLocal() -> Location {
         "/usr/share/zoneinfo/",
         "/usr/share/lib/zoneinfo/",
         "/usr/lib/locale/TZ/",
+        "tzdata/zoneinfo/",
     ];
     // consult $TZ to find the time zone to use.
     // no $TZ means use the system default /etc/localtime.
@@ -4104,9 +4105,10 @@ use std::io::{Error, ErrorKind};
 
 fn loadLocation(name: &str, sources: Vec<&str>) -> Result<Location, Error> {
     for source in sources {
-        let zoneData = loadTzinfo(name, source)?;
-        let z = LoadLocationFromTZData(name, zoneData)?;
-        return Ok(z);
+        if let Ok(zoneData) = loadTzinfo(name, source) {
+            let z = LoadLocationFromTZData(name, zoneData)?;
+            return Ok(z);
+        }
     }
 
     Err(Error::new(ErrorKind::Other, "unknown time zone"))
@@ -4424,9 +4426,10 @@ pub fn LoadLocation(name: &str) -> Result<Location, Error> {
     const errLocation: &str = "time: invalid location name";
     use std::sync::Once;
     let zoneSources = vec![
-        "/usr/share/zoneinfo/",
         "/usr/share/lib/zoneinfo/",
         "/usr/lib/locale/TZ/",
+        "/usr/share/zoneinfo/",
+        "tzdata/zoneinfo/",
     ];
     let zoneinfoOnce = Once::new();
     if name == "" || name == "UTC" {
