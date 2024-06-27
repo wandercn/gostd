@@ -4059,6 +4059,18 @@ fn initLocal() -> Location {
         "/usr/lib/locale/TZ/",
         "tzdata/zoneinfo/",
     ];
+
+    let mut dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .to_str()
+        .unwrap_or_default()
+        .replace("\\", "/")
+        .to_owned();
+
+    #[cfg(target_os = "windows")]
+    let zoneSources = vec![{
+        dir.push_str("/tzdata/zoneinfo/");
+        dir.as_str()
+    }];
     // consult $TZ to find the time zone to use.
     // no $TZ means use the system default /etc/localtime.
     // $TZ="" means use UTC.
@@ -4429,6 +4441,7 @@ pub fn LoadLocation(name: &str) -> Result<Location, Error> {
         "/usr/share/lib/zoneinfo/",
         "/usr/lib/locale/TZ/",
         "/usr/share/zoneinfo/",
+        "tzdata/zoneinfo/",
     ];
 
     let mut dir = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -4906,13 +4919,11 @@ fn loadTzinfoFromDirOrZip(dir: &str, name: &str) -> Result<Vec<byte>, Error> {
     let mut name = name.to_string();
     if dir != "" {
         let mut temp = dir.to_string();
-        // temp.push_str("/");
+        temp.push_str("/");
         temp.push_str(name.as_str());
         name = temp
     }
-    println!("{}", name);
     let mut buf = Vec::new();
-    // let mut f = File::open(name)?;
     match File::open(name) {
         Ok(mut f) => {
             f.read_to_end(&mut buf)?;

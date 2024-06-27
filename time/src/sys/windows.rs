@@ -15,9 +15,7 @@ pub fn monotonic_now() -> uint64 {
     cvt(unsafe { QueryPerformanceCounter(&mut counter as *mut _) }).unwrap();
     let frequency_u64 = uint64!(unsafe { *frequency.QuadPart() });
     let counter_u64 = uint64!(unsafe { *counter.QuadPart() });
-    println!("frequency_u64: {}", frequency_u64);
-    println!("counter_u64: {}", counter_u64);
-    let nanoseconds = Wrapping(counter_u64) * Wrapping(1_000_000_000) / Wrapping(frequency_u64);
+    let nanoseconds = Wrapping(counter_u64) * Wrapping(1_000_000_000) / Wrapping(frequency_u64); // Wrapping 处理算数溢出问题
 
     uint64!(nanoseconds.0)
 }
@@ -29,8 +27,6 @@ pub fn real_time_now() -> (uint64, uint64) {
     unsafe {
         GetSystemTimePreciseAsFileTime(&mut t);
     }
-    println!("hight: {}", t.dwHighDateTime);
-    println!("low: {}", t.dwLowDateTime);
     let u1 = (uint64!(t.dwHighDateTime)) << 32;
     let u2 = (uint64!(t.dwLowDateTime));
     let nanoseconds = (u1 | u2) * 100;
