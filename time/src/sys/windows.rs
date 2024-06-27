@@ -19,7 +19,7 @@ pub fn monotonic_now() -> uint64 {
     println!("counter_u64: {}", counter_u64);
     let nanoseconds = Wrapping(counter_u64) * Wrapping(1_000_000_000) / Wrapping(frequency_u64);
 
-    uint64!(nanoseconds)
+    uint64!(nanoseconds.0)
 }
 
 #[cfg(windows)]
