@@ -1,10 +1,15 @@
 use gostd_builtin::*;
 pub fn monotonic_now() -> uint64 {
-    inner::monotonic_now()
+    let mon_now = inner::monotonic_now();
+    dbg!("mon_now: {}", mon_now);
+    panic!("");
+    mon_now
 }
 
 pub fn real_time_now() -> (uint64, uint64) {
-    inner::real_time_now()
+    let real_now = inner::real_time_now();
+    dbg!("real_now: {:?}", real_now);
+    real_now
 }
 
 #[cfg(all(all(unix), not(target_os = "macos")))]
