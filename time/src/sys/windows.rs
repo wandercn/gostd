@@ -30,10 +30,9 @@ pub fn real_time_now() -> (uint64, uint64) {
     unsafe {
         GetSystemTimePreciseAsFileTime(&mut ft);
     }
-    let mut li: LARGE_INTEGER = unsafe { mem::zeroed() };
-    li.LowPart = ft.dwLowDateTime;
-    li.HighPart = ft.dwHighDateTime;
-    let nanoseconds = unsafe { *li.QuadPart() } * 100;
+    let u1 = (uint64!(t.dwHighDateTime)) << 32;
+    let u2 = (uint64!(t.dwLowDateTime));
+    let nanoseconds = (u1 | u2) * 100;
     let seconds = nanoseconds / 1_000_000_000 - EPOCH_DIFFERENCE;
     let nanoseconds = nanoseconds % 1_000_000_000;
 
