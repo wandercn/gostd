@@ -2,7 +2,7 @@ use gostd_builtin::*;
 pub fn monotonic_now() -> uint64 {
     let mon_now = inner::monotonic_now();
     dbg!("mon_now: {}", mon_now);
-    panic!("");
+    // panic!("");
     mon_now
 }
 
