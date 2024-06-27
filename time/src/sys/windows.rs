@@ -27,8 +27,11 @@ pub fn real_time_now() -> (uint64, uint64) {
     unsafe {
         GetSystemTimePreciseAsFileTime(&mut t);
     }
-
-    let nanoseconds = ((uint64!(t.dwHighDateTime)) << 32 | (uint64!(t.dwLowDateTime))) * 100;
+    println!("hight: {}", t.dwHighDateTime);
+    println!("low: {}", t.dwLowDateTime);
+    let u1 = (uint64!(t.dwHighDateTime)) << 32;
+    let u2 = (uint64!(t.dwLowDateTime));
+    let nanoseconds = (u1 | u2) * 100;
     let seconds = nanoseconds / 1_000_000_000;
     let nanoseconds = nanoseconds % 1_000_000_000;
 
