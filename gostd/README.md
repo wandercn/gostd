@@ -147,6 +147,7 @@ use gostd::vendor
 - [x] http模块的client客户端功能，支持http和https。(version >=0.2.6)
 - [x] 完成bytes模块。(version >=0.2.8)
 - [x] 完成mime::multipart模块。(version >=0.3.1)
+- [x] 修复windos10平台编译失败的bug。(version>=0.3.18)
 
 # 独立发布包
  
