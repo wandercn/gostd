@@ -4469,8 +4469,13 @@ pub fn LoadLocation(name: &str) -> Result<Location, Error> {
         let z = LoadLocationFromTZData(name, zoneData)?;
         return Ok(z);
     } else {
-        let z = loadLocation(name, zoneSources)?;
-        return Ok(z);
+        match loadLocation(name, zoneSources) {
+            Ok(z) => Ok(z),
+            Err(e) => {
+                println!("loadLocation error:{}", e);
+                Err(e)
+            }
+        }
     }
 }
 
