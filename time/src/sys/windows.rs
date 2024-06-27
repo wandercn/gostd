@@ -28,7 +28,7 @@ pub fn real_time_now() -> (uint64, uint64) {
     let mut ft: FILETIME = unsafe { mem::zeroed() };
 
     unsafe {
-        GetSystemTimePreciseAsFileTime(&mut t);
+        GetSystemTimePreciseAsFileTime(&mut ft);
     }
     let mut li: LARGE_INTEGER = unsafe { mem::zeroed() };
     li.LowPart = ft.dwLowDateTime;
