@@ -4578,9 +4578,13 @@ fn tzset(s: &str, initEnd: int64, sec: int64) -> (String, int, int64, int64, boo
     if !ok || len!(s) > 0 {
         return ("".to_string(), 0, 0, 0, false, false);
     }
-
+    use std::num::Wrapping;
     let (year, _, _, yday) = absDate(
-        uint64!((sec + unixToInternal + internalToAbsolute).abs()),
+        uint64!(
+            (Wrapping(sec) + Wrapping(unixToInternal) + Wrapping(internalToAbsolute))
+                .0
+                .abs()
+        ),
         false,
     );
 
