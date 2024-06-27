@@ -25,10 +25,10 @@ pub fn monotonic_now() -> uint64 {
 
 #[cfg(windows)]
 pub fn real_time_now() -> (uint64, uint64) {
-    let mut ft: FILETIME = unsafe { mem::zeroed() };
+    let mut t: FILETIME = unsafe { mem::zeroed() };
 
     unsafe {
-        GetSystemTimePreciseAsFileTime(&mut ft);
+        GetSystemTimePreciseAsFileTime(&mut t);
     }
     let u1 = (uint64!(t.dwHighDateTime)) << 32;
     let u2 = (uint64!(t.dwLowDateTime));
