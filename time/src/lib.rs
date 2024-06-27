@@ -4059,6 +4059,18 @@ fn initLocal() -> Location {
         "/usr/lib/locale/TZ/",
         "tzdata/zoneinfo/",
     ];
+
+    let mut dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .to_str()
+        .unwrap_or_default()
+        .replace("\\", "/")
+        .to_owned();
+
+    #[cfg(target_os = "windows")]
+    let zoneSources = vec![{
+        dir.push_str("/tzdata/zoneinfo/");
+        dir.as_str()
+    }];
     // consult $TZ to find the time zone to use.
     // no $TZ means use the system default /etc/localtime.
     // $TZ="" means use UTC.
@@ -4431,6 +4443,19 @@ pub fn LoadLocation(name: &str) -> Result<Location, Error> {
         "/usr/share/zoneinfo/",
         "tzdata/zoneinfo/",
     ];
+
+    let mut dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .to_str()
+        .unwrap_or_default()
+        .replace("\\", "/")
+        .to_owned();
+
+    #[cfg(target_os = "windows")]
+    let zoneSources = vec![{
+        dir.push_str("/tzdata/zoneinfo/");
+        dir.as_str()
+    }];
+
     let zoneinfoOnce = Once::new();
     if name == "" || name == "UTC" {
         return Ok(UTC.clone());
@@ -4457,8 +4482,13 @@ pub fn LoadLocation(name: &str) -> Result<Location, Error> {
         let z = LoadLocationFromTZData(name, zoneData)?;
         return Ok(z);
     } else {
-        let z = loadLocation(name, zoneSources)?;
-        return Ok(z);
+        match loadLocation(name, zoneSources) {
+            Ok(z) => Ok(z),
+            Err(e) => {
+                println!("loadLocation error:{}", e);
+                Err(e)
+            }
+        }
     }
 }
 
@@ -4561,9 +4591,13 @@ fn tzset(s: &str, initEnd: int64, sec: int64) -> (String, int, int64, int64, boo
     if !ok || len!(s) > 0 {
         return ("".to_string(), 0, 0, 0, false, false);
     }
-
+    use std::num::Wrapping;
     let (year, _, _, yday) = absDate(
-        uint64!((sec + unixToInternal + internalToAbsolute).abs()),
+        uint64!(
+            (Wrapping(sec) + Wrapping(unixToInternal) + Wrapping(internalToAbsolute))
+                .0
+                .abs()
+        ),
         false,
     );
 
@@ -4875,6 +4909,7 @@ fn loadFromEmbeddedTZData(zipname: &str) -> Result<string, Error> {
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
+use std::path::Path;
 
 fn loadTzinfoFromDirOrZip(dir: &str, name: &str) -> Result<Vec<byte>, Error> {
     // 从zip文件读取时区信息，暂时不实现，大部分情况系统目录都有时区文件
@@ -4889,9 +4924,13 @@ fn loadTzinfoFromDirOrZip(dir: &str, name: &str) -> Result<Vec<byte>, Error> {
         name = temp
     }
     let mut buf = Vec::new();
-    let mut f = File::open(name)?;
-    f.read_to_end(&mut buf)?;
-    Ok(buf)
+    match File::open(name) {
+        Ok(mut f) => {
+            f.read_to_end(&mut buf)?;
+            Ok(buf)
+        }
+        Err(err) => Err(err),
+    }
 }
 
 fn findZone(zones: Vec<zone>, name: String, offset: int, isDST: bool) -> int {
