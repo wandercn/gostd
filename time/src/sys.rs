@@ -5,7 +5,7 @@ pub fn monotonic_now() -> uint64 {
     dbg!("mon_now: {}", mon_now);
     mon_now
 }
-// 获取当前时间戳
+// 获取当前时间戳，包括秒部分和纳秒部分
 pub fn real_time_now() -> (uint64, uint64) {
     let real_now = inner::real_time_now();
     dbg!("real_now: {:?}", real_now);
