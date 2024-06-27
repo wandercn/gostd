@@ -1,7 +1,7 @@
 [package]
 name = "gostd_time"
 license = "MIT"
-version = "1.0.9"
+version = "1.1.0"
 edition = "2018"
 authors = ["wandercn<wander@ffactory.org>"]
 description = "Package time provides functionality for measuring and displaying time. time包提供了时间的显示和测量用的函数。日历的计算采用的是公历。"
