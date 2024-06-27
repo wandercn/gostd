@@ -1,11 +1,11 @@
 use cvt::cvt;
 use gostd_builtin::*;
 use std::mem;
+use std::num::Wrapping;
 use winapi::shared::minwindef::FILETIME;
 use winapi::shared::ntdef::LARGE_INTEGER;
 use winapi::um::profileapi::{QueryPerformanceCounter, QueryPerformanceFrequency};
 use winapi::um::sysinfoapi::GetSystemTimePreciseAsFileTime;
-
 #[cfg(windows)]
 pub fn monotonic_now() -> uint64 {
     let mut frequency: LARGE_INTEGER = unsafe { mem::zeroed() };
@@ -17,7 +17,7 @@ pub fn monotonic_now() -> uint64 {
     let counter_u64 = uint64!(unsafe { *counter.QuadPart() });
     println!("frequency_u64: {}", frequency_u64);
     println!("counter_u64: {}", counter_u64);
-    let nanoseconds = counter_u64 * 1_000_000_000 / frequency_u64;
+    let nanoseconds = Wrapping(counter_u64) * Wrapping(1_000_000_000) / frequency_u64;
 
     uint64!(nanoseconds)
 }
