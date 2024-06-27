@@ -15,6 +15,8 @@ pub fn monotonic_now() -> uint64 {
     cvt(unsafe { QueryPerformanceCounter(&mut counter as *mut _) }).unwrap();
     let frequency_u64 = uint64!(unsafe { *frequency.QuadPart() });
     let counter_u64 = uint64!(unsafe { *counter.QuadPart() });
+    println!("frequency_u64: {}", frequency_u64);
+    println!("counter_u64: {}", counter_u64);
     let nanoseconds = counter_u64 * 1_000_000_000 / frequency_u64;
 
     uint64!(nanoseconds)
