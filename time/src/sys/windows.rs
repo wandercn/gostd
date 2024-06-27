@@ -6,6 +6,9 @@ use winapi::shared::minwindef::FILETIME;
 use winapi::shared::ntdef::LARGE_INTEGER;
 use winapi::um::profileapi::{QueryPerformanceCounter, QueryPerformanceFrequency};
 use winapi::um::sysinfoapi::GetSystemTimePreciseAsFileTime;
+
+const EPOCH_DIFFERENCE: u64 = 11644473600; // windos时间戳和Unix时间戳的差值
+
 #[cfg(windows)]
 pub fn monotonic_now() -> uint64 {
     let mut frequency: LARGE_INTEGER = unsafe { mem::zeroed() };
@@ -22,15 +25,16 @@ pub fn monotonic_now() -> uint64 {
 
 #[cfg(windows)]
 pub fn real_time_now() -> (uint64, uint64) {
-    let mut t: FILETIME = unsafe { mem::zeroed() };
+    let mut ft: FILETIME = unsafe { mem::zeroed() };
 
     unsafe {
         GetSystemTimePreciseAsFileTime(&mut t);
     }
-    let u1 = (uint64!(t.dwHighDateTime)) << 32;
-    let u2 = (uint64!(t.dwLowDateTime));
-    let nanoseconds = (u1 | u2) * 100;
-    let seconds = nanoseconds / 1_000_000_000;
+    let mut li: LARGE_INTEGER = unsafe { mem::zeroed() };
+    li.LowPart = ft.dwLowDateTime;
+    li.HighPart = ft.dwHighDateTime;
+    let nanoseconds = unsafe { *li.QuadPart() } * 100;
+    let seconds = nanoseconds / 1_000_000_000 - EPOCH_DIFFERENCE;
     let nanoseconds = nanoseconds % 1_000_000_000;
 
     (uint64!(seconds), uint64!(nanoseconds))
