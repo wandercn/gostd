@@ -4929,10 +4929,7 @@ fn loadTzinfoFromDirOrZip(dir: &str, name: &str) -> Result<Vec<byte>, Error> {
             f.read_to_end(&mut buf)?;
             Ok(buf)
         }
-        Err(err) => {
-            println!("{}", err);
-            Err(err)
-        }
+        Err(err) => Err(err),
     }
 }
 
