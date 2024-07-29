@@ -347,14 +347,21 @@ impl Values {
     }
 }
 
-impl Iterator for Values {
+impl IntoIterator for Values {
     type Item = (String, Vec<String>);
+    type IntoIter = std::collections::hash_map::IntoIter<String, Vec<String>>;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0
-            .iter()
-            .next()
-            .and_then(|(k, v)| Some((k.to_owned(), v.to_owned())))
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Values {
+    type Item = (&'a String, &'a Vec<String>);
+    type IntoIter = std::collections::hash_map::Iter<'a, String, Vec<String>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
     }
 }
 
