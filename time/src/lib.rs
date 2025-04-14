@@ -1802,7 +1802,7 @@ fn parse(
                     std &= stdMask;
                     if std == stdFracSecond0 || std == stdFracSecond9 {
                         // Fractional second in the layout; proceed normally
-                        break;
+                        continue;
                     }
                     // No fractional second in the layout but we have one in the input.
                     let mut n = 2;
