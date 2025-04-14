@@ -679,7 +679,7 @@ fn readSetCookies(h: &Header) -> Vec<Cookie> {
                     let mut secs: int = 0;
                     let res = val.parse::<int>();
                     if res.is_err() || (secs != 0 && val.bytes().nth(0) == Some(b'0')) {
-                        break;
+                        continue;
                     }
                     secs = res.unwrap();
                     if secs <= 0 {
@@ -697,7 +697,7 @@ fn readSetCookies(h: &Header) -> Vec<Cookie> {
                             c.Expires = exptime.UTC();
                         } else {
                             c.Expires = time::Time::default();
-                            break;
+                            continue;
                         }
                     }
                     continue;

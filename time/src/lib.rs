@@ -1505,11 +1505,20 @@ pub fn Date(
 ///     .expect("Parse faile:");
 /// assert_eq!( t.String() ,"2013-02-03 19:54:00 +0000 PST".to_string());
 /// println!("{}", t);
+///
+/// // 纳秒解析
+///
+/// let t = time::Parse(time::RFC3339Nano, "2025-11-02T15:04:05.199929934Z")
+///     .ok()
+///     .expect("Parse faile:");
+/// assert_eq!( t.String() ,"2025-11-02 15:04:05.199929934 +0000 UTC".to_string());
+/// println!("{}", t);
 /// ```
 /// ## Output:
 ///
 /// ```text
 /// 2013-02-03 19:54:00 +0000 PST
+/// 2025-11-02 15:04:05.199929934 +0000 UTC
 /// ```
 pub fn Parse(layout: &str, value: &str) -> Result<Time, Error> {
     parse(layout, value, UTC.clone(), Local.clone())
@@ -1587,12 +1596,23 @@ fn parse(
         let stdstr = &layout[len!(prefix)..(len!(layout) - len!(suffix))];
         let res = skip(value, prefix)?;
         value = res;
-
+        if err != "" {
+            return Err(Error::new(
+                ErrorKind::Other,
+                format!("{} {} {} {} {}", alayout, avalue, prefix, value, ""),
+            ));
+        }
         if std == 0 {
             if len!(value) != 0 {
                 return Err(Error::new(
                     ErrorKind::Other,
-                    format!("{} {}", "extra text:", value),
+                    format!(
+                        "{} {} {} {}",
+                        alayout,
+                        avalue,
+                        "",
+                        format!("{} {}", "extra text:", value)
+                    ),
                 ));
             }
             break;
@@ -1602,8 +1622,8 @@ fn parse(
         match (std & stdMask) {
             stdYear => {
                 if len!(value) < 2 {
-                    err = "stdYear err1";
-                    break;
+                    err = "stdYear bad value for field";
+                    continue;
                 }
                 let hold = value;
                 p = &value[0..2];
@@ -1624,8 +1644,8 @@ fn parse(
             }
             stdLongYear => {
                 if len!(value) < 4 || !isDigit(value, 0) {
-                    err = "stdLongYear err1";
-                    break;
+                    err = "stdLongYear bad value for field";
+                    continue;
                 }
                 p = &value[0..4];
                 value = &value[4..];
@@ -1789,7 +1809,7 @@ fn parse(
                 }
                 if sec < 0 || 60 <= sec {
                     rangeErrString = "second";
-                    break;
+                    continue;
                 }
                 // Special case: do we have a fractional second but no
                 // fractional second in the format?
@@ -1822,7 +1842,7 @@ fn parse(
             stdPM => {
                 if len!(value) < 2 {
                     err = errBad;
-                    break;
+                    continue;
                 }
                 p = &value[0..2];
                 value = &value[2..];
@@ -1835,7 +1855,7 @@ fn parse(
             stdpm => {
                 if len!(value) < 2 {
                     err = errBad;
-                    break;
+                    continue;
                 }
                 p = &value[0..2];
                 value = &value[2..];
@@ -1862,7 +1882,7 @@ fn parse(
                 {
                     value = &value[1..];
                     z = UTC.clone();
-                    break;
+                    continue;
                 }
                 let mut sign: &str;
                 let mut hour: &str;
@@ -1871,11 +1891,11 @@ fn parse(
                 if std == stdISO8601ColonTZ || std == stdNumColonTZ {
                     if len!(value) < 6 {
                         err = errBad;
-                        break;
+                        continue;
                     }
                     if value.bytes().nth(3) != Some(b':') {
                         err = errBad;
-                        break;
+                        continue;
                     }
 
                     sign = &value[0..1];
@@ -1886,7 +1906,7 @@ fn parse(
                 } else if std == stdNumShortTZ || std == stdISO8601ShortTZ {
                     if len!(value) < 3 {
                         err = errBad;
-                        break;
+                        continue;
                     }
                     sign = &value[0..1];
                     hour = &value[1..3];
@@ -1896,11 +1916,11 @@ fn parse(
                 } else if std == stdISO8601ColonSecondsTZ || std == stdNumColonSecondsTZ {
                     if len!(value) < 9 {
                         err = errBad;
-                        break;
+                        continue;
                     }
                     if value.bytes().nth(3) != Some(b':') || value.bytes().nth(6) != Some(b':') {
                         err = errBad;
-                        break;
+                        continue;
                     }
                     sign = &value[0..1];
                     hour = &value[1..3];
@@ -1910,7 +1930,7 @@ fn parse(
                 } else if std == stdISO8601SecondsTZ || std == stdNumSecondsTz {
                     if len!(value) < 7 {
                         err = errBad;
-                        break;
+                        continue;
                     }
                     sign = &value[0..1];
                     hour = &value[1..3];
@@ -1920,7 +1940,7 @@ fn parse(
                 } else {
                     if len!(value) < 5 {
                         err = errBad;
-                        break;
+                        continue;
                     }
                     sign = &value[0..1];
                     hour = &value[1..3];
@@ -1966,14 +1986,14 @@ fn parse(
                 if len!(value) >= 3 && &value[0..3] == "UTC" {
                     z = UTC.clone();
                     value = &value[3..];
-                    break;
+                    continue;
                 }
                 let res = parseTimeZone(value);
                 let n = uint!(res.0);
                 let ok = res.1;
                 if !ok {
                     err = errBad;
-                    break;
+                    continue;
                 }
                 zoneName = &value[..n];
                 value = &value[n..];
@@ -1984,7 +2004,7 @@ fn parse(
                 let ndigit = uint!(1 + digitsLen(int!(std)));
                 if len!(value) < ndigit {
                     err = errBad;
-                    break;
+                    continue;
                 }
                 let res = parseNanoseconds(value, ndigit);
                 if res.is_err() {
@@ -2002,7 +2022,7 @@ fn parse(
                     || Some(b'9') < value.bytes().nth(1)
                 {
                     // Fractional second omitted.
-                    break;
+                    continue;
                 }
                 // Take any number of digits, even more than asked for,
                 // because it is what the stdSecond case would do.
@@ -3625,7 +3645,7 @@ impl Time {
                             || std == stdISO8601ColonSecondsTZ)
                     {
                         b.push(b'Z');
-                        break;
+                        continue;
                     }
 
                     let mut zone = offset / 60;
@@ -3666,7 +3686,7 @@ impl Time {
                 stdTZ => {
                     if name != "" {
                         b.extend_from_slice(name.as_bytes());
-                        break;
+                        continue;
                     }
 
                     let mut zone = offset / 60;
@@ -4309,8 +4329,8 @@ fn LoadLocationFromTZData(name: &str, data: Vec<byte>) -> Result<Location, Error
         }
 
         zones[i].name = byteString(abbr[uint!(b)..].to_vec());
-
-        if cfg!(aix) && len!(name) > 8 && (&name[..8] == "Etc/GMT+" || &name[..8] == "Etc/GMT-") {
+        #[cfg(not(target_os = "aix"))]
+        if len!(name) > 8 && (&name[..8] == "Etc/GMT+" || &name[..8] == "Etc/GMT-") {
             // There is a bug with AIX 7.2 TL 0 with files in Etc,
             // GMT+1 will return GMT-1 instead of GMT+1 or -01.
             if name != "Etc/GMT+0" {
