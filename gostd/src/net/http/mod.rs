@@ -228,7 +228,7 @@ use std::io::Error;
 ///     let response = http::Get(url)?;///
 ///     println!(
 ///         "{}",
-///         String::from_utf8(response.Body.expect("return body error")).unwrap()
+///         String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
 ///     );
 ///     Ok(())
 /// }
@@ -261,7 +261,7 @@ pub fn Head(url: &str) -> HttpResult {
 ///
 ///    println!(
 ///        "{}",
-///        String::from_utf8(response.Body.expect("return body error")).unwrap()
+///        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
 ///    );
 ///
 ///    Ok(())
@@ -548,7 +548,7 @@ pub struct Response {
     pub Header: Header,
     pub ContentLength: int64,
     pub TransferEncoding: Vec<String>,
-    pub Body: Option<Vec<u8>>,
+    pub Body: Option<BytesMut>,
     pub Close: bool,
     pub Uncompressed: bool,
     pub Trailer: Header,
@@ -1028,9 +1028,9 @@ impl persistConn {
     }
 }
 
+use bytes::{Buf, BytesMut};
 use rustls::pki_types::ServerName;
 use std::io::ErrorKind;
-
 fn getTLSConn(dnsName: &str, socket: TcpConn) -> StreamOwned<ClientConnection, TcpConn> {
     let mut clientRootCert =
         rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
@@ -1050,31 +1050,16 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
     // parse status line。
     let mut line = String::new();
     r.read_line(&mut line)?;
-    let i = strings::IndexByte(line.as_str(), b' ');
-    if i == -1 {
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    if parts.len() < 3 {
         return Err(Error::new(ErrorKind::Other, "malformed HTTP response"));
     }
-    resp.Proto = line.get(..i as usize).unwrap().to_string();
-    resp.Status =
-        strings::TrimLeft(&line.as_str()[i as usize + 1..len!(line) - 2], " ").to_string();
-    let mut statusCode = resp.Status.as_str();
-    let i = strings::IndexByte(resp.Status.as_str(), b' ');
-    if i != -1 {
-        statusCode = &resp.Status.as_str()[..i as usize];
-    }
-    if len!(statusCode) != 3 {
-        return Err(Error::new(ErrorKind::Other, "malformed HTTP status code"));
-    }
-    // map_err 重新转换Err类型到io::Error
-    resp.StatusCode = statusCode
-        .parse::<int>()
-        .map_err(|err| Error::new(ErrorKind::Other, err))?;
-
-    if resp.StatusCode < 0 {
-        return Err(Error::new(ErrorKind::Other, "malformed HTTP status code"));
-    }
-
-    let vers = ParseHTTPVersion(resp.Proto.as_str());
+    resp.Proto = parts[0].to_string();
+    resp.Status = parts[1..].join(" ");
+    resp.StatusCode = parts[1]
+        .parse::<isize>()
+        .map_err(|_| Error::new(ErrorKind::Other, "malformed HTTP status code"))?;
+    let vers = ParseHTTPVersion(&resp.Proto);
     let ok = vers.2;
     if !ok {
         return Err(Error::new(ErrorKind::Other, "malformed HTTP version"));
@@ -1083,7 +1068,7 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
     resp.ProtoMinor = vers.1;
 
     // 1. 获取response的header部分，到第一个 '\r\b'独立行为header的结束。
-    let mut headPart: Vec<u8> = vec![];
+    let mut headPart = BytesMut::new();
     let mut head_line = String::new();
     while r.read_line(&mut head_line).is_ok() {
         if head_line.as_bytes() == b"\r\n" {
@@ -1094,14 +1079,13 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
     }
 
     // parse headPart
-    resp.Header = Header::NewWithHashMap(parseHeader(headPart));
+    resp.Header = Header::NewWithHashMap(parseHeader(&headPart)?);
     fixPragmaCacheControl(&mut resp.Header);
 
-    let mut bodyPart: Vec<u8> = vec![];
     // set Body
     if resp.Header.Get("Transfer-Encoding").as_str() == "chunked" {
         // 2.chunked方式传输方式。获取body数据。
-        resp.Body.replace(parseChunkedBody(r)?);
+        resp.Body = Some(parseChunkedBody(r)?);
     } else {
         // 3. 除chunked外的其他传输方式，都有Content-Length字段,根据长度获取body
         let ln: usize = resp
@@ -1113,23 +1097,21 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
 
         let mut buf = vec![0; ln]; // 生成固定长度的数组，用于读取定长数据;
         r.read_exact(&mut buf)?;
-        bodyPart.extend_from_slice(&buf);
-        resp.Body = Some(bodyPart);
+        resp.Body = Some(BytesMut::from(&buf[..]));
     }
-    resp.ContentLength = len!(&resp.Body.as_ref().unwrap()) as i64;
+    resp.ContentLength = resp.Body.as_ref().map_or(0, |b| b.len() as i64);
     Ok(resp)
 }
 
 // chunk数据是以16位数据长度 7acc\r\n独立行开头+ [data] 下一行以\r\n结尾数据段形式，所以数据的结尾用0\r\n表示。
-fn parseChunkedBody(mut r: impl BufRead) -> Result<Vec<u8>, Error> {
-    let mut body: Vec<u8> = Vec::new();
+fn parseChunkedBody(mut r: impl BufRead) -> Result<BytesMut, Error> {
+    let mut body = BytesMut::new();
     let mut size_buf = vec![];
     while r.read_until(b'\n', &mut size_buf).is_ok() {
         // 校验开头行是\r\n结尾的chuank size行
-        if size_buf.as_slice().ends_with(b"\r\n") {
+        if size_buf.ends_with(b"\r\n") {
             // 删除尾部的\r\n,只保留表示大小的字符串
-            size_buf.pop(); // remove "\n"
-            size_buf.pop(); // remove "\r"
+            size_buf.truncate(size_buf.len() - 2); // Remove "\r\n"
 
             // 16进制chunk大小字符串
             let size_str = std::str::from_utf8(&size_buf).map_err(|e| {
@@ -1174,44 +1156,31 @@ fn fixPragmaCacheControl(header: &mut Header) {
     }
 }
 
-fn parseHeader(headPart: Vec<u8>) -> MIMEHeader {
+fn parseHeader(headPart: &[u8]) -> Result<MIMEHeader, Error> {
     let mut m: MIMEHeader = HashMap::new();
-    let lines = std::str::from_utf8(headPart.as_slice()).unwrap();
+    let lines = std::str::from_utf8(headPart).map_err(|e| {
+        Error::new(
+            ErrorKind::InvalidData,
+            format!("invalid UTF-8 sequence: {}", e),
+        )
+    })?;
 
-    for kv in lines.split("\r\n").into_iter() {
-        let mut i = strings::IndexByte(kv, b':');
-        if i < 0 {
-            continue;
-        }
-
-        let key = canonicalMIMEHeaderKey(kv.get(..i as usize).unwrap());
-        if key == "".to_string() {
-            continue;
-        }
-        i += 1;
-        while (uint!(i) < len!(kv.as_bytes())
-            && (kv.as_bytes()[i as usize] == b' ' || kv.as_bytes()[i as usize] == b'\t'))
-        {
-            i += 1;
-        }
-        let mut vv = Vec::<String>::new();
-        let value = strings::TrimFunc(string(&kv.as_bytes()[i as usize..]).trim(), |x| {
-            x == '\"' as u32
-        })
-        .to_string();
-
-        if let Some(mut v) = m.get(&key) {
-            vv = v.to_owned();
-            vv.push(value);
-            m.insert(key, vv.to_owned());
-        } else {
-            if len!(value) > 0 {
-                vv.push(value);
-                m.insert(key, vv.clone());
+    for kv in lines.split("\r\n") {
+        if let Some((key, value)) = kv.split_once(':') {
+            let key = canonicalMIMEHeaderKey(key);
+            if key.is_empty() {
+                continue;
             }
+
+            let value = value
+                .trim_start_matches(|c: char| c == ' ' || c == '\t')
+                .trim_matches('"')
+                .to_string();
+
+            m.entry(key).or_insert_with(Vec::new).push(value);
         }
     }
-    m
+    Ok(m)
 }
 
 fn startIndexOfBody(response: &Vec<u8>) -> Option<usize> {
