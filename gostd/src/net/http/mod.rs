@@ -203,6 +203,7 @@ use crate::strings;
 use crate::time;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::convert::TryInto;
 use std::io::Error;
 /// Get issues a GET to the specified URL. If the response is one of the following redirect codes, Get follows the redirect,up to a maximum of 10 redirects:
 /// ```text
@@ -296,7 +297,7 @@ pub struct Client {
     Timeout: time::Duration,
 }
 
-pub type HttpResult = Result<Response, Error>;
+pub type HttpResult = Result<Response, HTTPConnectError>;
 impl Default for Client {
     fn default() -> Self {
         Self {
@@ -358,7 +359,7 @@ impl Client {
         &mut self,
         req: &mut Request,
         deadline: time::Time,
-    ) -> Result<(Response, fn() -> bool), Error> {
+    ) -> Result<(Response, fn() -> bool), HTTPConnectError> {
         let (resp, didTimeout) = send(req, self.transport(), deadline)?;
         Ok((resp, didTimeout))
     }
@@ -385,7 +386,7 @@ fn send(
     ireq: &mut Request,
     mut rt: Box<dyn RoundTripper>,
     deadline: time::Time,
-) -> Result<(Response, fn() -> bool), Error> {
+) -> Result<(Response, fn() -> bool), HTTPConnectError> {
     let mut resp = Response::default();
     fn didTimeout() -> bool {
         return false;
@@ -426,7 +427,7 @@ fn redirectBehavior(reqMethod: &str, resp: &Response, ireq: &Request) -> (String
 }
 
 pub trait RoundTripper {
-    fn RoundTrip(&mut self, r: &Request) -> Result<Response, Error>;
+    fn RoundTrip(&mut self, r: &Request) -> HttpResult;
 }
 
 fn refererForURL(lastReq: &url::URL, newReq: &url::URL) -> String {
@@ -991,6 +992,7 @@ use std::net::Shutdown;
 use std::net::TcpStream;
 use std::rc::Rc;
 use std::sync::Arc;
+use webpki_roots::TLS_SERVER_ROOTS;
 impl persistConn {
     fn roundTrip(&mut self, req: &mut transportRequest, mut conn: TcpConn) -> HttpResult {
         self.numExpectedResponses += 1;
@@ -1015,7 +1017,7 @@ impl persistConn {
         let r = req.Req.Write()?;
 
         if req.Req.isTLS {
-            let mut tlsConn = getTLSConn(req.Req.Host.as_str(), conn);
+            let mut tlsConn = getTLSConn(req.Req.Host.as_str(), conn)?;
             tlsConn.write(r.as_slice())?;
             let mut reader = BufReader::new(tlsConn);
             let resp = ReadResponse(reader, &req.Req)?;
@@ -1028,21 +1030,45 @@ impl persistConn {
         }
     }
 }
-
+use anyhow::Result;
 use bytes::{Buf, BytesMut};
 use rustls::pki_types::ServerName;
+use rustls::{ClientConfig, RootCertStore};
 use std::io::ErrorKind;
-fn getTLSConn(dnsName: &str, socket: TcpConn) -> StreamOwned<ClientConnection, TcpConn> {
-    let mut clientRootCert =
-        rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+use thiserror::Error;
+#[derive(Error, Debug)]
+pub enum HTTPConnectError {
+    #[error("DNS name conversion failed: {0}")]
+    DnsNameConversion(#[from] rustls::pki_types::InvalidDnsNameError),
 
-    let tlsconfig = rustls::ClientConfig::builder()
-        .with_root_certificates(clientRootCert)
-        .with_no_client_auth();
-    let serverName = ServerName::try_from(dnsName).expect("url error").to_owned();
-    let mut tlsClient = ClientConnection::new(Arc::new(tlsconfig), serverName).unwrap();
+    #[error("Failed to connect to server: {0}")]
+    ConnectionFailure(String),
+
+    #[error("TLS handshake failed: {0}")]
+    TlsHandshakeFailure(#[from] rustls::Error),
+
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+}
+fn get_tls_config() -> Arc<ClientConfig> {
+    let mut clientRootCert = RootCertStore::from_iter(TLS_SERVER_ROOTS.iter().cloned());
+
+    Arc::new(
+        ClientConfig::builder()
+            .with_root_certificates(clientRootCert)
+            .with_no_client_auth(),
+    )
+}
+
+fn getTLSConn(
+    dnsName: &str,
+    socket: TcpConn,
+) -> Result<StreamOwned<ClientConnection, TcpConn>, HTTPConnectError> {
+    let tlsconfig = get_tls_config();
+    let serverName = ServerName::try_from(dnsName.to_owned())?;
+    let mut tlsClient = ClientConnection::new(tlsconfig, serverName)?;
     let mut tlsConn = StreamOwned::new(tlsClient, socket);
-    tlsConn
+    Ok(tlsConn)
 }
 
 pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
@@ -1053,7 +1079,7 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
     r.read_line(&mut line)?;
     let parts: Vec<&str> = line.split_whitespace().collect();
     if parts.len() < 3 {
-        return Err(Error::new(ErrorKind::Other, "malformed HTTP response"));
+        return Err(Error::new(ErrorKind::Other, "malformed HTTP response").into());
     }
     resp.Proto = parts[0].to_string();
     resp.Status = parts[1..].join(" ");
@@ -1063,7 +1089,7 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
     let vers = ParseHTTPVersion(&resp.Proto);
     let ok = vers.2;
     if !ok {
-        return Err(Error::new(ErrorKind::Other, "malformed HTTP version"));
+        return Err(Error::new(ErrorKind::Other, "malformed HTTP version").into());
     }
     resp.ProtoMajor = vers.0;
     resp.ProtoMinor = vers.1;
