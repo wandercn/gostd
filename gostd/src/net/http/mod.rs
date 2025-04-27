@@ -1285,20 +1285,21 @@ fn validHeaderFieldByte(b: byte) -> bool {
 }
 // Header KE规范化 content-length|CONTENT-LENGTH => Content-Length
 const toLower: byte = (b'a' - b'A');
-fn canonicalMIMEHeaderKey(a: &str) -> String {
+fn canonicalMIMEHeaderKey(s: &str) -> String {
     let mut upper = true;
-    let mut new = String::new();
-    for (i, &c) in a.as_bytes().iter().enumerate() {
-        let mut c1 = c;
-        if upper && b'a' <= c && c <= b'z' {
-            c1 -= toLower;
-        } else if !upper && b'A' <= c && c <= b'Z' {
-            c1 += toLower;
-        }
-        upper = (c1 == b'-');
-        new.push(c1 as char);
+    let mut new = String::with_capacity(s.len());
+    for &byte in s.as_bytes() {
+        let c = if upper && byte >= b'a' && byte <= b'z' {
+            byte - toLower
+        } else if !upper && byte >= b'A' && byte <= b'Z' {
+            byte + toLower
+        } else {
+            byte
+        };
+        upper = c == b'-';
+        new.push(c as char);
     }
-    new.clone()
+    new
 }
 
 pub fn ParseHTTPVersion(vers: &str) -> (int, int, bool) {
