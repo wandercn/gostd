@@ -1302,39 +1302,23 @@ fn canonicalMIMEHeaderKey(a: &str) -> String {
 }
 
 pub fn ParseHTTPVersion(vers: &str) -> (int, int, bool) {
-    let Big = 1000000;
-    match vers {
-        "HTTP/1.1" => return (1, 1, true),
-        "HTTP/1.0" => return (1, 0, true),
-        _ => {
-            if !strings::HasPrefix(vers, "HTTP/") {
-                return (0, 0, false);
-            }
+    let big: int = 1_000_000;
 
-            let dot = strings::Index(vers, ".");
+    if !vers.starts_with("HTTP/") {
+        return (0, 0, false);
+    }
 
-            if dot < 0 {
-                return (0, 0, false);
-            }
-            let mut major = 0;
-            let mut minor = 0;
+    let version_part = &vers[5..];
+    let parts: Vec<&str> = version_part.split('.').collect();
 
-            if let Ok(mj) = vers.get(5..dot as usize).unwrap().parse::<int>() {
-                major = mj;
-                if major < 0 || major > Big {
-                    return (0, 0, false);
-                }
-            } else {
-                return (0, 0, false);
-            }
+    if parts.len() != 2 {
+        return (0, 0, false);
+    }
 
-            if let Ok(mi) = vers.get(dot as usize + 1..).unwrap().parse::<int>() {
-                minor = mi;
-                return (0, 0, false);
-            } else {
-                return (0, 0, false);
-            }
-            return (major, minor, true);
+    match (parts[0].parse::<int>(), parts[1].parse::<int>()) {
+        (Ok(major), Ok(minor)) if major >= 0 && major <= big && minor >= 0 && minor <= big => {
+            (major, minor, true)
         }
+        _ => (0, 0, false),
     }
 }
