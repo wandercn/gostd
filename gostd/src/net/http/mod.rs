@@ -202,6 +202,7 @@ use crate::net::url;
 use crate::strings;
 use crate::time;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::io::Error;
 /// Get issues a GET to the specified URL. If the response is one of the following redirect codes, Get follows the redirect,up to a maximum of 10 redirects:
 /// ```text
@@ -1199,89 +1200,18 @@ fn startIndexOfBody(response: &Vec<u8>) -> Option<usize> {
 }
 
 fn validHeaderFieldByte(b: byte) -> bool {
-    let isTokenTable: HashMap<char, bool> = [
-        ('!', true),
-        ('#', true),
-        ('$', true),
-        ('%', true),
-        ('&', true),
-        ('\'', true),
-        ('*', true),
-        ('+', true),
-        ('.', true),
-        ('0', true),
-        ('1', true),
-        ('2', true),
-        ('3', true),
-        ('4', true),
-        ('5', true),
-        ('6', true),
-        ('7', true),
-        ('8', true),
-        ('9', true),
-        ('A', true),
-        ('B', true),
-        ('C', true),
-        ('D', true),
-        ('E', true),
-        ('F', true),
-        ('G', true),
-        ('H', true),
-        ('I', true),
-        ('J', true),
-        ('K', true),
-        ('L', true),
-        ('M', true),
-        ('N', true),
-        ('O', true),
-        ('P', true),
-        ('Q', true),
-        ('R', true),
-        ('S', true),
-        ('T', true),
-        ('U', true),
-        ('W', true),
-        ('V', true),
-        ('X', true),
-        ('Y', true),
-        ('Z', true),
-        ('^', true),
-        ('_', true),
-        ('`', true),
-        ('a', true),
-        ('b', true),
-        ('c', true),
-        ('d', true),
-        ('e', true),
-        ('f', true),
-        ('g', true),
-        ('h', true),
-        ('i', true),
-        ('j', true),
-        ('k', true),
-        ('l', true),
-        ('m', true),
-        ('n', true),
-        ('o', true),
-        ('p', true),
-        ('q', true),
-        ('r', true),
-        ('s', true),
-        ('t', true),
-        ('u', true),
-        ('v', true),
-        ('w', true),
-        ('x', true),
-        ('y', true),
-        ('z', true),
-        ('|', true),
-        ('~', true),
+    let isTokenTable: HashSet<char> = [
+        '!', '#', '$', '%', '&', '\'', '*', '+', '.', '0', '1', '2', '3', '4', '5', '6', '7', '8',
+        '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q',
+        'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '^', '_', '`', 'a', 'b', 'c', 'd', 'e', 'f',
+        'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
+        'y', 'z', '|', '~',
     ]
     .iter()
     .cloned()
     .collect();
 
-    return (int!(b) < int!(len!(isTokenTable))) && isTokenTable.get(&(b as char)).is_some();
+    isTokenTable.contains(&(b as char))
 }
 // Header KE规范化 content-length|CONTENT-LENGTH => Content-Length
 const toLower: byte = (b'a' - b'A');
