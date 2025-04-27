@@ -1149,10 +1149,8 @@ pub type MIMEHeader = HashMap<String, Vec<String>>;
 
 fn fixPragmaCacheControl(header: &mut Header) {
     if let Some(hp) = header.0.get("Pragma") {
-        if len!(hp) > 0 && &hp[0] == "no-cache" {
-            if header.0.get("Cache-Control").is_none() {
-                header.Set("Cache-Control", "no-cache");
-            }
+        if len!(hp) > 0 && &hp[0] == "no-cache" && header.0.get("Cache-Control").is_none() {
+            header.Set("Cache-Control", "no-cache");
         }
     }
 }
