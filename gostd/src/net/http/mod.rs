@@ -259,7 +259,7 @@ pub fn Head(url: &str) -> HttpResult {
 ///     let postbody = r#"{"id":0,"category":{"id":0,"name":"string"},"name":"doggie","photoUrls":["string"],"tags":[{"id":0,"name":"string"}],"status":"available"}"#
 ///    .as_bytes()
 ///    .to_vec();
-///    let response = http::Post(url, "application/json", Some(postbody))?;
+///    let response = http::Post(url, "application/json", Some(postbody.into()))?;
 ///
 ///    println!(
 ///        "{}",
@@ -270,7 +270,7 @@ pub fn Head(url: &str) -> HttpResult {
 /// }
 ///
 /// ```
-pub fn Post(url: &str, contentType: &str, body: Option<Vec<u8>>) -> HttpResult {
+pub fn Post(url: &str, contentType: &str, body: Option<Bytes>) -> HttpResult {
     Client::New().Post(url, contentType, body)
 }
 
@@ -278,11 +278,11 @@ pub fn PostForm(url: &str, data: url::Values) -> HttpResult {
     Client::New().PostForm(url, data)
 }
 
-pub fn Patch(url: &str, body: Option<Vec<u8>>) -> HttpResult {
+pub fn Patch(url: &str, body: Option<Bytes>) -> HttpResult {
     Client::New().Patch(url, body)
 }
 
-pub fn Put(url: &str, body: Option<Vec<u8>>) -> HttpResult {
+pub fn Put(url: &str, body: Option<Bytes>) -> HttpResult {
     Client::New().Put(url, body)
 }
 
@@ -317,7 +317,7 @@ impl Client {
         self.Do(&mut req)
     }
 
-    pub fn Post(&mut self, url: &str, contentType: &str, body: Option<Vec<u8>>) -> HttpResult {
+    pub fn Post(&mut self, url: &str, contentType: &str, body: Option<Bytes>) -> HttpResult {
         let mut req = Request::New(Method::Post, url, body)?;
         req.Header.Set("Content-Type", contentType);
         self.Do(&mut req)
@@ -327,7 +327,7 @@ impl Client {
         self.Post(
             url,
             "application/x-www-form-urlencoded",
-            Some(data.Encode().as_bytes().to_vec()),
+            Some(data.Encode().into_bytes().into()),
         )
     }
 
@@ -336,12 +336,12 @@ impl Client {
         self.Do(&mut req)
     }
 
-    pub fn Patch(&mut self, url: &str, body: Option<Vec<u8>>) -> HttpResult {
+    pub fn Patch(&mut self, url: &str, body: Option<Bytes>) -> HttpResult {
         let mut req = Request::New(Method::Patch, url, body)?;
         self.Do(&mut req)
     }
 
-    pub fn Put(&mut self, url: &str, body: Option<Vec<u8>>) -> HttpResult {
+    pub fn Put(&mut self, url: &str, body: Option<Bytes>) -> HttpResult {
         let mut req = Request::New(Method::Put, url, body)?;
         self.Do(&mut req)
     }
@@ -451,7 +451,7 @@ pub struct Request {
     ProtoMajor: int,
     ProtoMinor: int,
     pub Header: Header,
-    pub Body: Option<Vec<u8>>,
+    pub Body: Option<Bytes>,
     // GetBody func() (io.ReadCloser, error)
     ContentLength: int64,
     TransferEncoding: Vec<String>,
@@ -470,7 +470,7 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn New(method: Method, url: &str, body: Option<Vec<u8>>) -> Result<Request, Error> {
+    pub fn New(method: Method, url: &str, body: Option<Bytes>) -> Result<Request, Error> {
         let mut u = url::Parse(url)?;
 
         u.Host = removeEmptyPort(u.Host.as_str()).to_string();
@@ -495,6 +495,7 @@ impl Request {
         };
         if let Some(buf) = body {
             req.ContentLength = len!(buf) as i64;
+
             req.Body = Some(buf);
         }
         if strings::HasPrefix(url, "https://") {
@@ -983,6 +984,7 @@ struct persistConn {
     reused: bool,
 }
 
+use bytes::Bytes;
 use rustls::ClientConnection;
 use rustls::StreamOwned;
 use std::convert::TryFrom;
@@ -1050,6 +1052,13 @@ pub enum HTTPConnectError {
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 }
+
+impl From<String> for HTTPConnectError {
+    fn from(err: String) -> Self {
+        HTTPConnectError::ConnectionFailure(err)
+    }
+}
+
 fn get_tls_config() -> Arc<ClientConfig> {
     let mut clientRootCert = RootCertStore::from_iter(TLS_SERVER_ROOTS.iter().cloned());
 
