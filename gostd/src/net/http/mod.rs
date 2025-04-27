@@ -225,7 +225,7 @@ use std::io::Error;
 /// ```
 /// use gostd::net::http;
 ///
-/// fn main() -> Result<(), std::io::Error> {
+/// fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let url = "https://petstore.swagger.io/v2/pet/findByStatus?status=available";
 ///     let response = http::Get(url)?;///
 ///     println!(
@@ -254,7 +254,7 @@ pub fn Head(url: &str) -> HttpResult {
 ///
 /// ```
 /// use gostd::net::http;
-/// fn main() -> Result<(), std::io::Error> {
+/// fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let url = "https://petstore.swagger.io/v2/pet";
 ///     let postbody = r#"{"id":0,"category":{"id":0,"name":"string"},"name":"doggie","photoUrls":["string"],"tags":[{"id":0,"name":"string"}],"status":"available"}"#
 ///    .as_bytes()
