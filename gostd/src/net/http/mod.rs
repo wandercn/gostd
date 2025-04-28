@@ -1032,7 +1032,6 @@ impl persistConn {
         }
     }
 }
-use anyhow::Result;
 use bytes::{Buf, BytesMut};
 use rustls::pki_types::ServerName;
 use rustls::{ClientConfig, RootCertStore};
