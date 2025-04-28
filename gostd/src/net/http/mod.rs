@@ -235,11 +235,11 @@ use std::io::Error;
 ///     Ok(())
 /// }
 /// ```
-pub fn Get(url: &str) -> HttpResult {
+pub fn Get(url: &str) -> HttpResult<Response> {
     Client::New().Get(url)
 }
 
-pub fn Head(url: &str) -> HttpResult {
+pub fn Head(url: &str) -> HttpResult<Response> {
     Client::New().Head(url)
 }
 
@@ -270,23 +270,23 @@ pub fn Head(url: &str) -> HttpResult {
 /// }
 ///
 /// ```
-pub fn Post(url: &str, contentType: &str, body: Option<Bytes>) -> HttpResult {
+pub fn Post(url: &str, contentType: &str, body: Option<Bytes>) -> HttpResult<Response> {
     Client::New().Post(url, contentType, body)
 }
 
-pub fn PostForm(url: &str, data: url::Values) -> HttpResult {
+pub fn PostForm(url: &str, data: url::Values) -> HttpResult<Response> {
     Client::New().PostForm(url, data)
 }
 
-pub fn Patch(url: &str, body: Option<Bytes>) -> HttpResult {
+pub fn Patch(url: &str, body: Option<Bytes>) -> HttpResult<Response> {
     Client::New().Patch(url, body)
 }
 
-pub fn Put(url: &str, body: Option<Bytes>) -> HttpResult {
+pub fn Put(url: &str, body: Option<Bytes>) -> HttpResult<Response> {
     Client::New().Put(url, body)
 }
 
-pub fn Delete(url: &str) -> HttpResult {
+pub fn Delete(url: &str) -> HttpResult<Response> {
     Client::New().Delete(url)
 }
 
@@ -296,8 +296,9 @@ pub struct Client {
     Jar: Box<dyn CookieJar>,
     Timeout: time::Duration,
 }
+use anyhow::Result;
 
-pub type HttpResult = Result<Response, HTTPConnectError>;
+pub type HttpResult<T> = Result<T, HTTPConnectError>;
 impl Default for Client {
     fn default() -> Self {
         Self {
@@ -312,18 +313,23 @@ impl Client {
         Self::default()
     }
 
-    pub fn Get(&mut self, url: &str) -> HttpResult {
+    pub fn Get(&mut self, url: &str) -> HttpResult<Response> {
         let mut req = Request::New(Method::Get, url, None)?;
         self.Do(&mut req)
     }
 
-    pub fn Post(&mut self, url: &str, contentType: &str, body: Option<Bytes>) -> HttpResult {
+    pub fn Post(
+        &mut self,
+        url: &str,
+        contentType: &str,
+        body: Option<Bytes>,
+    ) -> HttpResult<Response> {
         let mut req = Request::New(Method::Post, url, body)?;
         req.Header.Set("Content-Type", contentType);
         self.Do(&mut req)
     }
 
-    pub fn PostForm(&mut self, url: &str, data: url::Values) -> HttpResult {
+    pub fn PostForm(&mut self, url: &str, data: url::Values) -> HttpResult<Response> {
         self.Post(
             url,
             "application/x-www-form-urlencoded",
@@ -331,27 +337,27 @@ impl Client {
         )
     }
 
-    pub fn Head(&mut self, url: &str) -> HttpResult {
+    pub fn Head(&mut self, url: &str) -> HttpResult<Response> {
         let mut req = Request::New(Method::Head, url, None)?;
         self.Do(&mut req)
     }
 
-    pub fn Patch(&mut self, url: &str, body: Option<Bytes>) -> HttpResult {
+    pub fn Patch(&mut self, url: &str, body: Option<Bytes>) -> HttpResult<Response> {
         let mut req = Request::New(Method::Patch, url, body)?;
         self.Do(&mut req)
     }
 
-    pub fn Put(&mut self, url: &str, body: Option<Bytes>) -> HttpResult {
+    pub fn Put(&mut self, url: &str, body: Option<Bytes>) -> HttpResult<Response> {
         let mut req = Request::New(Method::Put, url, body)?;
         self.Do(&mut req)
     }
 
-    pub fn Delete(&mut self, url: &str) -> HttpResult {
+    pub fn Delete(&mut self, url: &str) -> HttpResult<Response> {
         let mut req = Request::New(Method::Delete, url, None)?;
         self.Do(&mut req)
     }
 
-    pub fn Do(&mut self, req: &mut Request) -> HttpResult {
+    pub fn Do(&mut self, req: &mut Request) -> HttpResult<Response> {
         self.done(req)
     }
 
@@ -359,12 +365,12 @@ impl Client {
         &mut self,
         req: &mut Request,
         deadline: time::Time,
-    ) -> Result<(Response, fn() -> bool), HTTPConnectError> {
+    ) -> HttpResult<(Response, fn() -> bool)> {
         let (resp, didTimeout) = send(req, self.transport(), deadline)?;
         Ok((resp, didTimeout))
     }
 
-    fn done(&mut self, req: &mut Request) -> HttpResult {
+    fn done(&mut self, req: &mut Request) -> HttpResult<Response> {
         let deadline = self.deadline();
         let (resp, didTimeout) = self.send(req, deadline)?;
         Ok(resp)
@@ -386,7 +392,7 @@ fn send(
     ireq: &mut Request,
     mut rt: Box<dyn RoundTripper>,
     deadline: time::Time,
-) -> Result<(Response, fn() -> bool), HTTPConnectError> {
+) -> HttpResult<(Response, fn() -> bool)> {
     let mut resp = Response::default();
     fn didTimeout() -> bool {
         return false;
@@ -427,7 +433,7 @@ fn redirectBehavior(reqMethod: &str, resp: &Response, ireq: &Request) -> (String
 }
 
 pub trait RoundTripper {
-    fn RoundTrip(&mut self, r: &Request) -> HttpResult;
+    fn RoundTrip(&mut self, r: &Request) -> HttpResult<Response>;
 }
 
 fn refererForURL(lastReq: &url::URL, newReq: &url::URL) -> String {
@@ -842,12 +848,12 @@ struct Transport {
 use std::net;
 use std::sync::mpsc;
 impl RoundTripper for Transport {
-    fn RoundTrip(&mut self, req: &Request) -> HttpResult {
+    fn RoundTrip(&mut self, req: &Request) -> HttpResult<Response> {
         self.roundTrip(req)
     }
 }
 impl Transport {
-    fn roundTrip(&mut self, req: &Request) -> HttpResult {
+    fn roundTrip(&mut self, req: &Request) -> HttpResult<Response> {
         let treq = &mut transportRequest {
             Req: req.clone(),
             extra: None,
@@ -996,7 +1002,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use webpki_roots::TLS_SERVER_ROOTS;
 impl persistConn {
-    fn roundTrip(&mut self, req: &mut transportRequest, mut conn: TcpConn) -> HttpResult {
+    fn roundTrip(&mut self, req: &mut transportRequest, mut conn: TcpConn) -> HttpResult<Response> {
         self.numExpectedResponses += 1;
         let mut requestedGzip = false;
         if !self.t.DisableCompression
@@ -1057,6 +1063,11 @@ impl From<String> for HTTPConnectError {
         HTTPConnectError::ConnectionFailure(err)
     }
 }
+impl From<&str> for HTTPConnectError {
+    fn from(err: &str) -> Self {
+        HTTPConnectError::ConnectionFailure(err.to_string())
+    }
+}
 
 fn get_tls_config() -> Arc<ClientConfig> {
     let mut clientRootCert = RootCertStore::from_iter(TLS_SERVER_ROOTS.iter().cloned());
@@ -1071,7 +1082,7 @@ fn get_tls_config() -> Arc<ClientConfig> {
 fn getTLSConn(
     dnsName: &str,
     socket: TcpConn,
-) -> Result<StreamOwned<ClientConnection, TcpConn>, HTTPConnectError> {
+) -> HttpResult<StreamOwned<ClientConnection, TcpConn>> {
     let tlsconfig = get_tls_config();
     let serverName = ServerName::try_from(dnsName.to_owned())?;
     let mut tlsClient = ClientConnection::new(tlsconfig, serverName)?;
@@ -1079,7 +1090,7 @@ fn getTLSConn(
     Ok(tlsConn)
 }
 
-pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult {
+pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult<Response> {
     let mut resp = Response::default();
     resp.Request = req.clone();
     // parse status line。
