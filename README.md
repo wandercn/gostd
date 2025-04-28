@@ -148,7 +148,8 @@ use gostd::vendor
 - [x] 完成bytes模块。(version >=0.2.8)
 - [x] 完成mime::multipart模块。(version >=0.3.1)
 - [x] 修复windos10平台编译失败的bug。(version>=0.3.18)
-
+- [x] 对net/http模块，自定义错误处理上的优化，引入bytes提高性能，api会有参数类型的变化(version>=0.4.1)
+- [ ] 对net/http模块，增加异步编程的支持，独立一个模块支持异步编程，原来模块保持不变。
 # 独立发布包
  
 独立发布gostd_time，代码等价于 use gostd::time 。 
