@@ -1,13 +1,13 @@
 [package]
-name = "gostd"
+name = "gostd_http"
 license = "MIT"
-version = "0.4.1"
+version = "1.1.1"
 edition = "2018"
 authors = ["wandercn<wander@rustpub.com>"]
-description = "gostd is the go standard library implementation in rust. gostd 是Go标准库的rust实现"
+description = "gostd_http is a part of gostd, gostd_http 是go标准库net/http的rust实现"
 homepage = "https://github.com/wandercn/gostd"
 repository = "https://github.com/wandercn/gostd"
-keywords = ["gobind", "go-api", "gostd", "go-to-rust", "go-standard-library"]
+keywords = ["gostd_http", "http", "gostd", "go-to-rust", "go-standard-library"]
 categories = ["api-bindings", "accessibility", "development-tools", "compilers"]
 
 [profile.dev]
@@ -17,15 +17,13 @@ opt-level = 0
 
 opt-level = 3
 [dependencies]
-
-# webpki-roots = "^0.26"
-# rustls = "^0.23"
-gostd_derive = "0.0.3"
 gostd_builtin = { version = "^1.0", optional = false, path = "../builtin" }
+gostd_strings = { version = "^1.0", optional = false, path = "../strings" }
+gostd_io = { version = "^1.0", optional = false, path = "../io" }
 gostd_time = { version = "^1.0", optional = false, path = "../time" }
-rand = "0.8.5"
-log = "0.4"
-lazy_static = "1.4.0"
+gostd_url= { version = "^1.0", optional = false, path = "../url" }
+webpki-roots = "^0.26"
+rustls = "^0.23"
 bytes = "1"
 thiserror ="2.0"
 anyhow= "1.0"
