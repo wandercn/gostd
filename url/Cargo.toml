@@ -1,0 +1,23 @@
+[package]
+name = "gostd_url"
+license = "MIT"
+version = "1.1.1"
+edition = "2018"
+authors = ["wandercn<wander@rustpub.com>"]
+description = "gostd_url is a part of gostd, gostd_url 是go标准库net/url的rust实现"
+homepage = "https://github.com/wandercn/gostd"
+repository = "https://github.com/wandercn/gostd"
+keywords = ["gostd_url", "url", "gostd", "go-to-rust", "go-standard-library"]
+categories = ["api-bindings", "accessibility", "development-tools", "compilers"]
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+
+opt-level = 3
+
+[dependencies]
+gostd_builtin = { version = "^1.0", optional = false, path = "../builtin" }
+gostd_strings = { version = "^1.0", optional = false, path = "../strings" }
+gostd_io = { version = "^1.0", optional = false, path = "../io" }
