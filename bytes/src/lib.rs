@@ -1398,7 +1398,7 @@ impl Buffer {
     }
 }
 
-use crate::io::ByteWriter;
+use io::ByteWriter;
 impl ByteWriter for Buffer {
     /// WriteByte appends the byte c to b's buffer.
     /// <details class="rustdoc-toggle top-doc">
@@ -1411,7 +1411,7 @@ impl ByteWriter for Buffer {
     }
 }
 
-use gostd_io::StringWriter;
+use io::StringWriter;
 impl StringWriter for Buffer {
     /// WriteString appends the contents of s to b's buffer. It returns the length of s.
     /// <details class="rustdoc-toggle top-doc">
@@ -1424,7 +1424,7 @@ impl StringWriter for Buffer {
     }
 }
 
-use crate::io::Writer;
+use io::Writer;
 impl Writer for Buffer {
     /// Write appends the contents of p to b's buffer. Write always returns len!(p).
     /// <details class="rustdoc-toggle top-doc">
