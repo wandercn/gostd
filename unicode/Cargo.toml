@@ -1,7 +1,7 @@
 [package]
 name = "gostd_unicode"
 license = "MIT"
-version = "1.1.1"
+version = "1.1.2"
 edition = "2018"
 authors = ["wandercn<wander@rustpub.com>"]
 description = "gostd_unicode is a part of gostd,gostd 是Go标准库的rust实现"
@@ -10,6 +10,13 @@ repository = "https://github.com/wandercn/gostd"
 keywords = ["gostd_unicode", "go-api", "gostd", "go-to-rust", "go-standard-library"]
 categories = ["api-bindings", "accessibility", "development-tools", "compilers"]
 
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+
+opt-level = 3
+
 [dependencies]
-gostd_builtin = { version = "^1.0", optional = false, path = "../builtin" }
+gostd_builtin = "^1.0"
 lazy_static = "1.4.0"

@@ -4,8 +4,9 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
-pub mod http;
-pub mod url;
+// pub mod http;
+pub use gostd_http as http;
+pub use gostd_url as url;
 
 use crate::builtin::*;
 use crate::io;

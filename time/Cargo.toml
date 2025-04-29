@@ -17,7 +17,7 @@ opt-level = 0
 
 opt-level = 3
 [dependencies]
-gostd_builtin = { version = "^1.0", optional = false, path = "../builtin"}
+gostd_builtin = "^1.0"
 gostd_derive = "0.0.3"
 libc = "0.2"
 cvt = "0.1.1"

@@ -11,8 +11,8 @@
 
 // #[cfg(test)]
 // mod tests;
-use crate::io::*;
 use crate::{builtin::*, bytes, io, strings};
+use io::*;
 use rand::RngCore;
 use std::borrow::{Borrow, BorrowMut};
 use std::collections::HashMap;

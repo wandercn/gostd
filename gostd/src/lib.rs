@@ -5,7 +5,7 @@ pub use gostd_builtin as builtin;
 pub use gostd_time as time;
 pub mod archive;
 pub mod bufio;
-pub mod bytes;
+pub use gostd_bytes as bytes;
 pub mod cmd;
 pub mod compress;
 pub mod container;
@@ -26,7 +26,7 @@ pub mod html;
 pub mod image;
 pub mod index;
 pub mod internal;
-pub mod io;
+pub use gostd_io as io;
 pub mod log;
 pub mod math;
 pub mod mime;
@@ -39,13 +39,13 @@ pub mod regexp;
 pub mod runtime;
 pub mod sort;
 pub mod strconv;
-pub mod strings;
+pub use gostd_strings as strings;
 pub mod sync;
 pub mod syscall;
 pub mod testdata;
 pub mod testing;
 pub mod text;
-pub mod unicode;
+pub use gostd_unicode as unicode;
 #[cfg(test)]
 mod tests {
     #[test]

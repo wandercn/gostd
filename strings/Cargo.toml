@@ -1,7 +1,7 @@
 [package]
 name = "gostd_strings"
 license = "MIT"
-version = "1.1.1"
+version = "1.1.2"
 edition = "2018"
 authors = ["wandercn<wander@rustpub.com>"]
 description = "gostd_strings is a part of gostd, gostd_strings 是go标准库strings的rust实现"
@@ -10,8 +10,14 @@ repository = "https://github.com/wandercn/gostd"
 keywords = ["gostd_strings", "strings", "gostd", "go-to-rust", "go-standard-library"]
 categories = ["api-bindings", "accessibility", "development-tools", "compilers"]
 
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+
+opt-level = 3
 [dependencies]
-gostd_io = { version = "^1.0", optional = false, path = "../io" }
-gostd_builtin = { version = "^1.0", optional = false, path = "../builtin" }
-gostd_unicode = { version = "^1.0", optional = false, path = "../unicode" }
+gostd_io = "^1.0"
+gostd_builtin = "^1.0"
+gostd_unicode = "^1.0"
 gostd_derive = "0.0.3"

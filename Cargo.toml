@@ -1,6 +1,2 @@
 [workspace]
-members = [
-   "gostd",
-   "builtin",
-   "time"
-]
+members = [ "gostd","builtin","time","http","url", "io", "strings" , "unicode", "bytes"]

@@ -150,11 +150,25 @@ use gostd::vendor
 - [x] 修复windos10平台编译失败的bug。(version>=0.3.18)
 - [x] 对net/http模块，自定义错误处理上的优化，引入bytes提高性能，api会有参数类型的变化(version>=0.4.1)
 - [ ] 对net/http模块，增加异步编程的支持，独立一个模块支持异步编程，原来模块保持不变。
+- [x] net::http,net::url,io,strings,unicode,bytes 独立发布包。
+
 # 独立发布包
  
 独立发布gostd_time，代码等价于 use gostd::time 。 
 
 独立发布gostd_builtin, 代码等价于 use gostd::builtin 。 
+
+独立发布gostd_unicode, 代码等价于 use gostd::unicode 。 
+
+独立发布gostd_http, 代码等价于 use gostd::net::http 。 
+
+独立发布gostd_strings, 代码等价于 use gostd::strings 。 
+
+独立发布gostd_bytes, 代码等价于 use gostd::bytes 。 
+
+独立发布gostd_url, 代码等价于 use gostd::net::url 。 
+
+独立发布gostd_io, 代码等价于 use gostd::io 。 
 
 # 使用例子
 

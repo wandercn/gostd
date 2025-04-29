@@ -18,6 +18,7 @@ use gostd_derive::Fmt;
 use gostd_builtin::*;
 use gostd_io as io;
 use gostd_unicode::utf8;
+use io::*;
 /// Compare returns an integer comparing two byte slices lexicographically. The result will be 0 if a==b, -1 if a < b, and +1 if a > b.
 /// <details class="rustdoc-toggle top-doc">
 /// <summary class="docblock">zh-cn</summary>
@@ -1410,7 +1411,7 @@ impl ByteWriter for Buffer {
     }
 }
 
-use crate::io::StringWriter;
+use gostd_io::StringWriter;
 impl StringWriter for Buffer {
     /// WriteString appends the contents of s to b's buffer. It returns the length of s.
     /// <details class="rustdoc-toggle top-doc">
