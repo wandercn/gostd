@@ -1,0 +1,26 @@
+[package]
+name = "gostd_bytes"
+license = "MIT"
+version = "1.1.1"
+edition = "2018"
+authors = ["wandercn<wander@rustpub.com>"]
+description = "gostd_bytes is a part of gostd, gostd_bytes 是go标准库bytes的rust实现"
+homepage = "https://github.com/wandercn/gostd"
+repository = "https://github.com/wandercn/gostd"
+keywords = ["gostd_bytes", "bytes", "gostd", "go-to-rust", "go-standard-library"]
+categories = ["api-bindings", "accessibility", "development-tools", "compilers"]
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+
+opt-level = 3
+
+[dependencies]
+gostd_builtin = { version = "^1.0", optional = false, path = "../builtin" }
+gostd_io = { version = "^1.0", optional = false, path = "../io" }
+gostd_time = { version = "^1.0", optional = false, path = "../time" }
+gostd_unicode = { version = "^1.0", optional = false, path = "../unicode" }
+gostd_derive = "0.0.3"
+gostd_strings = { version = "^1.0", optional = false, path = "../strings" }
