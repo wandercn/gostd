@@ -1,7 +1,7 @@
 [package]
 name = "gostd"
 license = "MIT"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2018"
 authors = ["wandercn<wander@rustpub.com>"]
 description = "gostd is the go standard library implementation in rust. gostd 是Go标准库的rust实现"
@@ -18,14 +18,14 @@ opt-level = 0
 opt-level = 3
 [dependencies]
 
-gostd_builtin = { version = "^1.0", optional = false, path = "../builtin" }
-gostd_strings = { version = "^1.0", optional = false, path = "../strings" }
-gostd_io = { version = "^1.0", optional = false, path = "../io" }
-gostd_time = { version = "^1.0", optional = false, path = "../time" }
-gostd_unicode = { version = "^1.0", optional = false, path = "../unicode" }
-gostd_url= { version = "^1.0", optional = false, path = "../url" }
-gostd_bytes= { version = "^1.0", optional = false, path = "../bytes" }
+gostd_builtin = "^1.0"
+gostd_strings = "^1.0"
+gostd_io = "^1.0"
+gostd_time ="^1.0"
+gostd_unicode = "^1.0"
+gostd_url= "^1.0"
+gostd_bytes=  "^1.0"
 gostd_derive = "0.0.3"
-gostd_http = { version = "^1.0", optional = false, path = "../http" }
+gostd_http =  "^1.0"
 rand = "0.8.5"
 
