@@ -1,3 +1,8 @@
+#![allow(unused)]
+// #![allow(dead_code)]
+#![allow(non_upper_case_globals)]
+#![allow(non_snake_case)]
+#![allow(non_camel_case_types)]
 use std::{num::ParseIntError, str::Utf8Error};
 
 use anyhow::Result;
@@ -22,6 +27,18 @@ pub enum HTTPConnectError {
 
     #[error("Parse integer error: {0}")]
     ParseIntError(#[from] ParseIntError),
+
+    #[error("http: request method or response status code does not allow body")]
+    ErrBodyNotAllowed,
+
+    #[error("http: connection has been hijacked")]
+    ErrHijacked,
+
+    #[error("http: wrote more than the declared Content-Length")]
+    ErrContentLength,
+
+    #[error("unused")]
+    ErrWriteAfterFlush,
 }
 
 impl From<String> for HTTPConnectError {
