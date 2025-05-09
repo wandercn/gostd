@@ -20,6 +20,8 @@ use gostd_url as url;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::convert::TryInto;
+use tokio::io::AsyncBufRead;
+use tokio::io::AsyncRead;
 /// DefaultMaxHeaderBytes is the maximum permitted size of the headers in an HTTP request. This can be overridden by setting Server.MaxHeaderBytes.
 
 const DefaultMaxHeaderBytes: int32 = 1 << 20;
@@ -242,7 +244,7 @@ fn send(
     }
 }
 
-fn redirectBehavior(reqMethod: &str, resp: &Response, ireq: &Request) -> (String, bool, bool) {
+pub fn redirectBehavior(reqMethod: &str, resp: &Response, ireq: &Request) -> (String, bool, bool) {
     let mut shouldRedirect = false;
     let mut includeBody = false;
     match resp.StatusCode {
@@ -265,7 +267,7 @@ pub trait RoundTripper {
     fn RoundTrip(&mut self, r: &Request) -> HttpResult<Response>;
 }
 
-fn refererForURL(lastReq: &url::URL, newReq: &url::URL) -> String {
+pub fn refererForURL(lastReq: &url::URL, newReq: &url::URL) -> String {
     if (lastReq.Scheme == "https") && (newReq.Scheme == "http") {
         return "".to_string();
     }
@@ -278,10 +280,11 @@ fn refererForURL(lastReq: &url::URL, newReq: &url::URL) -> String {
     referer
 }
 
+use std::io;
 use std::iter::FromIterator;
 use std::sync;
 #[derive(Default, Clone)]
-struct Transport {
+pub struct Transport {
     // idleMu: sync::Mutex,
     closeIdle: bool,
     // idleConn:HashMap<String, Vec<>>
@@ -424,7 +427,7 @@ impl connectMethod {
         self.targetScheme.clone()
     }
 
-    fn addr(&self) -> String {
+    pub fn addr(&self) -> String {
         self.targetAddr.clone()
     }
 }
@@ -530,6 +533,72 @@ fn getTLSConn(
     Ok(tlsConn)
 }
 
+use tokio::io::{AsyncBufReadExt, AsyncReadExt};
+
+async fn read_response<R>(mut r: R, req: &Request) -> HttpResult<Response>
+where
+    R: AsyncBufRead + AsyncBufReadExt + AsyncReadExt + Unpin,
+{
+    let mut resp = Response {
+        request: req.clone(),
+        ..Default::default()
+    };
+
+    // Parse status line.
+    let mut line = String::new();
+    r.read_line(&mut line).await?;
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    if parts.len() < 3 {
+        return Err(HTTPConnectError::ConnectionFailure(
+            "malformed HTTP response".to_string(),
+        ));
+    }
+    resp.Proto = parts[0].to_string();
+    resp.Status = parts[1..].join(" ");
+    resp.StatusCode = parts[1].parse::<isize>().unwrap_or(-1);
+    let vers = ParseHTTPVersion(&resp.Proto);
+    let ok = vers.2;
+    if !ok {
+        return Err(HTTPConnectError::ConnectionFailure(
+            "malformed HTTP version".to_string(),
+        ));
+    }
+    resp.ProtoMajor = vers.0;
+    resp.ProtoMinor = vers.1;
+
+    // Get response headers until the first "\r\n".
+    let mut head_part = BytesMut::new();
+    let mut head_line = String::new();
+    loop {
+        head_line.clear();
+        r.read_line(&mut head_line).await?;
+        if head_line.as_bytes() == b"\r\n" {
+            break;
+        }
+        head_part.extend_from_slice(head_line.as_bytes());
+    }
+
+    // Parse headers.
+    resp.Header = Header::NewWithHashMap(parseHeader(&head_part)?);
+    fixPragmaCacheControl(&mut resp.Header);
+
+    // Set body based on transfer encoding or content length.
+    if resp.Header.Get("Transfer-Encoding") == "chunked" {
+        resp.Body = Some(parse_chunked_body(r).await?);
+    } else {
+        let ln: usize = resp
+            .Header
+            .Get("Content-Length")
+            .parse::<usize>()
+            .expect("Content-Length is not exist");
+        let mut buf = vec![0; ln];
+        r.read_exact(&mut buf).await?;
+        resp.Body = Some(BytesMut::from(&buf[..]));
+    }
+
+    resp.ContentLength = resp.Body.as_ref().map_or(0, |b| b.len() as i64);
+    Ok(resp)
+}
 pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult<Response> {
     let mut resp = Response::default();
     resp.Request = req.clone();
@@ -589,6 +658,42 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult<Response> 
     }
     resp.ContentLength = resp.Body.as_ref().map_or(0, |b| b.len() as i64);
     Ok(resp)
+}
+// chunk数据是以16位数据长度 7acc\r\n独立行开头+ [data] 下一行以\r\n结尾数据段形式，所以数据的结尾用0\r\n表示。
+async fn parse_chunked_body<R>(mut r: R) -> HttpResult<BytesMut>
+where
+    R: AsyncBufRead + AsyncBufReadExt + AsyncReadExt + Unpin,
+{
+    let mut body = BytesMut::new();
+    let mut size_buf = vec![];
+    while r.read_until(b'\n', &mut size_buf).await.is_ok() {
+        // 校验开头行是\r\n结尾的chuank size行
+        if size_buf.ends_with(b"\r\n") {
+            // 删除尾部的\r\n,只保留表示大小的字符串
+            size_buf.truncate(size_buf.len() - 2); // Remove "\r\n"
+
+            // 16进制chunk大小字符串
+            let size_str = std::str::from_utf8(&size_buf)?;
+
+            // 如果字符串等于"0"，已经到最后一个chunk数据段。
+            if size_str == "0" {
+                break;
+            }
+
+            // 按chunk长度读取分段的实际数据
+            let chunk_size = usize::from_str_radix(size_str, 16)?;
+
+            let mut chunk_data = vec![0u8; chunk_size];
+            r.read_exact(&mut chunk_data).await?;
+            body.extend_from_slice(&chunk_data);
+            //读取每个chunk data 结尾的\r\n，并丢弃掉
+            let mut crlf = [0u8; 2];
+            r.read_exact(&mut crlf).await?;
+            //chuank size 行的数据要清空
+            size_buf.clear();
+        }
+    }
+    Ok(body)
 }
 
 // chunk数据是以16位数据长度 7acc\r\n独立行开头+ [data] 下一行以\r\n结尾数据段形式，所以数据的结尾用0\r\n表示。

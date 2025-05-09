@@ -12,6 +12,8 @@ use thiserror::Error;
 pub enum HTTPConnectError {
     #[error("DNS name conversion failed: {0}")]
     DnsNameConversion(#[from] rustls::pki_types::InvalidDnsNameError),
+    #[error("DNS name conversion failed: {0}")]
+    TokioDnsNameConversion(#[from] tokio_rustls::rustls::client::InvalidDnsNameError),
 
     #[error("Failed to connect to server: {0}")]
     ConnectionFailure(String),

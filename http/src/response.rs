@@ -23,4 +23,5 @@ pub struct Response {
     pub Uncompressed: bool,
     pub Trailer: Header,
     pub Request: Request,
+    pub(crate) request: Request,
 }
