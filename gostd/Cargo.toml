@@ -18,8 +18,8 @@ opt-level = 0
 opt-level = 3
 [features]
 default = []  
-tokio-runtime = ["gostd_http/tokio-runtime"]  # 启用 Tokio 特性
-async-std-runtime = ["gostd_http/async-std-runtime"]  # 启用 Async-std 特性
+tokio-rt = ["gostd_http/tokio-runtime"]  # 启用 Tokio 特性
+async-std-rt = ["gostd_http/async-std-runtime"]  # 启用 Async-std 特性
 [dependencies]
 
 gostd_builtin = "^1.0"
@@ -28,8 +28,8 @@ gostd_io = "^1.0"
 gostd_time ="^1.0"
 gostd_unicode = "^1.0"
 gostd_url= "^1.0"
-gostd_bytes=  "^1.0"
+gostd_bytes=  "1.0"
 gostd_derive = "0.0.3"
-gostd_http =  "^1.0"
+gostd_http =  "1.1.3"
 rand = "0.8.5"
 

@@ -22,7 +22,6 @@ default = []
 async-http=[]
 tokio-runtime = ["tokio", "tokio-rustls","async-http"]
 async-std-runtime = ["async-std", "async-tls","async-http"]
-[dev-dependencies]
 
 [dependencies]
 gostd_builtin="^1.0"
