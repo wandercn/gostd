@@ -1,7 +1,7 @@
 [package]
 name = "gostd"
 license = "MIT"
-version = "0.4.3"
+version = "0.4.4"
 edition = "2018"
 authors = ["wandercn<wander@rustpub.com>"]
 description = "gostd is the go standard library implementation in rust. gostd 是Go标准库的rust实现"
@@ -30,6 +30,6 @@ gostd_unicode = "^1.0"
 gostd_url= "^1.0"
 gostd_bytes=  "1.0"
 gostd_derive = "0.0.3"
-gostd_http =  "1.1.3"
+gostd_http =  "1"
 rand = "0.8.5"
 
