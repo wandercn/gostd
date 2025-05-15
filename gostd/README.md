@@ -149,8 +149,8 @@ use gostd::vendor
 - [x] 完成mime::multipart模块。(version >=0.3.1)
 - [x] 修复windos10平台编译失败的bug。(version>=0.3.18)
 - [x] 对net/http模块，自定义错误处理上的优化，引入bytes提高性能，api会有参数类型的变化(version>=0.4.1)
-- [ ] 对net/http模块，增加异步编程的支持，独立一个模块支持异步编程，原来模块保持不变。
-- [x] http,url,io,strings,unicode,bytes 独立发布包。
+- [x] 对net/http模块，增加异步编程的支持，独立一个模块async_http支持异步编程，原来模块保持不变。(version>=0.4.3)
+- [x] net::http,net::url,io,strings,unicode,bytes 独立发布包。
 
 # 独立发布包
  
@@ -215,7 +215,262 @@ fn main() -> Result<(), std::io::Error> {
     Ok(())
 }
 ```
+
+
+
 ## http模块
+
+### Async 异步http
+  默认不启用异步方式
+
+    features =["async-std-runtime"] // 使用async_std 异步运行时
+    或者 features =["tokio-runtime"] // 使用 tokio 异步运行时
+
+#### 使用async_std
+
+ Cargo.toml配置：
+
+    async-std = {version = "1.13" ,features = ["attributes"]}
+    gostd = { version = "0.4" ,features =["async-std-runtime"]}
+
+1. POST
+
+```rust
+
+use gostd::net::http::async_http 
+
+#[async_std::main]
+async fn main() -> anyhow::Result<()> {
+    let url = "https://petstore.swagger.io/v2/pet";
+    let postbody = r#"{"id":0,"category":{"id":0,"name":"string"},"name":"doggie","photoUrls":["string"],"tags":[{"id":0,"name":"string"}],"status":"available"}"#
+   .as_bytes()
+   .to_vec();
+    let response = async_http::Post(url, "application/json", Some(postbody.into())).await?;
+
+    println!(
+        "{}",
+        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
+    );
+
+    Ok(())
+}
+
+```
+或者 
+
+```rust
+use gostd::net::http::{async_http::AsyncClient, Method, Request};
+
+#[async_std::main]
+async fn main() -> anyhow::Result<()> {
+    let url = "https://petstore.swagger.io/v2/pet";
+
+    let postbody = r#"{
+      "id": 0,
+      "category": {
+        "id": 0,
+        "name": "string"
+      },
+      "name": "doggie",
+      "photoUrls": [
+        "string"
+      ],
+      "tags": [
+        {
+          "id": 0,
+          "name": "string"
+        }
+      ],
+      "status": "available"
+    }"#
+    .as_bytes()
+    .to_vec();
+
+    let mut req = Request::New(Method::Post, url, Some(postbody.into()))?;
+
+    req.Header.Set("accept", "application/json");
+    req.Header.Set("Content-Type", "application/json");
+    let mut client = AsyncClient::New();
+    let response = client.Do(&mut req).await?;
+
+    println!(
+        "{}",
+        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
+    );
+
+    Ok(())
+}
+// output
+// {"id":92233723685477587,"category":{"id":,"name":"string"},"name":"doggie","photoUrls":["string"],"tags":[{"id":,"name":"string"}],"status":"available"}
+
+```
+
+2. GET
+
+```rust
+use gostd::net::http::async_http;
+
+#[async_std::main]
+async fn main() -> anyhow::Result<()> {
+    let url = "https://petstore.swagger.io/v2/pet/findByStatus?status=available";
+    let response = async_http::Get(url).await?;
+
+    println!(
+        "{}",
+        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
+    );
+
+    Ok(())
+}
+
+``` 
+或者 
+
+```rust
+use gostd::net::http::{async_http::AsyncClient, Method, Request};
+
+#[async_std::main]
+async fn main() -> anyhow::Result<()> {
+    let url = "https://petstore.swagger.io/v2/pet/findByStatus?status=available";
+    let mut req = Request::New(Method::Get, url, None)?;
+    req.Header.Set("Content-Type", "application/json");
+
+    let mut client = AsyncClient::New();
+
+    let response = client.Do(&mut req).await?;
+    println!(
+        "{}",
+        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
+    );
+
+    Ok(())
+}
+
+```
+
+#### 使用tokio
+
+ Cargo.toml配置：
+
+    tokio = { version = "1.44", features = ["full"] }
+    gostd = { version = "0.4" ,features =["tokio-runtime""]}
+
+1. POST
+
+```rust
+
+use gostd::net::http::async_http 
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let url = "https://petstore.swagger.io/v2/pet";
+    let postbody = r#"{"id":0,"category":{"id":0,"name":"string"},"name":"doggie","photoUrls":["string"],"tags":[{"id":0,"name":"string"}],"status":"available"}"#
+   .as_bytes()
+   .to_vec();
+    let response = async_http::Post(url, "application/json", Some(postbody.into())).await?;
+
+    println!(
+        "{}",
+        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
+    );
+
+    Ok(())
+}
+
+```
+或者 
+
+```rust
+use gostd::net::http::{async_http::AsyncClient, Method, Request};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let url = "https://petstore.swagger.io/v2/pet";
+
+    let postbody = r#"{
+      "id": 0,
+      "category": {
+        "id": 0,
+        "name": "string"
+      },
+      "name": "doggie",
+      "photoUrls": [
+        "string"
+      ],
+      "tags": [
+        {
+          "id": 0,
+          "name": "string"
+        }
+      ],
+      "status": "available"
+    }"#
+    .as_bytes()
+    .to_vec();
+
+    let mut req = Request::New(Method::Post, url, Some(postbody.into()))?;
+
+    req.Header.Set("accept", "application/json");
+    req.Header.Set("Content-Type", "application/json");
+    let mut client = AsyncClient::New();
+    let response = client.Do(&mut req).await?;
+
+    println!(
+        "{}",
+        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
+    );
+
+    Ok(())
+}
+// output
+// {"id":92233723685477587,"category":{"id":,"name":"string"},"name":"doggie","photoUrls":["string"],"tags":[{"id":,"name":"string"}],"status":"available"}
+
+```
+
+2. GET
+
+```rust
+use gostd::net::http::async_http;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let url = "https://petstore.swagger.io/v2/pet/findByStatus?status=available";
+    let response = async_http::Get(url).await?;
+
+    println!(
+        "{}",
+        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
+    );
+
+    Ok(())
+}
+
+``` 
+或者 
+
+```rust
+use gostd::net::http::{async_http::AsyncClient, Method, Request};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let url = "https://petstore.swagger.io/v2/pet/findByStatus?status=available";
+    let mut req = Request::New(Method::Get, url, None)?;
+    req.Header.Set("Content-Type", "application/json");
+
+    let mut client = AsyncClient::New();
+
+    let response = client.Do(&mut req).await?;
+    println!(
+        "{}",
+        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
+    );
+
+    Ok(())
+}
+
+```
+
+### Sync 同步http
 
 ### client客户端
 
@@ -224,7 +479,7 @@ fn main() -> Result<(), std::io::Error> {
 ```rust
 
 use gostd::net::http;
-fn main() -> Result<(), std::io::Error> {
+fn main() -> anyhow::Result<()> {
     let url = "https://petstore.swagger.io/v2/pet";
     let postbody = r#"{"id":0,"category":{"id":0,"name":"string"},"name":"doggie","photoUrls":["string"],"tags":[{"id":0,"name":"string"}],"status":"available"}"#
    .as_bytes()
@@ -245,7 +500,7 @@ fn main() -> Result<(), std::io::Error> {
 ```rust
 use gostd::net::http::{Client, Method, Request};
 
-fn main() -> Result<(), std::io::Error> {
+fn main() -> anyhow::Result<()> {
 
     let url = "https://petstore.swagger.io/v2/pet";
 
@@ -295,7 +550,7 @@ fn main() -> Result<(), std::io::Error> {
 ```rust
 use gostd::net::http;
 
-fn main() -> Result<(), std::io::Error> {
+fn main() -> anyhow::Result<()> {
     let url = "https://petstore.swagger.io/v2/pet/findByStatus?status=available";
     let response = http::Get(url)?;
 
@@ -313,7 +568,7 @@ fn main() -> Result<(), std::io::Error> {
 ```rust
 use gostd::net::http::{Client, Method, Request};
 
-fn main() -> Result<(), std::io::Error> {
+fn main() -> anyhow::Result<()> {
 
     let url = "https://petstore.swagger.io/v2/pet/findByStatus?status=available";
     let mut req = Request::New(Method::Get, url, None)?;
@@ -331,6 +586,7 @@ fn main() -> Result<(), std::io::Error> {
 }
 
 ```
+
 
 ## strings模块
 
@@ -416,3 +672,4 @@ fn main() {
 }
 
 ```
+
