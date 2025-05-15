@@ -3,18 +3,14 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
-use std::{num::ParseIntError, str::Utf8Error};
-
 use anyhow::Result;
+use std::{num::ParseIntError, str::Utf8Error};
 
 use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum HTTPConnectError {
     #[error("DNS name conversion failed: {0}")]
     DnsNameConversion(#[from] rustls::pki_types::InvalidDnsNameError),
-    #[error("DNS name conversion failed: {0}")]
-    TokioDnsNameConversion(#[from] tokio_rustls::rustls::client::InvalidDnsNameError),
-
     #[error("Failed to connect to server: {0}")]
     ConnectionFailure(String),
 

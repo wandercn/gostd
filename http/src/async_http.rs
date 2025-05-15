@@ -1,4 +1,29 @@
-use std::{collections::HashMap, convert::TryFrom, iter::FromIterator, sync::Arc};
+#![allow(unused)]
+// #![allow(dead_code)]
+#![allow(non_upper_case_globals)]
+#![allow(non_snake_case)]
+#![allow(non_camel_case_types)]
+
+#[cfg(feature = "tokio-runtime")]
+use tokio::{
+    io::{AsyncBufRead, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+};
+#[cfg(feature = "tokio-runtime")]
+use tokio_rustls::{client::TlsStream, rustls, TlsConnector};
+
+#[cfg(feature = "async-std-runtime")]
+use async_std::{
+    io::{BufReadExt, BufReader, ReadExt, WriteExt},
+    net::TcpStream,
+    prelude::*,
+};
+
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+    sync::Arc,
+};
 
 use crate::{
     cookies::{Cookie, CookieJar},
@@ -13,14 +38,90 @@ use gostd_builtin::*;
 use gostd_strings as strings;
 use gostd_time as time;
 use gostd_url as url;
-use tokio::{
-    io::{AsyncBufRead, AsyncWriteExt},
-    net::TcpStream,
-};
-use tokio_rustls::rustls::{Certificate, ClientConfig, RootCertStore};
-use tokio_rustls::{TlsConnector, TlsStream};
-use webpki_roots::TLS_SERVER_ROOTS;
+/// Get issues a GET to the specified URL. If the response is one of the following redirect codes, Get follows the redirect,up to a maximum of 10 redirects:
+/// ```text
+/// 301 (Moved Permanently)
+/// 302 (Found)
+/// 303 (See Other)
+/// 307 (Temporary Redirect)
+/// 308 (Permanent Redirect)
+/// ```
+/// Get is a wrapper around Client.Get.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Get向指定的URL发出一个GET请求，如果回应的状态码如下，Get会在调用c.CheckRedirect后执行重定向
+///Get是对包变量Client的Get方法的包装。
+/// </details>
+///
+/// # Example
+///
+/// ```
+/// use gostd_http::async_http;
+/// // or use gostd::net::http::async_http;
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///    let url = "https://petstore.swagger.io/v2/pet/findByStatus?status=available";
+///    let response = async_http::Get(url).await?;
+///    println!(
+///        "{}",
+///        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
+///    );
+///    Ok(())
+///}
+/// ```
+pub async fn Get(url: &str) -> HttpResult<Response> {
+    AsyncClient::New().Get(url).await
+}
 
+pub async fn Head(url: &str) -> HttpResult<Response> {
+    AsyncClient::New().Head(url).await
+}
+
+/// Post issues a POST to the specified URL. Post is a wrapper around DefaultClient.Post.
+/// To set custom headers, use Request::New and Client.Do.
+/// <details class="rustdoc-toggle top-doc">
+/// <summary class="docblock">zh-cn</summary>
+/// Post向指定的URL发出一个POST请求。bodyType为POST数据的类型， body为POST数据，作为请求的主体
+/// </details>
+///
+/// # Example
+///
+/// ```
+/// use gostd_http::async_http;
+/// // or gostd::net::http::async_http;
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let url = "https://petstore.swagger.io/v2/pet";
+///     let postbody = r#"{"id":0,"category":{"id":0,"name":"string"},"name":"doggie","photoUrls":["string"],"tags":[{"id":0,"name":"string"}],"status":"available"}"#
+///     .as_bytes()
+///     .to_vec();
+///     let response = async_http::Post(url, "application/json", Some(postbody.into())).await?;///
+///     println!(
+///         "{}",
+///         String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
+///     );///
+///     Ok(())
+/// }
+/// ```
+pub async fn Post(url: &str, contentType: &str, body: Option<Bytes>) -> HttpResult<Response> {
+    AsyncClient::New().Post(url, contentType, body).await
+}
+
+pub async fn PostForm(url: &str, data: url::Values) -> HttpResult<Response> {
+    AsyncClient::New().PostForm(url, data).await
+}
+
+pub async fn Patch(url: &str, body: Option<Bytes>) -> HttpResult<Response> {
+    AsyncClient::New().Patch(url, body).await
+}
+
+pub async fn Put(url: &str, body: Option<Bytes>) -> HttpResult<Response> {
+    AsyncClient::New().Put(url, body).await
+}
+
+pub async fn AsyncClient(url: &str) -> HttpResult<Response> {
+    AsyncClient::New().Delete(url).await
+}
 // Async Client
 pub struct AsyncClient {
     transport: Transport,
@@ -43,12 +144,12 @@ impl AsyncClient {
         Self::default()
     }
 
-    pub async fn get(&mut self, url: &str) -> HttpResult<Response> {
+    pub async fn Get(&mut self, url: &str) -> HttpResult<Response> {
         let mut req = Request::New(Method::Get, url, None)?;
-        self.do_request(&mut req).await
+        self.Do(&mut req).await
     }
 
-    pub async fn post(
+    pub async fn Post(
         &mut self,
         url: &str,
         content_type: &str,
@@ -56,11 +157,11 @@ impl AsyncClient {
     ) -> HttpResult<Response> {
         let mut req = Request::New(Method::Post, url, body)?;
         req.Header.Set("Content-Type", content_type);
-        self.do_request(&mut req).await
+        self.Do(&mut req).await
     }
 
-    pub async fn post_form(&mut self, url: &str, data: url::Values) -> HttpResult<Response> {
-        self.post(
+    pub async fn PostForm(&mut self, url: &str, data: url::Values) -> HttpResult<Response> {
+        self.Post(
             url,
             "application/x-www-form-urlencoded",
             Some(data.Encode().into_bytes().into()),
@@ -68,27 +169,27 @@ impl AsyncClient {
         .await
     }
 
-    pub async fn head(&mut self, url: &str) -> HttpResult<Response> {
+    pub async fn Head(&mut self, url: &str) -> HttpResult<Response> {
         let mut req = Request::New(Method::Head, url, None)?;
-        self.do_request(&mut req).await
+        self.Do(&mut req).await
     }
 
-    pub async fn patch(&mut self, url: &str, body: Option<Bytes>) -> HttpResult<Response> {
+    pub async fn Patch(&mut self, url: &str, body: Option<Bytes>) -> HttpResult<Response> {
         let mut req = Request::New(Method::Patch, url, body)?;
-        self.do_request(&mut req).await
+        self.Do(&mut req).await
     }
 
-    pub async fn put(&mut self, url: &str, body: Option<Bytes>) -> HttpResult<Response> {
+    pub async fn Put(&mut self, url: &str, body: Option<Bytes>) -> HttpResult<Response> {
         let mut req = Request::New(Method::Put, url, body)?;
-        self.do_request(&mut req).await
+        self.Do(&mut req).await
     }
 
-    pub async fn delete(&mut self, url: &str) -> HttpResult<Response> {
+    pub async fn Delete(&mut self, url: &str) -> HttpResult<Response> {
         let mut req = Request::New(Method::Delete, url, None)?;
-        self.do_request(&mut req).await
+        self.Do(&mut req).await
     }
 
-    async fn do_request(&mut self, req: &mut Request) -> HttpResult<Response> {
+    pub async fn Do(&mut self, req: &mut Request) -> HttpResult<Response> {
         self.done(req).await
     }
 
@@ -97,7 +198,7 @@ impl AsyncClient {
         req: &mut Request,
         deadline: time::Time,
     ) -> HttpResult<(Response, fn() -> bool)> {
-        let (resp, did_timeout) = send_async(req, self.transport(), deadline).await?;
+        let (resp, did_timeout) = send(req, self.transport(), deadline).await?;
         Ok((resp, did_timeout))
     }
 
@@ -119,7 +220,7 @@ impl AsyncClient {
     }
 }
 
-async fn send_async(
+async fn send(
     ireq: &mut Request,
     mut rt: Transport,
     deadline: time::Time,
@@ -339,53 +440,74 @@ impl persistConn {
         }
 
         let r = req.Req.Write()?;
-        if req.Req.isTLS {
-            let mut tls_conn = get_tls_conn(req.Req.Host.as_str(), conn).await?;
-            tls_conn.write_all(r.as_slice());
-            let mut reader = tokio::io::BufReader::new(tls_conn);
-            let resp = read_response(&mut reader, &req.Req).await?;
-            Ok(resp)
-        } else {
-            conn.write_all(r.as_slice());
-            let mut reader = tokio::io::BufReader::new(conn);
-            let resp = read_response(&mut reader, &req.Req).await?;
-            Ok(resp)
+        #[cfg(feature = "tokio-runtime")]
+        {
+            if req.Req.isTLS {
+                let mut tls_conn = get_tls_conn(req.Req.Host.as_str(), conn).await?;
+                tls_conn.write_all(r.as_slice()).await?;
+                let mut reader = tokio::io::BufReader::new(tls_conn);
+                let resp = read_response(&mut reader, &req.Req).await?;
+                Ok(resp)
+            } else {
+                conn.write_all(r.as_slice()).await?;
+                let mut reader = tokio::io::BufReader::new(conn);
+                let resp = read_response(&mut reader, &req.Req).await?;
+                Ok(resp)
+            }
+        }
+        #[cfg(feature = "async-std-runtime")]
+        {
+            if req.Req.isTLS {
+                let mut tls_conn = get_tls_conn(req.Req.Host.as_str(), conn).await?;
+                tls_conn.write_all(r.as_slice()).await?;
+                let mut reader = BufReader::new(tls_conn);
+                let resp = read_response(&mut reader, &req.Req).await?;
+                Ok(resp)
+            } else {
+                conn.write_all(r.as_slice()).await?;
+                let mut reader = BufReader::new(conn);
+                let resp = read_response(&mut reader, &req.Req).await?;
+                Ok(resp)
+            }
         }
     }
 }
 
-fn get_tls_config() -> Arc<ClientConfig> {
-    // 创建一个空的 RootCertStore
-    let mut root_store = RootCertStore::empty();
-
-    // 将 webpki_roots 提供的根证书添加到 root_store 中
-    for cert in TLS_SERVER_ROOTS.iter() {
-        // 将 DER 格式的证书数据转换为 rustls::Certificate
-        let mut der_data = Vec::new();
-        der_data.extend_from_slice(&cert.subject);
-        der_data.extend_from_slice(&cert.subject_public_key_info);
-        let cert = Certificate(der_data);
-        root_store.add(&cert).unwrap();
-    }
-
-    // 将 root_store 包装在 Arc 中
-    let root_store = Arc::new(root_store);
+#[cfg(feature = "tokio-runtime")]
+fn get_tls_config() -> Arc<rustls::ClientConfig> {
+    let mut root_cert_store = rustls::RootCertStore::empty();
+    root_cert_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
 
     Arc::new(
-        ClientConfig::builder()
-            .with_safe_defaults()
-            .with_root_certificates(root_store)
+        rustls::ClientConfig::builder()
+            .with_root_certificates(root_cert_store)
             .with_no_client_auth(),
     )
 }
+
+#[cfg(feature = "tokio-runtime")]
 async fn get_tls_conn(dns_name: &str, socket: TcpStream) -> HttpResult<TlsStream<TcpStream>> {
     let tls_config = get_tls_config();
-    let server_name = tokio_rustls::rustls::ServerName::try_from(dns_name)?;
+    let server_name = dns_name.to_owned().try_into()?;
     let connector = TlsConnector::from(tls_config.clone());
     let tls_stream = connector.connect(server_name, socket).await?;
-    Ok(tokio_rustls::TlsStream::Client(tls_stream))
+    Ok(tls_stream)
 }
-use tokio::io::{AsyncBufReadExt, AsyncReadExt};
+
+#[cfg(feature = "async-std-runtime")]
+use async_tls::{client::TlsStream, TlsConnector};
+// 使用 async-std 运行时
+#[cfg(feature = "async-std-runtime")]
+async fn get_tls_conn(
+    dns_name: &str,
+    socket: async_std::net::TcpStream,
+) -> HttpResult<TlsStream<async_std::net::TcpStream>> {
+    let server_name = dns_name.to_owned();
+    let connector = TlsConnector::default();
+    let tls_stream = connector.connect(server_name, socket).await?;
+    Ok(tls_stream)
+}
+#[cfg(feature = "tokio-runtime")]
 async fn read_response<R>(mut r: R, req: &Request) -> HttpResult<Response>
 where
     R: AsyncBufRead + Unpin,
@@ -450,7 +572,7 @@ where
     resp.ContentLength = resp.Body.as_ref().map_or(0, |b| b.len() as i64);
     Ok(resp)
 }
-
+#[cfg(feature = "tokio-runtime")]
 async fn parse_chunked_body<R>(mut r: R) -> HttpResult<BytesMut>
 where
     R: AsyncBufRead + Unpin,
@@ -476,6 +598,98 @@ where
     Ok(body)
 }
 
+#[cfg(feature = "async-std-runtime")]
+async fn read_response<R>(mut r: R, req: &Request) -> HttpResult<Response>
+where
+    R: BufReadExt + Unpin,
+{
+    let mut resp = Response {
+        request: req.clone(),
+        ..Default::default()
+    };
+
+    // Parse status line.
+    let mut line = String::new();
+
+    r.read_line(&mut line).await?;
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    if parts.len() < 3 {
+        return Err(HTTPConnectError::ConnectionFailure(
+            "malformed HTTP response".to_string(),
+        ));
+    }
+    resp.Proto = parts[0].to_string();
+    resp.Status = parts[1..].join(" ");
+    resp.StatusCode = parts[1].parse::<isize>().unwrap_or(-1);
+    let vers = parse_http_version(&resp.Proto);
+    let ok = vers.2;
+    if !ok {
+        return Err(HTTPConnectError::ConnectionFailure(
+            "malformed HTTP version".to_string(),
+        ));
+    }
+    resp.ProtoMajor = vers.0;
+    resp.ProtoMinor = vers.1;
+
+    // Get response headers until the first "\r\n".
+    let mut head_part = BytesMut::new();
+    let mut head_line = String::new();
+    loop {
+        head_line.clear();
+        r.read_line(&mut head_line).await?;
+        if head_line.as_bytes() == b"\r\n" {
+            break;
+        }
+        head_part.extend_from_slice(head_line.as_bytes());
+    }
+
+    // Parse headers.
+    resp.Header = Header::NewWithHashMap(parse_header(&head_part)?);
+    fix_pragma_cache_control(&mut resp.Header);
+
+    // Set body based on transfer encoding or content length.
+    if resp.Header.Get("Transfer-Encoding") == "chunked" {
+        resp.Body = Some(parse_chunked_body(&mut r).await?);
+    } else {
+        let ln: usize = resp
+            .Header
+            .Get("Content-Length")
+            .parse::<usize>()
+            .expect("Content-Length is not exist");
+        let mut buf = vec![0; ln];
+        r.read_exact(&mut buf).await?;
+        resp.Body = Some(BytesMut::from(&buf[..]));
+    }
+
+    resp.ContentLength = resp.Body.as_ref().map_or(0, |b| b.len() as i64);
+    Ok(resp)
+}
+
+#[cfg(feature = "async-std-runtime")]
+async fn parse_chunked_body<R>(mut r: R) -> HttpResult<BytesMut>
+where
+    R: BufReadExt + Unpin,
+{
+    let mut body = BytesMut::new();
+    let mut size_buf = vec![];
+    while r.read_until(b'\n', &mut size_buf).await.is_ok() {
+        if size_buf.ends_with(b"\r\n") {
+            size_buf.truncate(size_buf.len() - 2); // Remove "\r\n"
+            let size_str = std::str::from_utf8(&size_buf)?;
+            if size_str == "0" {
+                break;
+            }
+            let chunk_size = usize::from_str_radix(size_str, 16)?;
+            let mut chunk_data = vec![0u8; chunk_size];
+            r.read_exact(&mut chunk_data).await?;
+            body.extend_from_slice(&chunk_data);
+            let mut crlf = [0u8; 2];
+            r.read_exact(&mut crlf).await?;
+            size_buf.clear();
+        }
+    }
+    Ok(body)
+}
 pub type MIMEHeader = HashMap<String, Vec<String>>;
 
 fn fix_pragma_cache_control(header: &mut Header) {

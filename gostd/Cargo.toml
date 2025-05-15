@@ -1,7 +1,7 @@
 [package]
 name = "gostd"
 license = "MIT"
-version = "0.4.2"
+version = "0.4.3"
 edition = "2018"
 authors = ["wandercn<wander@rustpub.com>"]
 description = "gostd is the go standard library implementation in rust. gostd 是Go标准库的rust实现"
@@ -16,6 +16,10 @@ opt-level = 0
 [profile.release]
 
 opt-level = 3
+[features]
+default = []  
+tokio-runtime = ["gostd_http/tokio-runtime"]  # 启用 Tokio 特性
+async-std-runtime = ["gostd_http/async-std-runtime"]  # 启用 Async-std 特性
 [dependencies]
 
 gostd_builtin = "^1.0"
