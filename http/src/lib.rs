@@ -12,5 +12,8 @@ pub mod response;
 pub mod server;
 pub mod status;
 pub use client::*;
+pub use error::*;
 pub use method::*;
 pub use request::*;
+pub use response::*;
+pub use status::*;
