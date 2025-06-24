@@ -223,15 +223,15 @@ fn main() -> Result<(), std::io::Error> {
 ### Async 异步http
   默认不启用异步方式
 
-    features =["async-std-runtime"] // 使用async_std 异步运行时
-    或者 features =["tokio-runtime"] // 使用 tokio 异步运行时
+    features =["async-std-rt"] // 使用async_std 异步运行时
+    或者 features =["tokio-rt"] // 使用 tokio 异步运行时
 
 #### 使用async_std
 
  Cargo.toml配置：
 
     async-std = {version = "1.13" ,features = ["attributes"]}
-    gostd = { version = "0.4" ,features =["async-std-runtime"]}
+    gostd = { version = "0.4" ,features =["async-std-rt"]}
 
 1. POST
 
@@ -353,7 +353,7 @@ async fn main() -> anyhow::Result<()> {
  Cargo.toml配置：
 
     tokio = { version = "1.44", features = ["full"] }
-    gostd = { version = "0.4" ,features =["tokio-runtime""]}
+    gostd = { version = "0.4" ,features =["tokio-rt""]}
 
 1. POST
 

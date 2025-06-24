@@ -16,7 +16,7 @@
  Cargo.toml配置：
 
     async-std = {version = "1.13" ,features = ["attributes"]}
-    gostd = { version = "0.4" ,features =["async-std-runtime"]}
+    gostd = { version = "0.4" ,features =["async-std-rt"]}
     或者 gostd_http = { version = "1" ,features =["async-std-runtime"]}
 
 1. POST
@@ -140,7 +140,7 @@ async fn main() -> anyhow::Result<()> {
  Cargo.toml配置：
 
     tokio = { version = "1.44", features = ["full"] }
-    gostd = { version = "0.4" ,features =["tokio-runtime""]}
+    gostd = { version = "0.4" ,features =["tokio-rt"]}
     或者 gostd_http = { version = "1" ,features =["tokio-runtime"]}
 
 1. POST
