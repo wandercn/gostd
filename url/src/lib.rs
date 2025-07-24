@@ -317,6 +317,11 @@ impl Values {
     pub fn Has(&self, key: &str) -> bool {
         self.0.contains_key(key)
     }
+    /// An iterator visiting all keys in arbitrary order.
+    /// The iterator element type is `&str`.
+    pub fn keys(&self) -> impl Iterator<Item = &str> {
+        self.0.keys().map(|k| k.as_str())
+    }
 
     /// Encode encodes the values into ``URL encoded'' form
     /// ("bar=baz&foo=quux") sorted by key.
