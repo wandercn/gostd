@@ -209,7 +209,7 @@ fn main() -> anyhow::Result<()> {
 
 ## multipart模块
 
-### form-data Body
+### form-data Body (文本字段)
 
 ```rust
 use gostd::bytes;
@@ -223,7 +223,7 @@ fn main() -> Result<(), std::io::Error> {
     w.Close()?;
     let contentType = w.FormDataContentType();
     let url = "http://www.baidu.com";
-    let mut req = Request::New(Method::Post, url, Some(body.Bytes()))?;
+    let mut req = Request::New(Method::Post, url, Some(body.Bytes().into()))?;
     req.Header.Set("Content-Type", contentType.as_str());
     let mut client = Client::New();
     let response = client.Do(&mut req)?;
@@ -236,3 +236,44 @@ fn main() -> Result<(), std::io::Error> {
     Ok(())
 }
 ```
+
+### form-data Body (带文件附件)
+
+```rust
+use gostd::bytes;
+use gostd::mime::multipart::Writer;
+use gostd::net::http::{Client, Method, Request};
+use std::fs;
+
+fn main() -> anyhow::Result<()> {
+    let mut body = bytes::Buffer::new();
+    let mut w = Writer::new(&mut body);
+
+    // 1. 添加普通文本字段
+    w.WriteField("title", "测试上传附件")?;
+
+    // 2. 创建文件表单部分
+    // CreateFormFile 返回底层 buffer 的可变引用，可直接写入文件字节
+    let mut file_part = w.CreateFormFile("file_field_name", "example.txt")?;
+
+    // 3. 读取本地文件并写入
+    let content = fs::read("test_file.txt")?; 
+    file_part.Write(content)?;
+
+    // 4. 关闭 Writer 以写入最后的 boundary 边界
+    w.Close()?;
+
+    let contentType = w.FormDataContentType();
+    let url = "http://example.com/api/upload";
+
+    let mut req = Request::New(Method::Post, url, Some(body.Bytes().into()))?;
+    req.Header.Set("Content-Type", contentType.as_str());
+
+    let mut client = Client::New();
+    let response = client.Do(&mut req)?;
+
+    println!("Response status: {}", response.Status);
+    Ok(())
+}
+```
+
