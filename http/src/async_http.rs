@@ -281,8 +281,11 @@ fn referer_for_url(last_req: &url::URL, new_req: &url::URL) -> String {
     referer
 }
 
-#[derive(Default, Clone)]
+type PoolKey = String;
+
+#[derive(Clone)]
 struct Transport {
+    idle_conns: Arc<std::sync::Mutex<HashMap<PoolKey, Vec<TcpStream>>>>,
     close_idle: bool,
     proxy: Option<url::URL>,
     force_attempt_http2: bool,
@@ -295,6 +298,26 @@ struct Transport {
     write_buffer_size: i32,
     read_buffer_size: i32,
     tls_next_proto_was_nil: bool,
+}
+
+impl Default for Transport {
+    fn default() -> Self {
+        Self {
+            idle_conns: Arc::new(std::sync::Mutex::new(HashMap::new())),
+            close_idle: false,
+            proxy: None,
+            force_attempt_http2: false,
+            max_idle_conns: 100,
+            disable_keep_alives: false,
+            disable_compression: false,
+            i_max_idle_conns_per_host: 2,
+            max_conns_per_host: 0,
+            max_response_header_bytes: 0,
+            write_buffer_size: 4096,
+            read_buffer_size: 4096,
+            tls_next_proto_was_nil: false,
+        }
+    }
 }
 
 impl AsyncRoundTripper for Transport {
@@ -310,8 +333,18 @@ impl Transport {
             extra: None,
         };
         let cm = self.connect_method_for_request(treq)?;
-        let (mut pconn, conn) = self.get_conn(treq, cm).await?;
-        pconn.round_trip(treq, conn).await
+        let (mut pconn, conn) = self.get_conn(treq, cm.clone()).await?;
+        let mut resp = pconn.round_trip(treq, conn).await?;
+        resp.reused = pconn.reused;
+        
+        // 简单实现：请求完成后，如果支持复用且不是 TLS（目前 TLS 复用较复杂，先实现平文本复用），则放回池中
+        if !self.disable_keep_alives && !req.Close && !treq.Req.isTLS {
+             if let Ok(mut conns) = self.idle_conns.lock() {
+                 let key = cm.addr();
+                 conns.entry(key).or_insert_with(Vec::new).push(pconn.last_conn.unwrap());
+             }
+        }
+        Ok(resp)
     }
 
     async fn get_conn(
@@ -319,6 +352,18 @@ impl Transport {
         treq: &transportRequest,
         cm: connectMethod,
     ) -> HttpResult<(persistConn, TcpStream)> {
+        if !self.disable_keep_alives {
+            if let Ok(mut conns) = self.idle_conns.lock() {
+                let key = cm.addr();
+                if let Some(list) = conns.get_mut(&key) {
+                    if let Some(conn) = list.pop() {
+                        let mut pconn = persistConn::default();
+                        pconn.reused = true;
+                        return Ok((pconn, conn));
+                    }
+                }
+            }
+        }
         let conn = self.dial_conn(cm).await?;
         let pconn = persistConn::default();
         Ok((pconn, conn))

@@ -24,4 +24,5 @@ pub struct Response {
     pub Trailer: Header,
     pub Request: Request,
     pub(crate) request: Request,
+    pub reused: bool,
 }

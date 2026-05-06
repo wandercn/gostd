@@ -328,18 +328,19 @@ use std::net;
 use std::sync::mpsc;
 impl RoundTripper for Transport {
     fn RoundTrip(&mut self, req: &Request) -> HttpResult<Response> {
-        self.roundTrip(req)
+        self.round_trip(req)
     }
 }
 impl Transport {
-    fn roundTrip(&mut self, req: &Request) -> HttpResult<Response> {
+    fn round_trip(&mut self, req: &Request) -> HttpResult<Response> {
         let treq = &mut transportRequest {
             Req: req.clone(),
             extra: None,
         };
         let cm = self.connectMethodForRequest(treq)?;
         let (mut pconn, mut conn) = self.getConn(treq, cm.clone())?;
-        let resp = pconn.roundTrip(treq, conn)?;
+        let mut resp = pconn.roundTrip(treq, conn)?;
+        resp.reused = pconn.reused;
         
         if !self.DisableKeepAlives && !req.Close && !treq.Req.isTLS {
             if let Ok(mut conns) = self.idle_conns.lock() {
@@ -349,6 +350,7 @@ impl Transport {
         }
         Ok(resp)
     }
+
 
     fn getConn(
         &mut self,
