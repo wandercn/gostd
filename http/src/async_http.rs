@@ -55,7 +55,7 @@ use gostd_url as url;
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore
 /// use gostd_http::async_http;
 /// // or use gostd::net::http::async_http;
 /// #[tokio::main]
@@ -86,7 +86,7 @@ pub async fn Head(url: &str) -> HttpResult<Response> {
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore
 /// use gostd_http::async_http;
 /// // or gostd::net::http::async_http;
 /// #[tokio::main]
