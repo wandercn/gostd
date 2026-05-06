@@ -14,8 +14,8 @@ impl Header {
     }
     pub fn Add(&mut self, key: &str, value: &str) {
         self.0
-            .get_mut(&key.to_string())
-            .unwrap()
+            .entry(key.to_string())
+            .or_insert_with(Vec::new)
             .push(value.to_string())
     }
 
@@ -23,12 +23,11 @@ impl Header {
         self.0.insert(key.to_string(), vec![value.to_string()]);
     }
 
-    pub fn Get(&self, key: &str) -> String {
+    pub fn Get(&self, key: &str) -> &str {
         self.0
             .get(key)
-            .unwrap_or(&vec!["".to_string()])
-            .get(0)
-            .unwrap()
-            .to_string()
+            .and_then(|v| v.get(0))
+            .map(|s| s.as_str())
+            .unwrap_or("")
     }
 }

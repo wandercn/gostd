@@ -11,19 +11,19 @@ use gostd_strings as strings;
 use gostd_time as time;
 use gostd_url as url;
 
-fn validHeaderFieldByte(b: byte) -> bool {
-    let isTokenTable: HashSet<char> = [
-        '!', '#', '$', '%', '&', '\'', '*', '+', '.', '0', '1', '2', '3', '4', '5', '6', '7', '8',
-        '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q',
-        'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '^', '_', '`', 'a', 'b', 'c', 'd', 'e', 'f',
-        'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
-        'y', 'z', '|', '~',
-    ]
-    .iter()
-    .cloned()
-    .collect();
+static TOKEN_TABLE: [bool; 256] = {
+    let mut table = [false; 256];
+    let bytes = b"!#$%&'*+-.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ^_`abcdefghijklmnopqrstuvwxyz|~";
+    let mut i = 0;
+    while i < bytes.len() {
+        table[bytes[i] as usize] = true;
+        i += 1;
+    }
+    table
+};
 
-    isTokenTable.contains(&(b as char))
+fn validHeaderFieldByte(b: byte) -> bool {
+    TOKEN_TABLE[b as usize]
 }
 fn isCookieNameValid(raw: &str) -> bool {
     if raw == "" {

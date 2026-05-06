@@ -238,7 +238,7 @@ fn send(
         if !shouldRedirect {
             return Ok((resp, didTimeout));
         }
-        let mut u = ireq.URL.Parse(loc.as_str())?;
+        let mut u = ireq.URL.Parse(loc)?;
         let urlRef = refererForURL(&ireq.URL, &u);
         ireq.Method = redirectMethod.clone();
         ireq.URL = u.clone();
@@ -289,6 +289,11 @@ use std::sync::mpsc;
 
 type PoolKey = String;
 
+struct IdleConn {
+    conn: TcpStream,
+    idle_at: std::time::Instant,
+}
+
 enum PoolMessage {
     Get(PoolKey, mpsc::Sender<Option<TcpStream>>),
     Put(PoolKey, TcpStream),
@@ -314,19 +319,52 @@ pub struct Transport {
 impl Default for Transport {
     fn default() -> Self {
         let (tx, rx) = mpsc::channel::<PoolMessage>();
+        let idle_timeout = std::time::Duration::from_secs(90);
 
         // 启动同步连接管理器线程
         std::thread::spawn(move || {
-            let mut pool: HashMap<PoolKey, Vec<TcpStream>> = HashMap::new();
-            while let Ok(msg) = rx.recv() {
-                match msg {
-                    PoolMessage::Get(key, reply_tx) => {
-                        let conn = pool.get_mut(&key).and_then(|v| v.pop());
-                        let _ = reply_tx.send(conn);
+            let mut pool: HashMap<PoolKey, Vec<IdleConn>> = HashMap::new();
+            loop {
+                // 使用 recv_timeout 实现周期性清理
+                match rx.recv_timeout(std::time::Duration::from_secs(30)) {
+                    Ok(msg) => match msg {
+                        PoolMessage::Get(key, reply_tx) => {
+                            let mut found = None;
+                            if let Some(list) = pool.get_mut(&key) {
+                                while let Some(idle) = list.pop() {
+                                    if idle.idle_at.elapsed() > idle_timeout {
+                                        continue;
+                                    }
+                                    // 健康探测
+                                    let _ = idle.conn.set_nonblocking(true);
+                                    let mut buf = [0u8; 1];
+                                    match idle.conn.peek(&mut buf) {
+                                        Ok(0) => continue, // EOF
+                                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                                            let _ = idle.conn.set_nonblocking(false);
+                                            found = Some(idle.conn);
+                                            break;
+                                        }
+                                        _ => continue,
+                                    }
+                                }
+                            }
+                            let _ = reply_tx.send(found);
+                        }
+                        PoolMessage::Put(key, conn) => {
+                            pool.entry(key).or_insert_with(Vec::new).push(IdleConn {
+                                conn,
+                                idle_at: std::time::Instant::now(),
+                            });
+                        }
+                    },
+                    Err(mpsc::RecvTimeoutError::Timeout) => {
+                        // 周期性清理
+                        for list in pool.values_mut() {
+                            list.retain(|idle| idle.idle_at.elapsed() <= idle_timeout);
+                        }
                     }
-                    PoolMessage::Put(key, conn) => {
-                        pool.entry(key).or_insert_with(Vec::new).push(conn);
-                    }
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break,
                 }
             }
         });
@@ -629,7 +667,7 @@ pub fn ReadResponse(r: &mut impl BufRead, req: &Request) -> HttpResult<Response>
     fixPragmaCacheControl(&mut resp.Header);
 
     // set Body
-    if resp.Header.Get("Transfer-Encoding").as_str() == "chunked" {
+    if resp.Header.Get("Transfer-Encoding") == "chunked" {
         // 2.chunked方式传输方式。获取body数据。
         resp.Body = Some(parseChunkedBody(r)?);
     } else {
@@ -637,7 +675,6 @@ pub fn ReadResponse(r: &mut impl BufRead, req: &Request) -> HttpResult<Response>
         let ln: usize = resp
             .Header
             .Get("Content-Length")
-            .as_str()
             .parse::<usize>()
             .expect("Content-Length is not exist");
 

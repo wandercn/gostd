@@ -237,7 +237,7 @@ async fn send(
         if !should_redirect {
             return Ok((resp, did_timeout));
         }
-        let u = ireq.URL.Parse(loc.as_str())?;
+        let u = ireq.URL.Parse(loc)?;
         let url_ref = referer_for_url(&ireq.URL, &u);
         ireq.Method = redirect_method.clone();
         ireq.URL = u.clone();
@@ -289,9 +289,15 @@ use tokio::sync::{mpsc, oneshot};
 #[cfg(feature = "async-std-runtime")]
 use async_std::channel as mpsc;
 
+struct IdleConn {
+    conn: TcpStream,
+    idle_at: std::time::Instant,
+}
+
 enum PoolMessage {
     Get(PoolKey, #[cfg(feature = "tokio-runtime")] oneshot::Sender<Option<TcpStream>>, #[cfg(feature = "async-std-runtime")] mpsc::Sender<Option<TcpStream>>),
     Put(PoolKey, TcpStream),
+    Clean,
 }
 
 #[derive(Clone)]
@@ -318,38 +324,106 @@ impl Default for Transport {
         #[cfg(feature = "async-std-runtime")]
         let (tx, rx) = mpsc::unbounded();
 
+        let idle_timeout = std::time::Duration::from_secs(90);
+
         // 启动后台连接管理器 Actor
         #[cfg(feature = "tokio-runtime")]
-        tokio::spawn(async move {
-            let mut pool: HashMap<PoolKey, Vec<TcpStream>> = HashMap::new();
-            while let Some(msg) = rx.recv().await {
-                match msg {
-                    PoolMessage::Get(key, reply_tx) => {
-                        let conn = pool.get_mut(&key).and_then(|v| v.pop());
-                        let _ = reply_tx.send(conn);
-                    }
-                    PoolMessage::Put(key, conn) => {
-                        pool.entry(key).or_insert_with(Vec::new).push(conn);
+        {
+            let cleaner_tx = tx.clone();
+            tokio::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
+                loop {
+                    interval.tick().await;
+                    if cleaner_tx.send(PoolMessage::Clean).await.is_err() {
+                        break;
                     }
                 }
-            }
-        });
+            });
+
+            tokio::spawn(async move {
+                let mut pool: HashMap<PoolKey, Vec<IdleConn>> = HashMap::new();
+                while let Some(msg) = rx.recv().await {
+                    match msg {
+                        PoolMessage::Get(key, reply_tx) => {
+                            let mut found = None;
+                            if let Some(list) = pool.get_mut(&key) {
+                                while let Some(idle) = list.pop() {
+                                    if idle.idle_at.elapsed() > idle_timeout {
+                                        continue;
+                                    }
+                                    let mut buf = [0u8; 1];
+                                    match idle.conn.try_read(&mut buf) {
+                                        Ok(0) => continue,
+                                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                                            found = Some(idle.conn);
+                                            break;
+                                        }
+                                        _ => continue,
+                                    }
+                                }
+                            }
+                            let _ = reply_tx.send(found);
+                        }
+                        PoolMessage::Put(key, conn) => {
+                            pool.entry(key).or_insert_with(Vec::new).push(IdleConn {
+                                conn,
+                                idle_at: std::time::Instant::now(),
+                            });
+                        }
+                        PoolMessage::Clean => {
+                            for list in pool.values_mut() {
+                                list.retain(|idle| idle.idle_at.elapsed() <= idle_timeout);
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
         #[cfg(feature = "async-std-runtime")]
-        async_std::task::spawn(async move {
-            let mut pool: HashMap<PoolKey, Vec<TcpStream>> = HashMap::new();
-            while let Ok(msg) = rx.recv().await {
-                match msg {
-                    PoolMessage::Get(key, reply_tx) => {
-                        let conn = pool.get_mut(&key).and_then(|v| v.pop());
-                        let _ = reply_tx.send(conn).await;
-                    }
-                    PoolMessage::Put(key, conn) => {
-                        pool.entry(key).or_insert_with(Vec::new).push(conn);
+        {
+            let cleaner_tx = tx.clone();
+            async_std::task::spawn(async move {
+                loop {
+                    async_std::task::sleep(std::time::Duration::from_secs(30)).await;
+                    if cleaner_tx.send(PoolMessage::Clean).await.is_err() {
+                        break;
                     }
                 }
-            }
-        });
+            });
+
+            async_std::task::spawn(async move {
+                let mut pool: HashMap<PoolKey, Vec<IdleConn>> = HashMap::new();
+                while let Ok(msg) = rx.recv().await {
+                    match msg {
+                        PoolMessage::Get(key, reply_tx) => {
+                            let mut found = None;
+                            if let Some(list) = pool.get_mut(&key) {
+                                while let Some(idle) = list.pop() {
+                                    if idle.idle_at.elapsed() > idle_timeout {
+                                        continue;
+                                    }
+                                    found = Some(idle.conn);
+                                    break;
+                                }
+                            }
+                            let _ = reply_tx.send(found).await;
+                        }
+                        PoolMessage::Put(key, conn) => {
+                            pool.entry(key).or_insert_with(Vec::new).push(IdleConn {
+                                conn,
+                                idle_at: std::time::Instant::now(),
+                            });
+                        }
+                        PoolMessage::Clean => {
+                            for list in pool.values_mut() {
+                                list.retain(|idle| idle.idle_at.elapsed() <= idle_timeout);
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
         Self {
             pool_tx: tx,
