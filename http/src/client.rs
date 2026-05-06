@@ -126,15 +126,15 @@ pub fn Delete(url: &str) -> HttpResult<Response> {
 }
 
 pub struct Client {
-    Transport: Box<dyn RoundTripper>,
+    pub Transport: Transport,
     // CheckRedirect: fn(req: &Request, via: Vec<&Request>) -> Result<(), Error>,
-    Jar: Box<dyn CookieJar>,
-    Timeout: time::Duration,
+    pub Jar: Box<dyn CookieJar>,
+    pub Timeout: time::Duration,
 }
 impl Default for Client {
     fn default() -> Self {
         Self {
-            Transport: Box::new(Transport::default()),
+            Transport: Transport::default(),
             Timeout: time::Duration::new(0),
             Jar: Box::new(Cookie::default()),
         }
@@ -199,7 +199,7 @@ impl Client {
         req: &mut Request,
         deadline: time::Time,
     ) -> HttpResult<(Response, fn() -> bool)> {
-        let (resp, didTimeout) = send(req, self.transport(), deadline)?;
+        let (resp, didTimeout) = send(req, Box::new(self.transport()), deadline)?;
         Ok((resp, didTimeout))
     }
 
@@ -216,8 +216,8 @@ impl Client {
         time::Time::default()
     }
 
-    fn transport(&self) -> Box<dyn RoundTripper> {
-        Box::new(Transport::default())
+    fn transport(&self) -> Transport {
+        self.Transport.clone()
     }
 }
 
@@ -285,20 +285,16 @@ pub fn refererForURL(lastReq: &url::URL, newReq: &url::URL) -> String {
 use std::io;
 use std::iter::FromIterator;
 use std::sync;
-#[derive(Default, Clone)]
+type PoolKey = String;
+
+#[derive(Clone)]
 pub struct Transport {
-    // idleMu: sync::Mutex,
+    idle_conns: Arc<sync::Mutex<HashMap<PoolKey, Vec<TcpStream>>>>,
     closeIdle: bool,
-    // idleConn:HashMap<String, Vec<>>
     Proxy: Option<url::URL>,
-    // Dial: fn(network: &str, addr: &str) -> Result<net::TcpConn, Error>,
     ForceAttemptHTTP2: bool,
     MaxIdleConns: int,
-    // IdleConnTimeout:       90 * time.Second,
-    // TLSHandshakeTimeout:   10 * time.Second,
-    // ExpectContinueTimeout: 1 * time.Second,
     DisableKeepAlives: bool,
-
     DisableCompression: bool,
     iMaxIdleConnsPerHost: int,
     MaxConnsPerHost: int,
@@ -306,6 +302,26 @@ pub struct Transport {
     WriteBufferSize: int,
     ReadBufferSize: int,
     tlsNextProtoWasNil: bool,
+}
+
+impl Default for Transport {
+    fn default() -> Self {
+        Self {
+            idle_conns: Arc::new(sync::Mutex::new(HashMap::new())),
+            closeIdle: false,
+            Proxy: None,
+            ForceAttemptHTTP2: false,
+            MaxIdleConns: 100,
+            DisableKeepAlives: false,
+            DisableCompression: false,
+            iMaxIdleConnsPerHost: 2,
+            MaxConnsPerHost: 0,
+            MaxResponseHeaderBytes: 0,
+            WriteBufferSize: 4096,
+            ReadBufferSize: 4096,
+            tlsNextProtoWasNil: false,
+        }
+    }
 }
 
 use std::net;
@@ -322,11 +338,16 @@ impl Transport {
             extra: None,
         };
         let cm = self.connectMethodForRequest(treq)?;
-        let (mut pconn, mut conn) = self.getConn(treq, cm)?;
-        // conn.set_write_timeout(Some(std::time::Duration::new(5, 0)));
-        // conn.set_read_timeout(Some(std::time::Duration::new(5, 0)));
-
-        pconn.roundTrip(treq, conn)
+        let (mut pconn, mut conn) = self.getConn(treq, cm.clone())?;
+        let resp = pconn.roundTrip(treq, conn)?;
+        
+        if !self.DisableKeepAlives && !req.Close && !treq.Req.isTLS {
+            if let Ok(mut conns) = self.idle_conns.lock() {
+                let key = cm.addr();
+                conns.entry(key).or_insert_with(Vec::new).push(pconn.last_conn.unwrap());
+            }
+        }
+        Ok(resp)
     }
 
     fn getConn(
@@ -334,6 +355,18 @@ impl Transport {
         treq: &transportRequest,
         cm: connectMethod,
     ) -> HttpResult<(persistConn, TcpConn)> {
+        if !self.DisableKeepAlives {
+            if let Ok(mut conns) = self.idle_conns.lock() {
+                let key = cm.addr();
+                if let Some(list) = conns.get_mut(&key) {
+                    if let Some(conn) = list.pop() {
+                        let mut pconn = persistConn::default();
+                        pconn.reused = true;
+                        return Ok((pconn, conn));
+                    }
+                }
+            }
+        }
         let conn = self.dialConn(cm)?;
         let pconn = persistConn::default();
         Ok((pconn, conn))
@@ -435,7 +468,7 @@ impl connectMethod {
 }
 type TcpConn = TcpStream;
 use std::sync::mpsc::channel;
-#[derive(Default, Clone)]
+#[derive(Default)]
 struct persistConn {
     t: Transport,
     // br: bufio.Reader,
@@ -451,6 +484,7 @@ struct persistConn {
     numExpectedResponses: int,
     broken: bool,
     reused: bool,
+    last_conn: Option<TcpStream>,
 }
 
 use bytes::Bytes;
@@ -474,12 +508,6 @@ impl persistConn {
             && req.Req.Method != "HEAD".to_string()
         {
             requestedGzip = true;
-            // req.extra = Some(req.Req.Header.clone());
-            // let mut hd = req.extra.take().unwrap();
-            // // hd.Set("Accept-Encoding", "gzip");
-
-            // req.extra = Some(hd.clone());
-            // req.Req.Header = hd;
         }
         if req.Req.Close {
             req.Req.Header.Set("Connection", "close");
@@ -491,12 +519,13 @@ impl persistConn {
             let mut tlsConn = getTLSConn(req.Req.Host.as_str(), conn)?;
             tlsConn.write(r.as_slice())?;
             let mut reader = BufReader::new(tlsConn);
-            let resp = ReadResponse(reader, &req.Req)?;
+            let resp = ReadResponse(&mut reader, &req.Req)?;
             Ok(resp)
         } else {
             conn.write(r.as_slice())?;
             let mut reader = BufReader::new(conn);
-            let resp = ReadResponse(reader, &req.Req)?;
+            let resp = ReadResponse(&mut reader, &req.Req)?;
+            self.last_conn = Some(reader.into_inner());
             Ok(resp)
         }
     }
@@ -535,7 +564,7 @@ fn getTLSConn(
     Ok(tlsConn)
 }
 
-pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult<Response> {
+pub fn ReadResponse(r: &mut impl BufRead, req: &Request) -> HttpResult<Response> {
     let mut resp = Response::default();
     resp.Request = req.clone();
     // parse status line。
@@ -597,7 +626,7 @@ pub fn ReadResponse(mut r: impl BufRead, req: &Request) -> HttpResult<Response> 
 }
 
 // chunk数据是以16位数据长度 7acc\r\n独立行开头+ [data] 下一行以\r\n结尾数据段形式，所以数据的结尾用0\r\n表示。
-fn parseChunkedBody(mut r: impl BufRead) -> HttpResult<BytesMut> {
+fn parseChunkedBody(r: &mut impl BufRead) -> HttpResult<BytesMut> {
     let mut body = BytesMut::new();
     let mut size_buf = vec![];
     while r.read_until(b'\n', &mut size_buf).is_ok() {
@@ -717,3 +746,4 @@ pub fn ParseHTTPVersion(vers: &str) -> (int, int, bool) {
         _ => (0, 0, false),
     }
 }
+

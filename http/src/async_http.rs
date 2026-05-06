@@ -216,7 +216,7 @@ impl AsyncClient {
     }
 
     fn transport(&self) -> Transport {
-        Transport::default()
+        self.transport.clone()
     }
 }
 
@@ -408,7 +408,7 @@ impl connectMethod {
 
 type TcpConn = TcpStream;
 
-#[derive(Default, Clone)]
+#[derive(Default)]
 struct persistConn {
     t: Transport,
     nwrite: i64,
@@ -418,6 +418,7 @@ struct persistConn {
     num_expected_responses: i32,
     broken: bool,
     reused: bool,
+    last_conn: Option<TcpStream>,
 }
 
 impl persistConn {
@@ -452,6 +453,7 @@ impl persistConn {
                 conn.write_all(r.as_slice()).await?;
                 let mut reader = tokio::io::BufReader::new(conn);
                 let resp = read_response(&mut reader, &req.Req).await?;
+                self.last_conn = Some(reader.into_inner());
                 Ok(resp)
             }
         }
@@ -467,6 +469,7 @@ impl persistConn {
                 conn.write_all(r.as_slice()).await?;
                 let mut reader = BufReader::new(conn);
                 let resp = read_response(&mut reader, &req.Req).await?;
+                self.last_conn = Some(reader.into_inner());
                 Ok(resp)
             }
         }
@@ -508,7 +511,7 @@ async fn get_tls_conn(
     Ok(tls_stream)
 }
 #[cfg(feature = "tokio-runtime")]
-async fn read_response<R>(mut r: R, req: &Request) -> HttpResult<Response>
+async fn read_response<R>(r: &mut R, req: &Request) -> HttpResult<Response>
 where
     R: AsyncBufRead + Unpin,
 {
@@ -557,7 +560,7 @@ where
 
     // Set body based on transfer encoding or content length.
     if resp.Header.Get("Transfer-Encoding") == "chunked" {
-        resp.Body = Some(parse_chunked_body(&mut r).await?);
+        resp.Body = Some(parse_chunked_body(r).await?);
     } else {
         let ln: usize = resp
             .Header
@@ -573,7 +576,7 @@ where
     Ok(resp)
 }
 #[cfg(feature = "tokio-runtime")]
-async fn parse_chunked_body<R>(mut r: R) -> HttpResult<BytesMut>
+async fn parse_chunked_body<R>(r: &mut R) -> HttpResult<BytesMut>
 where
     R: AsyncBufRead + Unpin,
 {
@@ -599,7 +602,7 @@ where
 }
 
 #[cfg(feature = "async-std-runtime")]
-async fn read_response<R>(mut r: R, req: &Request) -> HttpResult<Response>
+async fn read_response<R>(r: &mut R, req: &Request) -> HttpResult<Response>
 where
     R: BufReadExt + Unpin,
 {
@@ -649,7 +652,7 @@ where
 
     // Set body based on transfer encoding or content length.
     if resp.Header.Get("Transfer-Encoding") == "chunked" {
-        resp.Body = Some(parse_chunked_body(&mut r).await?);
+        resp.Body = Some(parse_chunked_body(r).await?);
     } else {
         let ln: usize = resp
             .Header
@@ -666,7 +669,7 @@ where
 }
 
 #[cfg(feature = "async-std-runtime")]
-async fn parse_chunked_body<R>(mut r: R) -> HttpResult<BytesMut>
+async fn parse_chunked_body<R>(r: &mut R) -> HttpResult<BytesMut>
 where
     R: BufReadExt + Unpin,
 {
