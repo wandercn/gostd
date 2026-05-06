@@ -40,7 +40,6 @@ gostd_http  等价于 gostd::net::http
 1. POST
 
 ```rust
-
 use gostd::net::http::async_http; 
 // 或者用 use gostd_http::async_http
 
@@ -54,12 +53,11 @@ async fn main() -> anyhow::Result<()> {
 
     println!(
         "{}",
-        String::from_utf8(response.Body.unwrap().to_vec()).unwrap()
+        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
     );
 
     Ok(())
 }
-
 ```
 或者 
 
@@ -100,13 +98,12 @@ async fn main() -> anyhow::Result<()> {
 
     println!(
         "{} (connection reused: {})",
-        String::from_utf8(response.Body.unwrap().to_vec()).unwrap(),
+        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap(),
         response.reused
     );
 
     Ok(())
 }
-
 ```
 
 2. GET
@@ -121,12 +118,11 @@ async fn main() -> anyhow::Result<()> {
 
     println!(
         "{}",
-        String::from_utf8(response.Body.unwrap().to_vec()).unwrap()
+        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
     );
 
     Ok(())
 }
-
 ``` 
 
 #### 使用tokio
@@ -140,7 +136,6 @@ async fn main() -> anyhow::Result<()> {
 1. POST
 
 ```rust
-
 use gostd::net::http::async_http; 
 // 或者用 use gostd_http::async_http;
 #[tokio::main]
@@ -153,12 +148,11 @@ async fn main() -> anyhow::Result<()> {
 
     println!(
         "{}",
-        String::from_utf8(response.Body.unwrap().to_vec()).unwrap()
+        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
     );
 
     Ok(())
 }
-
 ```
 
 ### Sync 同步http
@@ -168,23 +162,65 @@ async fn main() -> anyhow::Result<()> {
 1. POST
 
 ```rust
-
 use gostd::net::http;
 fn main() -> anyhow::Result<()> {
     let url = "https://petstore.swagger.io/v2/pet";
     let postbody = r#"{"id":0,"category":{"id":0,"name":"string"},"name":"doggie","photoUrls":["string"],"tags":[{"id":0,"name":"string"}],"status":"available"}"#
    .as_bytes()
    .to_vec();
-    let response = http::Post(url, "application/json", Some(postbody))?;
+    let response = http::Post(url, "application/json", Some(postbody.into()))?;
 
     println!(
         "{}",
-        String::from_utf8(response.Body.unwrap().to_vec()).unwrap()
+        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
     );
 
     Ok(())
 }
+```
+或者 
 
+```rust
+use gostd::net::http::{Client, Method, Request};
+
+fn main() -> anyhow::Result<()> {
+    let url = "https://petstore.swagger.io/v2/pet";
+
+    let postbody = r#"{
+      "id": 0,
+      "category": {
+        "id": 0,
+        "name": "string"
+      },
+      "name": "doggie",
+      "photoUrls": [
+        "string"
+      ],
+      "tags": [
+        {
+          "id": 0,
+          "name": "string"
+        }
+      ],
+      "status": "available"
+    }"#
+    .as_bytes()
+    .to_vec();
+
+    let mut req = Request::New(Method::Post, url, Some(postbody.into()))?;
+
+    req.Header.Set("accept", "application/json");
+    req.Header.Set("Content-Type", "application/json");
+    let mut client = Client::New();
+    let response = client.Do(&mut req)?;
+
+    println!(
+        "{}",
+        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
+    );
+
+    Ok(())
+}
 ```
 
 2. GET
@@ -198,14 +234,34 @@ fn main() -> anyhow::Result<()> {
 
     println!(
         "{} (reused: {})",
-        String::from_utf8(response.Body.unwrap().to_vec()).unwrap(),
+        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap(),
         response.reused
     );
 
     Ok(())
 }
-
 ``` 
+或者 
+
+```rust
+use gostd::net::http::{Client, Method, Request};
+
+fn main() -> anyhow::Result<()> {
+    let url = "https://petstore.swagger.io/v2/pet/findByStatus?status=available";
+    let mut req = Request::New(Method::Get, url, None)?;
+    req.Header.Set("Content-Type", "application/json");
+
+    let mut client = Client::New();
+
+    let response = client.Do(&mut req)?;
+    println!(
+        "{}",
+        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
+    );
+
+    Ok(())
+}
+```
 
 ## multipart模块
 
@@ -215,7 +271,8 @@ fn main() -> anyhow::Result<()> {
 use gostd::bytes;
 use gostd::mime::multipart::Writer;
 use gostd::net::http::{Client, Method, Request};
-fn main() -> Result<(), std::io::Error> {
+
+fn main() -> anyhow::Result<()> {
     let mut body = bytes::Buffer::new();
     let mut w = Writer::new(&mut body);
     w.WriteField("requestId", "12121231231")?;
@@ -230,7 +287,7 @@ fn main() -> Result<(), std::io::Error> {
 
     println!(
         "{}",
-        String::from_utf8(response.Body.unwrap().to_vec()).unwrap()
+        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
     );
 
     Ok(())
@@ -276,4 +333,3 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 ```
-
