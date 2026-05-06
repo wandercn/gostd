@@ -283,9 +283,20 @@ fn referer_for_url(last_req: &url::URL, new_req: &url::URL) -> String {
 
 type PoolKey = String;
 
+#[cfg(feature = "tokio-runtime")]
+use tokio::sync::{mpsc, oneshot};
+
+#[cfg(feature = "async-std-runtime")]
+use async_std::channel as mpsc;
+
+enum PoolMessage {
+    Get(PoolKey, #[cfg(feature = "tokio-runtime")] oneshot::Sender<Option<TcpStream>>, #[cfg(feature = "async-std-runtime")] mpsc::Sender<Option<TcpStream>>),
+    Put(PoolKey, TcpStream),
+}
+
 #[derive(Clone)]
 struct Transport {
-    idle_conns: Arc<std::sync::Mutex<HashMap<PoolKey, Vec<TcpStream>>>>,
+    pool_tx: mpsc::Sender<PoolMessage>,
     close_idle: bool,
     proxy: Option<url::URL>,
     force_attempt_http2: bool,
@@ -302,8 +313,46 @@ struct Transport {
 
 impl Default for Transport {
     fn default() -> Self {
+        #[cfg(feature = "tokio-runtime")]
+        let (tx, mut rx) = mpsc::channel(1024);
+        #[cfg(feature = "async-std-runtime")]
+        let (tx, rx) = mpsc::unbounded();
+
+        // 启动后台连接管理器 Actor
+        #[cfg(feature = "tokio-runtime")]
+        tokio::spawn(async move {
+            let mut pool: HashMap<PoolKey, Vec<TcpStream>> = HashMap::new();
+            while let Some(msg) = rx.recv().await {
+                match msg {
+                    PoolMessage::Get(key, reply_tx) => {
+                        let conn = pool.get_mut(&key).and_then(|v| v.pop());
+                        let _ = reply_tx.send(conn);
+                    }
+                    PoolMessage::Put(key, conn) => {
+                        pool.entry(key).or_insert_with(Vec::new).push(conn);
+                    }
+                }
+            }
+        });
+
+        #[cfg(feature = "async-std-runtime")]
+        async_std::task::spawn(async move {
+            let mut pool: HashMap<PoolKey, Vec<TcpStream>> = HashMap::new();
+            while let Ok(msg) = rx.recv().await {
+                match msg {
+                    PoolMessage::Get(key, reply_tx) => {
+                        let conn = pool.get_mut(&key).and_then(|v| v.pop());
+                        let _ = reply_tx.send(conn).await;
+                    }
+                    PoolMessage::Put(key, conn) => {
+                        pool.entry(key).or_insert_with(Vec::new).push(conn);
+                    }
+                }
+            }
+        });
+
         Self {
-            idle_conns: Arc::new(std::sync::Mutex::new(HashMap::new())),
+            pool_tx: tx,
             close_idle: false,
             proxy: None,
             force_attempt_http2: false,
@@ -336,13 +385,12 @@ impl Transport {
         let (mut pconn, conn) = self.get_conn(treq, cm.clone()).await?;
         let mut resp = pconn.round_trip(treq, conn).await?;
         resp.reused = pconn.reused;
-        
-        // 简单实现：请求完成后，如果支持复用且不是 TLS（目前 TLS 复用较复杂，先实现平文本复用），则放回池中
+
+        // 归还连接到 Actor 管理器
         if !self.disable_keep_alives && !req.Close && !treq.Req.isTLS {
-             if let Ok(mut conns) = self.idle_conns.lock() {
-                 let key = cm.addr();
-                 conns.entry(key).or_insert_with(Vec::new).push(pconn.last_conn.unwrap());
-             }
+            if let Some(last_conn) = pconn.last_conn {
+                let _ = self.pool_tx.send(PoolMessage::Put(cm.addr(), last_conn)).await;
+            }
         }
         Ok(resp)
     }
@@ -353,10 +401,23 @@ impl Transport {
         cm: connectMethod,
     ) -> HttpResult<(persistConn, TcpStream)> {
         if !self.disable_keep_alives {
-            if let Ok(mut conns) = self.idle_conns.lock() {
-                let key = cm.addr();
-                if let Some(list) = conns.get_mut(&key) {
-                    if let Some(conn) = list.pop() {
+            let key = cm.addr();
+            #[cfg(feature = "tokio-runtime")]
+            {
+                let (reply_tx, reply_rx) = oneshot::channel();
+                if self.pool_tx.send(PoolMessage::Get(key, reply_tx,)).await.is_ok() {
+                    if let Ok(Some(conn)) = reply_rx.await {
+                        let mut pconn = persistConn::default();
+                        pconn.reused = true;
+                        return Ok((pconn, conn));
+                    }
+                }
+            }
+            #[cfg(feature = "async-std-runtime")]
+            {
+                let (reply_tx, reply_rx) = mpsc::bounded(1);
+                if self.pool_tx.send(PoolMessage::Get(key, reply_tx)).await.is_ok() {
+                    if let Ok(Some(conn)) = reply_rx.recv().await {
                         let mut pconn = persistConn::default();
                         pconn.reused = true;
                         return Ok((pconn, conn));

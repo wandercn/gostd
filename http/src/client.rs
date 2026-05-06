@@ -285,11 +285,18 @@ pub fn refererForURL(lastReq: &url::URL, newReq: &url::URL) -> String {
 use std::io;
 use std::iter::FromIterator;
 use std::sync;
+use std::sync::mpsc;
+
 type PoolKey = String;
+
+enum PoolMessage {
+    Get(PoolKey, mpsc::Sender<Option<TcpStream>>),
+    Put(PoolKey, TcpStream),
+}
 
 #[derive(Clone)]
 pub struct Transport {
-    idle_conns: Arc<sync::Mutex<HashMap<PoolKey, Vec<TcpStream>>>>,
+    pool_tx: mpsc::Sender<PoolMessage>,
     closeIdle: bool,
     Proxy: Option<url::URL>,
     ForceAttemptHTTP2: bool,
@@ -306,8 +313,26 @@ pub struct Transport {
 
 impl Default for Transport {
     fn default() -> Self {
+        let (tx, rx) = mpsc::channel::<PoolMessage>();
+
+        // 启动同步连接管理器线程
+        std::thread::spawn(move || {
+            let mut pool: HashMap<PoolKey, Vec<TcpStream>> = HashMap::new();
+            while let Ok(msg) = rx.recv() {
+                match msg {
+                    PoolMessage::Get(key, reply_tx) => {
+                        let conn = pool.get_mut(&key).and_then(|v| v.pop());
+                        let _ = reply_tx.send(conn);
+                    }
+                    PoolMessage::Put(key, conn) => {
+                        pool.entry(key).or_insert_with(Vec::new).push(conn);
+                    }
+                }
+            }
+        });
+
         Self {
-            idle_conns: Arc::new(sync::Mutex::new(HashMap::new())),
+            pool_tx: tx,
             closeIdle: false,
             Proxy: None,
             ForceAttemptHTTP2: false,
@@ -325,7 +350,6 @@ impl Default for Transport {
 }
 
 use std::net;
-use std::sync::mpsc;
 impl RoundTripper for Transport {
     fn RoundTrip(&mut self, req: &Request) -> HttpResult<Response> {
         self.round_trip(req)
@@ -343,9 +367,8 @@ impl Transport {
         resp.reused = pconn.reused;
         
         if !self.DisableKeepAlives && !req.Close && !treq.Req.isTLS {
-            if let Ok(mut conns) = self.idle_conns.lock() {
-                let key = cm.addr();
-                conns.entry(key).or_insert_with(Vec::new).push(pconn.last_conn.unwrap());
+            if let Some(last_conn) = pconn.last_conn {
+                let _ = self.pool_tx.send(PoolMessage::Put(cm.addr(), last_conn));
             }
         }
         Ok(resp)
@@ -358,14 +381,13 @@ impl Transport {
         cm: connectMethod,
     ) -> HttpResult<(persistConn, TcpConn)> {
         if !self.DisableKeepAlives {
-            if let Ok(mut conns) = self.idle_conns.lock() {
-                let key = cm.addr();
-                if let Some(list) = conns.get_mut(&key) {
-                    if let Some(conn) = list.pop() {
-                        let mut pconn = persistConn::default();
-                        pconn.reused = true;
-                        return Ok((pconn, conn));
-                    }
+            let key = cm.addr();
+            let (reply_tx, reply_rx) = mpsc::channel();
+            if self.pool_tx.send(PoolMessage::Get(key, reply_tx)).is_ok() {
+                if let Ok(Some(conn)) = reply_rx.recv() {
+                    let mut pconn = persistConn::default();
+                    pconn.reused = true;
+                    return Ok((pconn, conn));
                 }
             }
         }
