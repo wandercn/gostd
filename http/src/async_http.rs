@@ -464,8 +464,8 @@ impl AsyncRoundTripper for Transport {
 
 impl Transport {
     async fn round_trip(&mut self, req: &Request) -> HttpResult<Response> {
-        let treq = &mut transportRequest {
-            Req: req.clone(),
+        let treq = &mut TransportRequest {
+            req: req.clone(),
             extra: None,
         };
         let cm = self.connect_method_for_request(treq)?;
@@ -484,9 +484,9 @@ impl Transport {
 
     async fn get_conn(
         &mut self,
-        treq: &transportRequest,
-        cm: connectMethod,
-    ) -> HttpResult<(persistConn, HttpStream)> {
+        treq: &TransportRequest,
+        cm: ConnectMethod,
+    ) -> HttpResult<(PersistConn, HttpStream)> {
         let key = cm.pool_key();
         if !self.disable_keep_alives {
             #[cfg(feature = "tokio-runtime")]
@@ -494,7 +494,7 @@ impl Transport {
                 let (reply_tx, reply_rx) = oneshot::channel();
                 if self.pool_tx.send(PoolMessage::Get(key.clone(), reply_tx,)).await.is_ok() {
                     if let Ok(Some(conn)) = reply_rx.await {
-                        let mut pconn = persistConn::default();
+                        let mut pconn = PersistConn::default();
                         pconn.reused = true;
                         return Ok((pconn, conn));
                     }
@@ -505,7 +505,7 @@ impl Transport {
                 let (reply_tx, reply_rx) = mpsc::bounded(1);
                 if self.pool_tx.send(PoolMessage::Get(key.clone(), reply_tx)).await.is_ok() {
                     if let Ok(Some(conn)) = reply_rx.recv().await {
-                        let mut pconn = persistConn::default();
+                        let mut pconn = PersistConn::default();
                         pconn.reused = true;
                         return Ok((pconn, conn));
                     }
@@ -514,41 +514,41 @@ impl Transport {
         }
         
         let conn = self.dial_conn(cm.clone()).await?;
-        let stream: HttpStream = if treq.Req.isTLS {
+        let stream: HttpStream = if treq.req.isTLS {
              #[cfg(feature = "tokio-runtime")]
              {
-                 Box::new(get_tls_conn(treq.Req.Host.as_str(), conn).await?)
+                 Box::new(get_tls_conn(treq.req.Host.as_str(), conn).await?)
              }
              #[cfg(feature = "async-std-runtime")]
              {
-                 Box::new(get_tls_conn(treq.Req.Host.as_str(), conn).await?)
+                 Box::new(get_tls_conn(treq.req.Host.as_str(), conn).await?)
              }
         } else {
             Box::new(conn)
         };
 
-        let pconn = persistConn::default();
+        let pconn = PersistConn::default();
         Ok((pconn, stream))
     }
 
-    async fn dial_conn(&mut self, cm: connectMethod) -> HttpResult<TcpStream> {
+    async fn dial_conn(&mut self, cm: ConnectMethod) -> HttpResult<TcpStream> {
         self.dial("tcp", cm.addr().as_str()).await
     }
 
-    async fn dial(&mut self, network: &str, addr: &str) -> HttpResult<TcpStream> {
+    async fn dial(&mut self, _network: &str, addr: &str) -> HttpResult<TcpStream> {
         Ok(TcpStream::connect(addr).await?)
     }
 
-    fn connect_method_for_request(&mut self, treq: &transportRequest) -> HttpResult<connectMethod> {
-        let mut cm = connectMethod::default();
-        cm.target_scheme = treq.Req.URL.Scheme.clone();
-        cm.target_addr = canonical_addr(&treq.Req.URL.clone())?;
+    fn connect_method_for_request(&mut self, treq: &TransportRequest) -> HttpResult<ConnectMethod> {
+        let mut cm = ConnectMethod::default();
+        cm.target_scheme = treq.req.URL.Scheme.clone();
+        cm.target_addr = canonical_addr(&treq.req.URL.clone())?;
         cm.proxy_url = None;
         cm.only_h1 = true;
         Ok(cm)
     }
 
-    fn wirte_buffer_size(self) -> i32 {
+    fn write_buffer_size(self) -> i32 {
         if self.write_buffer_size > 0 {
             return self.write_buffer_size;
         }
@@ -579,12 +579,12 @@ fn canonical_addr(url: &url::URL) -> HttpResult<String> {
 }
 
 #[derive(Default, Clone)]
-struct transportRequest {
-    pub Req: Request,
+struct TransportRequest {
+    pub req: Request,
     extra: Option<Header>,
 }
 
-impl transportRequest {
+impl TransportRequest {
     fn extra_headers(&mut self) -> Header {
         if let Some(extra) = self.extra.clone() {
             return extra;
@@ -594,14 +594,14 @@ impl transportRequest {
 }
 
 #[derive(Default, PartialEq, PartialOrd, Clone)]
-struct connectMethod {
+struct ConnectMethod {
     proxy_url: Option<url::URL>,
     target_scheme: String,
     target_addr: String,
     only_h1: bool,
 }
 
-impl connectMethod {
+impl ConnectMethod {
     fn scheme(&self) -> String {
         self.target_scheme.clone()
     }
@@ -618,7 +618,7 @@ impl connectMethod {
 type TcpConn = TcpStream;
 
 #[derive(Default)]
-struct persistConn {
+struct PersistConn {
     t: Transport,
     nwrite: i64,
     is_proxy: bool,
@@ -630,32 +630,32 @@ struct persistConn {
     last_conn: Option<HttpStream>,
 }
 
-impl persistConn {
+impl PersistConn {
     async fn round_trip(
         &mut self,
-        req: &mut transportRequest,
+        req: &mut TransportRequest,
         mut conn: HttpStream,
     ) -> HttpResult<Response> {
         self.num_expected_responses += 1;
         let mut requested_gzip = false;
         if !self.t.disable_compression
-            && req.Req.Header.Get("Accept-Encoding") == ""
-            && req.Req.Header.Get("Range") == ""
-            && req.Req.Method != "HEAD".to_string()
+            && req.req.Header.Get("Accept-Encoding") == ""
+            && req.req.Header.Get("Range") == ""
+            && req.req.Method != "HEAD".to_string()
         {
             requested_gzip = true;
         }
-        if req.Req.Close {
-            req.Req.Header.Set("Connection", "close");
+        if req.req.Close {
+            req.req.Header.Set("Connection", "close");
         }
 
-        let r = req.Req.Write()?;
+        let r = req.req.Write()?;
         
         #[cfg(feature = "tokio-runtime")]
         {
             conn.write_all(r.as_slice()).await?;
             let mut reader = tokio::io::BufReader::new(conn);
-            let resp = read_response(&mut reader, &req.Req).await?;
+            let resp = read_response(&mut reader, &req.req).await?;
             self.last_conn = Some(Box::new(reader.into_inner()));
             Ok(resp)
         }
@@ -663,7 +663,7 @@ impl persistConn {
         {
             conn.write_all(r.as_slice()).await?;
             let mut reader = BufReader::new(conn);
-            let resp = read_response(&mut reader, &req.Req).await?;
+            let resp = read_response(&mut reader, &req.req).await?;
             self.last_conn = Some(Box::new(reader.into_inner()));
             Ok(resp)
         }

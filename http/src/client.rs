@@ -391,13 +391,13 @@ impl RoundTripper for Transport {
 }
 impl Transport {
     fn round_trip(&mut self, req: &Request) -> HttpResult<Response> {
-        let treq = &mut transportRequest {
-            Req: req.clone(),
+        let treq = &mut TransportRequest {
+            req: req.clone(),
             extra: None,
         };
-        let cm = self.connectMethodForRequest(treq)?;
-        let (mut pconn, mut conn) = self.getConn(treq, cm.clone())?;
-        let mut resp = pconn.roundTrip(treq, conn)?;
+        let cm = self.connect_method_for_request(treq)?;
+        let (mut pconn, conn) = self.get_conn(treq, cm.clone())?;
+        let mut resp = pconn.round_trip(treq, conn)?;
         resp.reused = pconn.reused;
         
         if !self.DisableKeepAlives && !req.Close {
@@ -409,70 +409,59 @@ impl Transport {
     }
 
 
-    fn getConn(
+    fn get_conn(
         &mut self,
-        treq: &transportRequest,
-        cm: connectMethod,
-    ) -> HttpResult<(persistConn, HttpStream)> {
+        treq: &TransportRequest,
+        cm: ConnectMethod,
+    ) -> HttpResult<(PersistConn, HttpStream)> {
         let key = cm.pool_key();
         if !self.DisableKeepAlives {
             let (reply_tx, reply_rx) = mpsc::channel();
             if self.pool_tx.send(PoolMessage::Get(key, reply_tx)).is_ok() {
                 if let Ok(Some(conn)) = reply_rx.recv() {
-                    let mut pconn = persistConn::default();
+                    let mut pconn = PersistConn::default();
                     pconn.reused = true;
                     return Ok((pconn, conn));
                 }
             }
         }
         
-        let conn = self.dialConn(cm)?;
-        let stream: HttpStream = if treq.Req.isTLS {
-             Box::new(getTLSConn(treq.Req.Host.as_str(), conn)?)
+        let conn = self.dial_conn(cm)?;
+        let stream: HttpStream = if treq.req.isTLS {
+             Box::new(getTLSConn(treq.req.Host.as_str(), conn)?)
         } else {
             Box::new(conn)
         };
 
-        let pconn = persistConn::default();
+        let pconn = PersistConn::default();
         Ok((pconn, stream))
     }
 
-    fn dialConn(&mut self, cm: connectMethod) -> HttpResult<TcpConn> {
-        // pconn.t = self;
-        // pconn.reqch = mpsc::channel();
-        // pconn.writech = mpsc::channel();
-        // pconn.writeLoopDone = mpsc::channel();
+    fn dial_conn(&mut self, cm: ConnectMethod) -> HttpResult<TcpConn> {
         self.dial("tcp", cm.addr().as_str())
-        // pconn.conn = conn;
-        // pconn.br = bufio::NewReaderSize(pconn, self.readBufferSize());
-        // pconn.bw = bufio::NewWriterSize(persistConnWriter { pconn }, self.writeBufferSize());
-        // 待实现读写进程
-        /* go pconn.readLoop()
-        go pconn.writeLoop() */
-        // Ok(pconn)
     }
 
-    fn dial(&mut self, network: &str, addr: &str) -> HttpResult<TcpConn> {
+    fn dial(&mut self, _network: &str, addr: &str) -> HttpResult<TcpConn> {
         Ok(net::TcpStream::connect(addr)?)
     }
 
-    fn connectMethodForRequest(&mut self, treq: &transportRequest) -> HttpResult<connectMethod> {
-        let mut cm = connectMethod::default();
-        cm.targetScheme = treq.Req.URL.Scheme.clone();
-        cm.targetAddr = canonicalAddr(&treq.Req.URL.clone())?;
-        cm.proxyURL = None;
-        cm.onlyH1 = true; //待优化
+    fn connect_method_for_request(&mut self, treq: &TransportRequest) -> HttpResult<ConnectMethod> {
+        let mut cm = ConnectMethod::default();
+        cm.target_scheme = treq.req.URL.Scheme.clone();
+        cm.target_addr = canonicalAddr(&treq.req.URL.clone())?;
+        cm.proxy_url = None;
+        cm.only_h1 = true; //待优化
         Ok(cm)
     }
 
-    fn wirteBufferSize(self) -> int {
+    fn write_buffer_size(self) -> int {
         if self.WriteBufferSize > 0 {
             return self.WriteBufferSize;
         }
         4 << 10
     }
 
-    fn readBufferSize(self) -> int {
+    fn read_buffer_size(self) -> int {
         if self.ReadBufferSize > 0 {
             return self.ReadBufferSize;
         }
@@ -496,13 +485,13 @@ fn canonicalAddr(url: &url::URL) -> HttpResult<String> {
 }
 
 #[derive(Default, Clone)]
-struct transportRequest {
-    pub Req: Request,
+struct TransportRequest {
+    pub req: Request,
     extra: Option<Header>,
 }
 
-impl transportRequest {
-    fn extraHeaders(&mut self) -> Header {
+impl TransportRequest {
+    fn extra_headers(&mut self) -> Header {
         if let Some(extra) = self.extra.clone() {
             return extra;
         }
@@ -511,44 +500,44 @@ impl transportRequest {
 }
 
 #[derive(Default, PartialEq, PartialOrd, Clone)]
-struct connectMethod {
-    proxyURL: Option<url::URL>, // nil for no proxy, else full proxy URL
-    targetScheme: String,       // "http" or "https"
+struct ConnectMethod {
+    proxy_url: Option<url::URL>, // nil for no proxy, else full proxy URL
+    target_scheme: String,       // "http" or "https"
     // If proxyURL specifies an http or https proxy, and targetScheme is http (not https),
     // then targetAddr is not included in the connect method key, because the socket can
     // be reused for different targetAddr values.
-    targetAddr: String,
-    onlyH1: bool, // whether to disable HTTP/2 and force HTTP/1
+    target_addr: String,
+    only_h1: bool, // whether to disable HTTP/2 and force HTTP/1
 }
-impl connectMethod {
+impl ConnectMethod {
     fn scheme(&self) -> String {
-        self.targetScheme.clone()
+        self.target_scheme.clone()
     }
 
     pub fn addr(&self) -> String {
-        self.targetAddr.clone()
+        self.target_addr.clone()
     }
 
     fn pool_key(&self) -> PoolKey {
-        format!("{}://{}", self.targetScheme, self.targetAddr)
+        format!("{}://{}", self.target_scheme, self.target_addr)
     }
 }
 type TcpConn = TcpStream;
 use std::sync::mpsc::channel;
 #[derive(Default)]
-struct persistConn {
+struct PersistConn {
     t: Transport,
     // br: bufio.Reader,
     // bw: bufio.Writer,
     nwrite: int64,
     // reqch: channel,
     // writech: channel,
-    isProxy: bool,
-    sawEOF: bool,
-    readLimit: int64,
+    is_proxy: bool,
+    saw_eof: bool,
+    read_limit: int64,
     // writeErrch: channel,
     // writeLoopDone: channel,
-    numExpectedResponses: int,
+    num_expected_responses: int,
     broken: bool,
     reused: bool,
     last_conn: Option<HttpStream>,
@@ -565,26 +554,26 @@ use std::net::TcpStream;
 use std::rc::Rc;
 use std::sync::Arc;
 use webpki_roots::TLS_SERVER_ROOTS;
-impl persistConn {
-    fn roundTrip(&mut self, req: &mut transportRequest, mut conn: HttpStream) -> HttpResult<Response> {
-        self.numExpectedResponses += 1;
-        let mut requestedGzip = false;
+impl PersistConn {
+    fn round_trip(&mut self, req: &mut TransportRequest, mut conn: HttpStream) -> HttpResult<Response> {
+        self.num_expected_responses += 1;
+        let mut requested_gzip = false;
         if !self.t.DisableCompression
-            && req.Req.Header.Get("Accept-Encoding") == ""
-            && req.Req.Header.Get("Range") == ""
-            && req.Req.Method != "HEAD".to_string()
+            && req.req.Header.Get("Accept-Encoding") == ""
+            && req.req.Header.Get("Range") == ""
+            && req.req.Method != "HEAD".to_string()
         {
-            requestedGzip = true;
+            requested_gzip = true;
         }
-        if req.Req.Close {
-            req.Req.Header.Set("Connection", "close");
+        if req.req.Close {
+            req.req.Header.Set("Connection", "close");
         }
 
-        let r = req.Req.Write()?;
+        let r = req.req.Write()?;
 
         conn.write(r.as_slice())?;
         let mut reader = BufReader::new(conn);
-        let resp = ReadResponse(&mut reader, &req.Req)?;
+        let resp = ReadResponse(&mut reader, &req.req)?;
         self.last_conn = Some(Box::new(reader.into_inner()));
         Ok(resp)
     }
