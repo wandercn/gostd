@@ -11,6 +11,8 @@ pub mod request;
 pub mod response;
 pub mod server;
 pub mod status;
+#[cfg(test)]
+mod pool_test;
 pub use client::*;
 pub use error::*;
 pub use method::*;
