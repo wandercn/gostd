@@ -263,6 +263,61 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
+## JSON 处理 (配合 serde_json)
+
+推荐配合 Rust 社区标准库 `serde` 和 `serde_json` 来处理结构化数据。
+
+### Cargo.toml 配置
+
+```toml
+[dependencies]
+gostd = { version = "0.4", features = ["tokio-rt"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+```
+
+### 示例：发送并解析 JSON
+
+```rust
+use gostd::net::http::{async_http, Method, Request, AsyncClient};
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Pet {
+    id: i64,
+    name: String,
+    status: String,
+}
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let url = "https://petstore.swagger.io/v2/pet";
+
+    // 1. 序列化：将 Struct 转换为 JSON 字节
+    let new_pet = Pet {
+        id: 12345,
+        name: "Rust-Buddy".to_string(),
+        status: "available".to_string(),
+    };
+    let post_body = serde_json::to_vec(&new_pet)?;
+
+    // 2. 发送请求
+    let mut client = AsyncClient::New();
+    let mut req = Request::New(Method::Post, url, Some(post_body.into()))?;
+    req.Header.Set("Content-Type", "application/json");
+    
+    let response = client.Do(&mut req).await?;
+
+    // 3. 反序列化：将响应 Body 转换回 Struct
+    if let Some(body_mut) = response.Body {
+        let pet: Pet = serde_json::from_slice(&body_mut)?;
+        println!("成功获取宠物信息: {:?}", pet);
+    }
+
+    Ok(())
+}
+```
+
 ## multipart模块
 
 ### form-data Body (文本字段)

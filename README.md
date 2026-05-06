@@ -613,6 +613,39 @@ fn main() -> anyhow::Result<()> {
 
 ```
 
+## JSON 处理 (配合 serde_json)
+
+推荐配合 Rust 社区标准库 `serde` 和 `serde_json` 来处理结构化数据。
+
+```rust
+use gostd::net::http::{Method, Request, AsyncClient};
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug)]
+struct User {
+    id: u64,
+    name: String,
+}
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // 1. 序列化
+    let user = User { id: 1, name: "Alice".into() };
+    let body = serde_json::to_vec(&user)?;
+
+    // 2. 发送
+    let mut client = AsyncClient::New();
+    let mut req = Request::New(Method::Post, "http://api.example.com/user", Some(body.into()))?;
+    let response = client.Do(&mut req).await?;
+
+    // 3. 反序列化响应
+    if let Some(data) = response.Body {
+        let resp_user: User = serde_json::from_slice(&data)?;
+        println!("Received: {:?}", resp_user);
+    }
+    Ok(())
+}
+```
 
 ## strings模块
 
