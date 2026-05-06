@@ -1,5 +1,23 @@
+gostd_http  等价于 gostd::net::http
 
- gostd_http  等价于 gostd::net::http
+`gostd_http` 是 Go 标准库 `net/http` 的 Rust 仿真实现，旨在为 Rust 开发者提供与 Go 语言一致的 HTTP 客户端开发体验，同时利用 Rust 的所有权模型和并发原语进行了深度优化。
+
+# 核心特性
+
+- **高性能连接池 (Connection Pooling)**：
+    - **Actor 模型架构**：底层连接管理采用基于消息传递的 Actor 模型，消除了高并发下的锁竞争瓶颈。
+    - **自动复用 (Keep-Alive)**：支持对 TCP 和 TLS 连接的持久化存储与自动复用。
+    - **HTTPS 深度优化**：支持复用完整的 TLS 会话，大幅减少 HTTPS 请求中的重复握手开销。
+- **智能化生命周期管理**：
+    - **空闲超时清理**：后台自动扫描并清理超过 90 秒未使用的闲置连接。
+    - **存活探测 (Health Check)**：在连接重用前进行主动探测，确保返回给用户的始终是可用的活跃连接。
+- **极致性能设计**：
+    - **零分配 Cookie 校验**：使用静态查找表加速字段合法性校验，彻底消除堆内存分配。
+    - **零拷贝头部读取**：`Header::Get` 直接返回借用（`&str`），显著降低内存克隆压力。
+- **健壮性与可观测性**：
+    - **强类型错误处理**：系统性移除 `unwrap`，通过精细化的错误枚举处理各种协议异常。
+    - **复用状态感知**：`Response` 结构体新增 `reused` 字段，方便开发者监控连接复用效率。
+- **高度仿真 API**：完美适配 Go 语言 `http.Client`、`http.Request` 的接口习惯。
 
 # 使用例子
 
@@ -36,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
 
     println!(
         "{}",
-        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
+        String::from_utf8(response.Body.unwrap().to_vec()).unwrap()
     );
 
     Ok(())
@@ -81,14 +99,13 @@ async fn main() -> anyhow::Result<()> {
     let response = client.Do(&mut req).await?;
 
     println!(
-        "{}",
-        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
+        "{} (connection reused: {})",
+        String::from_utf8(response.Body.unwrap().to_vec()).unwrap(),
+        response.reused
     );
 
     Ok(())
 }
-// output
-// {"id":92233723685477587,"category":{"id":,"name":"string"},"name":"doggie","photoUrls":["string"],"tags":[{"id":,"name":"string"}],"status":"available"}
 
 ```
 
@@ -104,36 +121,13 @@ async fn main() -> anyhow::Result<()> {
 
     println!(
         "{}",
-        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
+        String::from_utf8(response.Body.unwrap().to_vec()).unwrap()
     );
 
     Ok(())
 }
 
 ``` 
-或者 
-
-```rust
-use gostd::net::http::{async_http::AsyncClient, Method, Request};
-// 或者用 use gostd_http::{async_http::AsyncClient, Method, Request};
-#[async_std::main]
-async fn main() -> anyhow::Result<()> {
-    let url = "https://petstore.swagger.io/v2/pet/findByStatus?status=available";
-    let mut req = Request::New(Method::Get, url, None)?;
-    req.Header.Set("Content-Type", "application/json");
-
-    let mut client = AsyncClient::New();
-
-    let response = client.Do(&mut req).await?;
-    println!(
-        "{}",
-        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
-    );
-
-    Ok(())
-}
-
-```
 
 #### 使用tokio
 
@@ -159,98 +153,7 @@ async fn main() -> anyhow::Result<()> {
 
     println!(
         "{}",
-        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
-    );
-
-    Ok(())
-}
-
-```
-或者 
-
-```rust
-use gostd::net::http::{async_http::AsyncClient, Method, Request};
-// 或者用 use gostd_http::{async_http::AsyncClient, Method, Request};
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let url = "https://petstore.swagger.io/v2/pet";
-
-    let postbody = r#"{
-      "id": 0,
-      "category": {
-        "id": 0,
-        "name": "string"
-      },
-      "name": "doggie",
-      "photoUrls": [
-        "string"
-      ],
-      "tags": [
-        {
-          "id": 0,
-          "name": "string"
-        }
-      ],
-      "status": "available"
-    }"#
-    .as_bytes()
-    .to_vec();
-
-    let mut req = Request::New(Method::Post, url, Some(postbody.into()))?;
-
-    req.Header.Set("accept", "application/json");
-    req.Header.Set("Content-Type", "application/json");
-    let mut client = AsyncClient::New();
-    let response = client.Do(&mut req).await?;
-
-    println!(
-        "{}",
-        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
-    );
-
-    Ok(())
-}
-// output
-// {"id":92233723685477587,"category":{"id":,"name":"string"},"name":"doggie","photoUrls":["string"],"tags":[{"id":,"name":"string"}],"status":"available"}
-
-```
-
-2. GET
-
-```rust
-use gostd::net::http::async_http;
-// 或者用 use gostd_http::async_http;
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let url = "https://petstore.swagger.io/v2/pet/findByStatus?status=available";
-    let response = async_http::Get(url).await?;
-
-    println!(
-        "{}",
-        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
-    );
-
-    Ok(())
-}
-
-``` 
-或者 
-
-```rust
-use gostd::net::http::{async_http::AsyncClient, Method, Request};
-// 或者用 use gostd_http::{async_http::AsyncClient, Method, Request};
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let url = "https://petstore.swagger.io/v2/pet/findByStatus?status=available";
-    let mut req = Request::New(Method::Get, url, None)?;
-    req.Header.Set("Content-Type", "application/json");
-
-    let mut client = AsyncClient::New();
-
-    let response = client.Do(&mut req).await?;
-    println!(
-        "{}",
-        String::from_utf8(response.Body.expect("return body error").to_vec()).unwrap()
+        String::from_utf8(response.Body.unwrap().to_vec()).unwrap()
     );
 
     Ok(())
@@ -276,60 +179,11 @@ fn main() -> anyhow::Result<()> {
 
     println!(
         "{}",
-        String::from_utf8(response.Body.expect("return body error")).unwrap()
+        String::from_utf8(response.Body.unwrap().to_vec()).unwrap()
     );
 
     Ok(())
 }
-
-```
-或者 
-
-```rust
-use gostd::net::http::{Client, Method, Request};
-
-fn main() -> anyhow::Result<()> {
-
-    let url = "https://petstore.swagger.io/v2/pet";
-
-    let postbody = r#"{
-      "id": 0,
-      "category": {
-        "id": 0,
-        "name": "string"
-      },
-      "name": "doggie",
-      "photoUrls": [
-        "string"
-      ],
-      "tags": [
-        {
-          "id": 0,
-          "name": "string"
-        }
-      ],
-      "status": "available"
-    }"#
-    .as_bytes()
-    .to_vec();
-
-    let mut req = Request::New(Method::Post, url, Some(postbody))?;
-
-    req.Header.Set("accept", "application/json");
-    req.Header.Set("Content-Type", "application/json");
-    let mut client = Client::New();
-    let response = client.Do(&mut req)?;
-
-    println!(
-        "{}",
-        String::from_utf8(response.Body.expect("return body error")).unwrap()
-    );
-
-    Ok(())
-}
-
-// output
-// {"id":92233723685477587,"category":{"id":,"name":"string"},"name":"doggie","photoUrls":["string"],"tags":[{"id":,"name":"string"}],"status":"available"}
 
 ```
 
@@ -343,37 +197,16 @@ fn main() -> anyhow::Result<()> {
     let response = http::Get(url)?;
 
     println!(
-        "{}",
-        String::from_utf8(response.Body.expect("return body error")).unwrap()
+        "{} (reused: {})",
+        String::from_utf8(response.Body.unwrap().to_vec()).unwrap(),
+        response.reused
     );
 
     Ok(())
 }
 
 ``` 
-或者 
 
-```rust
-use gostd::net::http::{Client, Method, Request};
-
-fn main() -> anyhow::Result<()> {
-
-    let url = "https://petstore.swagger.io/v2/pet/findByStatus?status=available";
-    let mut req = Request::New(Method::Get, url, None)?;
-    req.Header.Set("Content-Type", "application/json");
-
-    let mut client = Client::New();
-
-    let response = client.Do(&mut req)?;
-    println!(
-        "{}",
-        String::from_utf8(response.Body.expect("return body error")).unwrap()
-    );
-
-    Ok(())
-}
-
-```
 ## multipart模块
 
 ### form-data Body
@@ -386,21 +219,7 @@ fn main() -> Result<(), std::io::Error> {
     let mut body = bytes::Buffer::new();
     let mut w = Writer::new(&mut body);
     w.WriteField("requestId", "12121231231")?;
-    w.WriteField("testTime", "2022-01-22 18:00:00")?;
-    w.WriteField("checkTime", "2022-01-22 22:00:00")?;
-    w.WriteField("auditTime", "2022-01-22 23:00:00")?;
-    w.WriteField("tubeCode", "QCGD99SDF")?;
-    w.WriteField("testRatio", "1")?;
     w.WriteField("name", "刘xxx")?;
-    w.WriteField("sex", "1")?;
-    w.WriteField("birthdate", "20003-07-02")?;
-    w.WriteField("address", "北京市丰台区")?;
-    w.WriteField("phoneNumber", "1881xxxx")?;
-    w.WriteField("cardType", "身份证")?;
-    w.WriteField("cardNumber", "xxxx")?;
-    w.WriteField("testResult", "0")?;
-    w.WriteField("testUserName", "xxx")?;
-    w.WriteField("checkUserName", "xxx")?;
     w.Close()?;
     let contentType = w.FormDataContentType();
     let url = "http://www.baidu.com";
@@ -411,11 +230,9 @@ fn main() -> Result<(), std::io::Error> {
 
     println!(
         "{}",
-        String::from_utf8(response.Body.expect("return body error")).unwrap()
+        String::from_utf8(response.Body.unwrap().to_vec()).unwrap()
     );
 
     Ok(())
 }
 ```
-
-
