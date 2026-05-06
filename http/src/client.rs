@@ -289,14 +289,19 @@ use std::sync::mpsc;
 
 type PoolKey = String;
 
+pub trait SyncStream: std::io::Read + std::io::Write + Send + Sync {}
+impl<T: std::io::Read + std::io::Write + Send + Sync> SyncStream for T {}
+
+type HttpStream = Box<dyn SyncStream>;
+
 struct IdleConn {
-    conn: TcpStream,
+    conn: HttpStream,
     idle_at: std::time::Instant,
 }
 
 enum PoolMessage {
-    Get(PoolKey, mpsc::Sender<Option<TcpStream>>),
-    Put(PoolKey, TcpStream),
+    Get(PoolKey, mpsc::Sender<Option<HttpStream>>),
+    Put(PoolKey, HttpStream),
 }
 
 #[derive(Clone)]
@@ -335,18 +340,9 @@ impl Default for Transport {
                                     if idle.idle_at.elapsed() > idle_timeout {
                                         continue;
                                     }
-                                    // 健康探测
-                                    let _ = idle.conn.set_nonblocking(true);
-                                    let mut buf = [0u8; 1];
-                                    match idle.conn.peek(&mut buf) {
-                                        Ok(0) => continue, // EOF
-                                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                                            let _ = idle.conn.set_nonblocking(false);
-                                            found = Some(idle.conn);
-                                            break;
-                                        }
-                                        _ => continue,
-                                    }
+                                    // 由于是 Trait Object，暂时仅依赖超时清理
+                                    found = Some(idle.conn);
+                                    break;
                                 }
                             }
                             let _ = reply_tx.send(found);
@@ -404,9 +400,9 @@ impl Transport {
         let mut resp = pconn.roundTrip(treq, conn)?;
         resp.reused = pconn.reused;
         
-        if !self.DisableKeepAlives && !req.Close && !treq.Req.isTLS {
+        if !self.DisableKeepAlives && !req.Close {
             if let Some(last_conn) = pconn.last_conn {
-                let _ = self.pool_tx.send(PoolMessage::Put(cm.addr(), last_conn));
+                let _ = self.pool_tx.send(PoolMessage::Put(cm.pool_key(), last_conn));
             }
         }
         Ok(resp)
@@ -417,9 +413,9 @@ impl Transport {
         &mut self,
         treq: &transportRequest,
         cm: connectMethod,
-    ) -> HttpResult<(persistConn, TcpConn)> {
+    ) -> HttpResult<(persistConn, HttpStream)> {
+        let key = cm.pool_key();
         if !self.DisableKeepAlives {
-            let key = cm.addr();
             let (reply_tx, reply_rx) = mpsc::channel();
             if self.pool_tx.send(PoolMessage::Get(key, reply_tx)).is_ok() {
                 if let Ok(Some(conn)) = reply_rx.recv() {
@@ -429,9 +425,16 @@ impl Transport {
                 }
             }
         }
+        
         let conn = self.dialConn(cm)?;
+        let stream: HttpStream = if treq.Req.isTLS {
+             Box::new(getTLSConn(treq.Req.Host.as_str(), conn)?)
+        } else {
+            Box::new(conn)
+        };
+
         let pconn = persistConn::default();
-        Ok((pconn, conn))
+        Ok((pconn, stream))
     }
 
     fn dialConn(&mut self, cm: connectMethod) -> HttpResult<TcpConn> {
@@ -456,7 +459,7 @@ impl Transport {
     fn connectMethodForRequest(&mut self, treq: &transportRequest) -> HttpResult<connectMethod> {
         let mut cm = connectMethod::default();
         cm.targetScheme = treq.Req.URL.Scheme.clone();
-        cm.targetAddr = canonicalAddr(&treq.Req.URL.clone());
+        cm.targetAddr = canonicalAddr(&treq.Req.URL.clone())?;
         cm.proxyURL = None;
         cm.onlyH1 = true; //待优化
         Ok(cm)
@@ -477,21 +480,19 @@ impl Transport {
     }
 }
 
-fn canonicalAddr(url: &url::URL) -> String {
-    let portMap: HashMap<String, String> = [
-        ("http".to_string(), "80".to_string()),
-        ("https".to_string(), "443".to_string()),
-        ("socks5".to_string(), "1080".to_string()),
-    ]
-    .iter()
-    .cloned()
-    .collect();
+fn canonicalAddr(url: &url::URL) -> HttpResult<String> {
     let addr = url.Hostname().to_string();
     let mut port = url.Port().to_string();
     if port == "" {
-        port = portMap.get(url.Scheme.as_str()).unwrap().to_string();
+        port = match url.Scheme.as_str() {
+            "http" => "80",
+            "https" => "443",
+            "socks5" => "1080",
+            _ => return Err(HTTPConnectError::ErrUnsupportedScheme(url.Scheme.clone())),
+        }
+        .to_string();
     }
-    strings::Join(vec![addr.as_str(), port.as_str()], ":")
+    Ok(strings::Join(vec![addr.as_str(), port.as_str()], ":"))
 }
 
 #[derive(Default, Clone)]
@@ -527,6 +528,10 @@ impl connectMethod {
     pub fn addr(&self) -> String {
         self.targetAddr.clone()
     }
+
+    fn pool_key(&self) -> PoolKey {
+        format!("{}://{}", self.targetScheme, self.targetAddr)
+    }
 }
 type TcpConn = TcpStream;
 use std::sync::mpsc::channel;
@@ -546,7 +551,7 @@ struct persistConn {
     numExpectedResponses: int,
     broken: bool,
     reused: bool,
-    last_conn: Option<TcpStream>,
+    last_conn: Option<HttpStream>,
 }
 
 use bytes::Bytes;
@@ -561,7 +566,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use webpki_roots::TLS_SERVER_ROOTS;
 impl persistConn {
-    fn roundTrip(&mut self, req: &mut transportRequest, mut conn: TcpConn) -> HttpResult<Response> {
+    fn roundTrip(&mut self, req: &mut transportRequest, mut conn: HttpStream) -> HttpResult<Response> {
         self.numExpectedResponses += 1;
         let mut requestedGzip = false;
         if !self.t.DisableCompression
@@ -577,19 +582,11 @@ impl persistConn {
 
         let r = req.Req.Write()?;
 
-        if req.Req.isTLS {
-            let mut tlsConn = getTLSConn(req.Req.Host.as_str(), conn)?;
-            tlsConn.write(r.as_slice())?;
-            let mut reader = BufReader::new(tlsConn);
-            let resp = ReadResponse(&mut reader, &req.Req)?;
-            Ok(resp)
-        } else {
-            conn.write(r.as_slice())?;
-            let mut reader = BufReader::new(conn);
-            let resp = ReadResponse(&mut reader, &req.Req)?;
-            self.last_conn = Some(reader.into_inner());
-            Ok(resp)
-        }
+        conn.write(r.as_slice())?;
+        let mut reader = BufReader::new(conn);
+        let resp = ReadResponse(&mut reader, &req.Req)?;
+        self.last_conn = Some(Box::new(reader.into_inner()));
+        Ok(resp)
     }
 }
 use bytes::{Buf, BytesMut};
@@ -672,15 +669,17 @@ pub fn ReadResponse(r: &mut impl BufRead, req: &Request) -> HttpResult<Response>
         resp.Body = Some(parseChunkedBody(r)?);
     } else {
         // 3. 除chunked外的其他传输方式，都有Content-Length字段,根据长度获取body
-        let ln: usize = resp
-            .Header
-            .Get("Content-Length")
-            .parse::<usize>()
-            .expect("Content-Length is not exist");
-
-        let mut buf = vec![0; ln]; // 生成固定长度的数组，用于读取定长数据;
-        r.read_exact(&mut buf)?;
-        resp.Body = Some(BytesMut::from(&buf[..]));
+        let content_length = resp.Header.Get("Content-Length");
+        if content_length.is_empty() {
+             resp.Body = None;
+        } else {
+            let ln: usize = content_length
+                .parse::<usize>()
+                .map_err(|_| HTTPConnectError::ErrInvalidContentLength)?;
+            let mut buf = vec![0; ln]; // 生成固定长度的数组，用于读取定长数据;
+            r.read_exact(&mut buf)?;
+            resp.Body = Some(BytesMut::from(&buf[..]));
+        }
     }
     resp.ContentLength = resp.Body.as_ref().map_or(0, |b| b.len() as i64);
     Ok(resp)

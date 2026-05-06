@@ -64,12 +64,17 @@ impl Response {
 }
 
 fn readSetCookies(h: &Header) -> Vec<Cookie> {
-    let cookieCount = len!(h.0.get(&"Set-Cookie".to_string()).unwrap());
+    let set_cookies = match h.0.get("Set-Cookie") {
+        Some(v) => v,
+        None => return vec![],
+    };
+
+    let cookieCount = len!(set_cookies);
     if cookieCount == 0 {
         return vec![];
     }
     let mut cookies = Vec::with_capacity(cookieCount);
-    for line in h.0.get("Set-Cookie").unwrap() {
+    for line in set_cookies {
         let mut parts = strings::Split(strings::TrimSpace(line.as_str()), ";");
         if len!(parts) == 1 && parts[0] == "" {
             continue;
@@ -149,15 +154,16 @@ fn readSetCookies(h: &Header) -> Vec<Cookie> {
                 }
                 "max-age" => {
                     let mut secs: int = 0;
-                    let res = val.parse::<int>();
-                    if res.is_err() || (secs != 0 && val.bytes().nth(0) == Some(b'0')) {
-                        continue;
+                    if let Ok(parsed_secs) = val.parse::<int>() {
+                         if parsed_secs != 0 && val.bytes().nth(0) == Some(b'0') {
+                            continue;
+                         }
+                         secs = parsed_secs;
+                         if secs <= 0 {
+                            secs = -1;
+                         }
+                         c.MaxAge = secs;
                     }
-                    secs = res.unwrap();
-                    if secs <= 0 {
-                        secs = -1;
-                    }
-                    c.MaxAge = secs;
                     continue;
                 }
                 "expires" => {

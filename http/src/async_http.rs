@@ -289,14 +289,33 @@ use tokio::sync::{mpsc, oneshot};
 #[cfg(feature = "async-std-runtime")]
 use async_std::channel as mpsc;
 
+#[cfg(feature = "tokio-runtime")]
+pub trait AsyncStream:
+    tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + Sync
+{
+}
+#[cfg(feature = "tokio-runtime")]
+impl<T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + Sync> AsyncStream for T {}
+
+#[cfg(feature = "async-std-runtime")]
+pub trait AsyncStream: async_std::io::Read + async_std::io::Write + Unpin + Send + Sync {}
+#[cfg(feature = "async-std-runtime")]
+impl<T: async_std::io::Read + async_std::io::Write + Unpin + Send + Sync> AsyncStream for T {}
+
+type HttpStream = Box<dyn AsyncStream>;
+
 struct IdleConn {
-    conn: TcpStream,
+    conn: HttpStream,
     idle_at: std::time::Instant,
 }
 
 enum PoolMessage {
-    Get(PoolKey, #[cfg(feature = "tokio-runtime")] oneshot::Sender<Option<TcpStream>>, #[cfg(feature = "async-std-runtime")] mpsc::Sender<Option<TcpStream>>),
-    Put(PoolKey, TcpStream),
+    Get(
+        PoolKey,
+        #[cfg(feature = "tokio-runtime")] oneshot::Sender<Option<HttpStream>>,
+        #[cfg(feature = "async-std-runtime")] mpsc::Sender<Option<HttpStream>>,
+    ),
+    Put(PoolKey, HttpStream),
     Clean,
 }
 
@@ -351,15 +370,9 @@ impl Default for Transport {
                                     if idle.idle_at.elapsed() > idle_timeout {
                                         continue;
                                     }
-                                    let mut buf = [0u8; 1];
-                                    match idle.conn.try_read(&mut buf) {
-                                        Ok(0) => continue,
-                                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                                            found = Some(idle.conn);
-                                            break;
-                                        }
-                                        _ => continue,
-                                    }
+                                    // 由于是 Trait Object，暂时仅依赖超时清理
+                                    found = Some(idle.conn);
+                                    break;
                                 }
                             }
                             let _ = reply_tx.send(found);
@@ -461,9 +474,9 @@ impl Transport {
         resp.reused = pconn.reused;
 
         // 归还连接到 Actor 管理器
-        if !self.disable_keep_alives && !req.Close && !treq.Req.isTLS {
+        if !self.disable_keep_alives && !req.Close {
             if let Some(last_conn) = pconn.last_conn {
-                let _ = self.pool_tx.send(PoolMessage::Put(cm.addr(), last_conn)).await;
+                let _ = self.pool_tx.send(PoolMessage::Put(cm.pool_key(), last_conn)).await;
             }
         }
         Ok(resp)
@@ -473,13 +486,13 @@ impl Transport {
         &mut self,
         treq: &transportRequest,
         cm: connectMethod,
-    ) -> HttpResult<(persistConn, TcpStream)> {
+    ) -> HttpResult<(persistConn, HttpStream)> {
+        let key = cm.pool_key();
         if !self.disable_keep_alives {
-            let key = cm.addr();
             #[cfg(feature = "tokio-runtime")]
             {
                 let (reply_tx, reply_rx) = oneshot::channel();
-                if self.pool_tx.send(PoolMessage::Get(key, reply_tx,)).await.is_ok() {
+                if self.pool_tx.send(PoolMessage::Get(key.clone(), reply_tx,)).await.is_ok() {
                     if let Ok(Some(conn)) = reply_rx.await {
                         let mut pconn = persistConn::default();
                         pconn.reused = true;
@@ -490,7 +503,7 @@ impl Transport {
             #[cfg(feature = "async-std-runtime")]
             {
                 let (reply_tx, reply_rx) = mpsc::bounded(1);
-                if self.pool_tx.send(PoolMessage::Get(key, reply_tx)).await.is_ok() {
+                if self.pool_tx.send(PoolMessage::Get(key.clone(), reply_tx)).await.is_ok() {
                     if let Ok(Some(conn)) = reply_rx.recv().await {
                         let mut pconn = persistConn::default();
                         pconn.reused = true;
@@ -499,9 +512,23 @@ impl Transport {
                 }
             }
         }
-        let conn = self.dial_conn(cm).await?;
+        
+        let conn = self.dial_conn(cm.clone()).await?;
+        let stream: HttpStream = if treq.Req.isTLS {
+             #[cfg(feature = "tokio-runtime")]
+             {
+                 Box::new(get_tls_conn(treq.Req.Host.as_str(), conn).await?)
+             }
+             #[cfg(feature = "async-std-runtime")]
+             {
+                 Box::new(get_tls_conn(treq.Req.Host.as_str(), conn).await?)
+             }
+        } else {
+            Box::new(conn)
+        };
+
         let pconn = persistConn::default();
-        Ok((pconn, conn))
+        Ok((pconn, stream))
     }
 
     async fn dial_conn(&mut self, cm: connectMethod) -> HttpResult<TcpStream> {
@@ -515,7 +542,7 @@ impl Transport {
     fn connect_method_for_request(&mut self, treq: &transportRequest) -> HttpResult<connectMethod> {
         let mut cm = connectMethod::default();
         cm.target_scheme = treq.Req.URL.Scheme.clone();
-        cm.target_addr = canonical_addr(&treq.Req.URL.clone());
+        cm.target_addr = canonical_addr(&treq.Req.URL.clone())?;
         cm.proxy_url = None;
         cm.only_h1 = true;
         Ok(cm)
@@ -536,21 +563,19 @@ impl Transport {
     }
 }
 
-fn canonical_addr(url: &url::URL) -> String {
-    let port_map: HashMap<String, String> = [
-        ("http".to_string(), "80".to_string()),
-        ("https".to_string(), "443".to_string()),
-        ("socks5".to_string(), "1080".to_string()),
-    ]
-    .iter()
-    .cloned()
-    .collect();
+fn canonical_addr(url: &url::URL) -> HttpResult<String> {
     let addr = url.Hostname().to_string();
     let mut port = url.Port().to_string();
     if port == "" {
-        port = port_map.get(url.Scheme.as_str()).unwrap().to_string();
+        port = match url.Scheme.as_str() {
+            "http" => "80",
+            "https" => "443",
+            "socks5" => "1080",
+            _ => return Err(HTTPConnectError::ErrUnsupportedScheme(url.Scheme.clone())),
+        }
+        .to_string();
     }
-    strings::Join(vec![addr.as_str(), port.as_str()], ":")
+    Ok(strings::Join(vec![addr.as_str(), port.as_str()], ":"))
 }
 
 #[derive(Default, Clone)]
@@ -584,6 +609,10 @@ impl connectMethod {
     fn addr(&self) -> String {
         self.target_addr.clone()
     }
+
+    fn pool_key(&self) -> PoolKey {
+        format!("{}://{}", self.target_scheme, self.target_addr)
+    }
 }
 
 type TcpConn = TcpStream;
@@ -598,14 +627,14 @@ struct persistConn {
     num_expected_responses: i32,
     broken: bool,
     reused: bool,
-    last_conn: Option<TcpStream>,
+    last_conn: Option<HttpStream>,
 }
 
 impl persistConn {
     async fn round_trip(
         &mut self,
         req: &mut transportRequest,
-        mut conn: TcpConn,
+        mut conn: HttpStream,
     ) -> HttpResult<Response> {
         self.num_expected_responses += 1;
         let mut requested_gzip = false;
@@ -621,37 +650,22 @@ impl persistConn {
         }
 
         let r = req.Req.Write()?;
+        
         #[cfg(feature = "tokio-runtime")]
         {
-            if req.Req.isTLS {
-                let mut tls_conn = get_tls_conn(req.Req.Host.as_str(), conn).await?;
-                tls_conn.write_all(r.as_slice()).await?;
-                let mut reader = tokio::io::BufReader::new(tls_conn);
-                let resp = read_response(&mut reader, &req.Req).await?;
-                Ok(resp)
-            } else {
-                conn.write_all(r.as_slice()).await?;
-                let mut reader = tokio::io::BufReader::new(conn);
-                let resp = read_response(&mut reader, &req.Req).await?;
-                self.last_conn = Some(reader.into_inner());
-                Ok(resp)
-            }
+            conn.write_all(r.as_slice()).await?;
+            let mut reader = tokio::io::BufReader::new(conn);
+            let resp = read_response(&mut reader, &req.Req).await?;
+            self.last_conn = Some(Box::new(reader.into_inner()));
+            Ok(resp)
         }
         #[cfg(feature = "async-std-runtime")]
         {
-            if req.Req.isTLS {
-                let mut tls_conn = get_tls_conn(req.Req.Host.as_str(), conn).await?;
-                tls_conn.write_all(r.as_slice()).await?;
-                let mut reader = BufReader::new(tls_conn);
-                let resp = read_response(&mut reader, &req.Req).await?;
-                Ok(resp)
-            } else {
-                conn.write_all(r.as_slice()).await?;
-                let mut reader = BufReader::new(conn);
-                let resp = read_response(&mut reader, &req.Req).await?;
-                self.last_conn = Some(reader.into_inner());
-                Ok(resp)
-            }
+            conn.write_all(r.as_slice()).await?;
+            let mut reader = BufReader::new(conn);
+            let resp = read_response(&mut reader, &req.Req).await?;
+            self.last_conn = Some(Box::new(reader.into_inner()));
+            Ok(resp)
         }
     }
 }
@@ -742,14 +756,17 @@ where
     if resp.Header.Get("Transfer-Encoding") == "chunked" {
         resp.Body = Some(parse_chunked_body(r).await?);
     } else {
-        let ln: usize = resp
-            .Header
-            .Get("Content-Length")
-            .parse::<usize>()
-            .expect("Content-Length is not exist");
-        let mut buf = vec![0; ln];
-        r.read_exact(&mut buf).await?;
-        resp.Body = Some(BytesMut::from(&buf[..]));
+        let content_length = resp.Header.Get("Content-Length");
+        if content_length.is_empty() {
+             resp.Body = None;
+        } else {
+            let ln: usize = content_length
+                .parse::<usize>()
+                .map_err(|_| HTTPConnectError::ErrInvalidContentLength)?;
+            let mut buf = vec![0; ln];
+            r.read_exact(&mut buf).await?;
+            resp.Body = Some(BytesMut::from(&buf[..]));
+        }
     }
 
     resp.ContentLength = resp.Body.as_ref().map_or(0, |b| b.len() as i64);
@@ -834,14 +851,17 @@ where
     if resp.Header.Get("Transfer-Encoding") == "chunked" {
         resp.Body = Some(parse_chunked_body(r).await?);
     } else {
-        let ln: usize = resp
-            .Header
-            .Get("Content-Length")
-            .parse::<usize>()
-            .expect("Content-Length is not exist");
-        let mut buf = vec![0; ln];
-        r.read_exact(&mut buf).await?;
-        resp.Body = Some(BytesMut::from(&buf[..]));
+        let content_length = resp.Header.Get("Content-Length");
+        if content_length.is_empty() {
+             resp.Body = None;
+        } else {
+            let ln: usize = content_length
+                .parse::<usize>()
+                .map_err(|_| HTTPConnectError::ErrInvalidContentLength)?;
+            let mut buf = vec![0; ln];
+            r.read_exact(&mut buf).await?;
+            resp.Body = Some(BytesMut::from(&buf[..]));
+        }
     }
 
     resp.ContentLength = resp.Body.as_ref().map_or(0, |b| b.len() as i64);

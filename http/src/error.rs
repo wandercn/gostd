@@ -35,6 +35,15 @@ pub enum HTTPConnectError {
     #[error("http: wrote more than the declared Content-Length")]
     ErrContentLength,
 
+    #[error("http: missing or invalid Content-Length")]
+    ErrInvalidContentLength,
+
+    #[error("http: malformed response: {0}")]
+    ErrMalformedResponse(String),
+
+    #[error("http: unsupported scheme: {0}")]
+    ErrUnsupportedScheme(String),
+
     #[error("unused")]
     ErrWriteAfterFlush,
 }
